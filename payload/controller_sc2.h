@@ -4,6 +4,7 @@
 #include <dev/usb/usb_ioctl.h>
 #include "gc_types.h"
 #include "sc2_binding.h"
+#include "sc2_flick.h"
 #include "sc2_control.h"
 #include "steam_usb.h"
 
@@ -50,11 +51,23 @@ int  sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep);
 int  sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
                         const uint8_t *addrs, int n, int timeout_ms);
 
+/* Per-controller input state. No packet history is shared between USB/Puck
+ * sessions; the USB reader owns one instance for its lifetime. */
+typedef struct {
+    sc2_bind_state_t binding;
+    sc2_flick_state_t flick;
+    int64_t qam_since_ms;
+    uint32_t previous_actions;
+    uint8_t qam_latched;
+} sc2_input_state_t;
+
+void sc2_input_state_reset(sc2_input_state_t *state);
+
 /* Returns 1 if pad updated (inject), 0 skip.
  * *link is set to 0 on wireless disconnect, 1 on connect/input. */
 int  sc2_handle_packet(const uint8_t *buf, uint32_t len,
                        ScePadData *out_pad, int *link,
-                       sc2_bind_state_t *binding_state);
+                       sc2_input_state_t *input_state);
 
 /* Paused (hold … for 5 s, or the portal): the Steam Controller is still read,
  * so the same hold resumes, but nothing is sent to the PS5 and the game hooks

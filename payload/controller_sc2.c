@@ -88,6 +88,13 @@ int sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep) {
     return -1;
 }
 
+void sc2_input_state_reset(sc2_input_state_t *state) {
+    if (!state) return;
+    memset(state, 0, sizeof(*state));
+    sc2_bind_reset(&state->binding);
+    sc2_flick_reset(&state->flick);
+}
+
 /* ── active-slot search ───────────────────────────────────────────────── */
 
 int sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
@@ -270,9 +277,9 @@ static uint32_t profile_input_mask(const steam_input_report_t *report) {
 }
 
 int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
-                      sc2_bind_state_t *binding_state) {
+                      sc2_input_state_t *input_state) {
     steam_report_t decoded;
-    if (!o || !link || !b || !binding_state || len == 0) return 0;
+    if (!o || !link || !b || !input_state || len == 0) return 0;
     int decoded_ok = steam_report_decode(b, len, &decoded);
     if (decoded_ok != 1) {
         if (decoded.kind != STEAM_REPORT_INPUT) return 0;
@@ -282,8 +289,7 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
         sc2_neutralize_pad(o);
         *link = 1;
         sc2_status_set_input(0, 1);
-        sc2_bind_reset(binding_state);
-        sc2_flick_reset();
+        sc2_input_state_reset(input_state);
         sc2_gyro_reset();
         sc2_gyro_set_moving(0);
         return 1;
@@ -291,9 +297,8 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
     if (decoded.kind == STEAM_REPORT_WIRELESS) {
         if (decoded.data.wireless.event == 1) {
             *link = 0; sc2_status_set_input(0, 0);
-            sc2_bind_reset(binding_state);
+            sc2_input_state_reset(input_state);
             sc2_gyro_reset();
-            sc2_flick_reset();
             sc2_battery_reset();
             sc2_neutralize_pad(o);
             return 1;
@@ -329,21 +334,22 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
 
     /* 1a. … is reserved for Puckbridge: hold it 5 s anywhere to pause /
      *     resume. It never reaches bindings, the menu or the PS5. */
-    static int64_t qam_since = 0;
-    static int qam_latched = 0;
     if (in & (1u << IN_QAM)) {
-        if (!qam_since) qam_since = now;
-        else if (!qam_latched && now - qam_since >= SC2_PAUSE_HOLD_MS) {
-            qam_latched = 1;
+        if (!input_state->qam_since_ms) input_state->qam_since_ms = now;
+        else if (!input_state->qam_latched &&
+                 now - input_state->qam_since_ms >= SC2_PAUSE_HOLD_MS) {
+            input_state->qam_latched = 1;
             sc2_set_paused(!sc2_pause_is_active());
         }
     } else {
-        qam_since = 0;
-        qam_latched = 0;
+        input_state->qam_since_ms = 0;
+        input_state->qam_latched = 0;
     }
     in &= ~(1u << IN_QAM);
     if (sc2_pause_is_active()) {
-        sc2_bind_reset(binding_state);
+        sc2_bind_reset(&input_state->binding);
+        input_state->previous_actions = 0;
+        sc2_flick_reset(&input_state->flick);
         return 0;                             /* nothing reaches the PS5 */
     }
 
@@ -369,26 +375,28 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
     if (sc2_menu_filter(&in)) {
         o->leftStick.x = o->leftStick.y = o->rightStick.x = o->rightStick.y = 128;
         o->buttons = 0; o->connected = 1; o->quat.w = 1.0f;
-        sc2_bind_reset(binding_state);
+        sc2_bind_reset(&input_state->binding);
+        input_state->previous_actions = 0;
+        sc2_flick_reset(&input_state->flick);
         sc2_gyro_set_moving(0);
         return 1;
     }
 
     /* 2. Steam Input-style bindings */
-    static uint32_t prev_act = 0;
-    uint32_t btn = sc2_bind_eval(binding_state, &P, profile_generation, in,
+    uint32_t btn = sc2_bind_eval(&input_state->binding, &P, profile_generation, in,
         (report->controls & ((uint32_t)1u << STEAM_CTL_LT)) != 0,
         (report->controls & ((uint32_t)1u << STEAM_CTL_RT)) != 0, now);
-    if (binding_state->neutral_report) {
-        sc2_flick_reset();
+    if (input_state->binding.neutral_report) {
+        sc2_flick_reset(&input_state->flick);
+        input_state->previous_actions = 0;
         sc2_gyro_reset();
         sc2_gyro_set_moving(0);
         sc2_neutralize_pad(o);
         return 1;
     }
     uint32_t act = btn & PB_ACT_MASK;
-    if ((act & PB_ACT_MENU) && !(prev_act & PB_ACT_MENU)) sc2_menu_toggle();
-    prev_act = act;
+    if ((act & PB_ACT_MENU) && !(input_state->previous_actions & PB_ACT_MENU)) sc2_menu_toggle();
+    input_state->previous_actions = act;
     sc2_gyro_buttons(act);
     btn &= ~PB_ACT_MASK;
 
@@ -435,7 +443,7 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
     o->leftStick.x  = steam_axis_to_u8(lx, dz, 0);
     o->leftStick.y  = steam_axis_to_u8(ly, dz, !P.invert_ly);
     if (P.rstick == RSTICK_FLICK) {                  /* flick stick: turns only */
-        int f = sc2_flick_apply(&P, rx, ry, now);
+        int f = sc2_flick_apply(&input_state->flick, &P, rx, ry, now);
         o->rightStick.x = (uint8_t)(128 + f);
         o->rightStick.y = 128;
     } else {

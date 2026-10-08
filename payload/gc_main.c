@@ -229,7 +229,7 @@ static void *klog_capture_thread(void *arg) {
 
 /* ── VDI injection ────────────────────────────────────────────────────── */
 typedef struct {
-    sc2_bind_state_t binding_state;
+    sc2_input_state_t sc2_input;
     uint32_t inject_count;
     int bind_ok;
     int32_t last_vdi_ret;
@@ -690,7 +690,7 @@ static void *usb_hid_thread(void *arg) {
     memset(&session, 0, sizeof(session));
     session.bind_ok = targ->bind_ok;
     session.last_vdi_ret = -1;
-    sc2_bind_reset(&session.binding_state);
+    sc2_input_state_reset(&session.sc2_input);
     free(targ);
 
     slot_registry_entry_t slot_entry;
@@ -1068,7 +1068,7 @@ main_loop: ;
         } else if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
             int was = sc2_link;
             injected = sc2_handle_packet(buf, len, &pad, &sc2_link,
-                                         &session.binding_state);
+                                         &session.sc2_input);
             int paused_now = sc2_pause_is_active();
             if (paused_now != sc2_pause_seen) {             /* paused or resumed (hold … 5 s) */
                 sc2_pause_seen = paused_now;
@@ -1197,7 +1197,7 @@ exit_slot:
     }
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
     sc2_assignment_release(assignment_token);
-    sc2_bind_reset(&session.binding_state);
+    sc2_input_state_reset(&session.sc2_input);
     slot_release(slot_token, "USB reader exit");
     return NULL;
 }
