@@ -15,6 +15,10 @@ This file is a **living register**, not evidence that code has already been copi
 
 License provenance also applies to images, icons, web fonts, binary blobs, test captures and generated content. Do not distribute private Sony symbols/firmware or SDK files subject to confidential access terms. Separate code attribution from scientific citation.
 
+## GitHub publication record
+
+The user-specified private repository `MNeroba/SteamController-PS5` was empty at publication time; it is a derivative repository, not a GitHub fork. `main` was initialized with project README commit `61780b03bcef6859935cac1ef288cf3eef12d3ba`. The pinned Puckbridge-based project snapshot was published to `fix/p0-safety` as commit `4596c7fc4a9876e56cb8194961f15de0fd1e7066`, opening [draft PR #1](https://github.com/MNeroba/SteamController-PS5/pull/1). The remote commit does not retain Puckbridge Git ancestry; the source SHA, upstream license, notices, modifications, and comparison reference are preserved in this register and `docs/BASE_SELECTION_ADR.md`.
+
 ## Source-base audit and unresolved rights
 
 - The pinned Puckbridge `LICENSE` is the unmodified GNU GPL version 3 license text; upstream README and source SPDX headers describe the code as GPL-3.0-or-later. Preserve the file, source notices, and GPL corresponding-source obligations in any distributed build.

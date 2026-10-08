@@ -23,6 +23,13 @@
 | M1-03 | 2026-10-08 | Working tree on `fix/p0-safety`, HEAD `78460113ef7c48502c765a1f83ba34d53c977134` | Selected payload cross-build attempt | `make -C payload`; Darwin 27.0.0 arm64; `PS5_PAYLOAD_SDK` unset and no `prospero.mk` found under `/Users/mneroba/GitHub` | BLOCKED_ENVIRONMENT (exit 2) | Makefile stops at line 6 before compilation: `PS5_PAYLOAD_SDK is not set`. No ELF or SDK verification. |
 | M1-04 | 2026-10-08 | Working tree on `fix/p0-safety`, HEAD `78460113ef7c48502c765a1f83ba34d53c977134` | Portal HTTP/auth/token, bounded JSON, Steam protocol and USB descriptors, mapping, motion math, feedback serialization | `make -C tests clean sanitize`; Darwin 27.0.0 arm64, Apple clang 21.0.0 (`clang-2100.3.34.2`), ASan+UBSan | PASS (exit 0) | 344 assertions: HTTP/auth/token 57, JSON 9, USB config 19, Steam protocol 190, mapping 24, motion 25, feedback 20. Pure host modules only; no PS5 integration files are compiled. |
 
+### GitHub publication and CI
+
+| ID | Date (UTC) | Commit | Target | Command / environment | Result | Evidence |
+|---|---|---|---|---|---|---|
+| PUB-01 | 2026-10-08 13:05 UTC | GitHub snapshot `4596c7fc4a9876e56cb8194961f15de0fd1e7066`; base README commit `61780b03bcef6859935cac1ef288cf3eef12d3ba` | Private repository initialization and draft PR | GitHub app connector; `MNeroba/SteamController-PS5`, `main` → `fix/p0-safety` | CREATED (DRAFT) | [PR #1](https://github.com/MNeroba/SteamController-PS5/pull/1), 145 changed files; PR metadata reported mergeable. `gh` CLI token remained invalid; connector permission was admin. |
+| CI-01 | 2026-10-08 13:06 UTC | `4596c7fc4a9876e56cb8194961f15de0fd1e7066` | GitHub Actions Host tests | Workflow run `37781721767` | QUEUED | No CI conclusion available yet; inspect the run before changing the PR status. |
+
 ### New entry template
 
 ```

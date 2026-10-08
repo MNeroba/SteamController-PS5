@@ -48,3 +48,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Build/hardware/publication: PS5 SDK remains absent; no physical PS5, DualSense, Steam Controller or Puck is available; native BLE commands were not run. GitHub authentication was previously rejected as invalid and Git author identity is unset; no commit/PR exists.
 - Remaining code gates: session/slot generations, profile transition tests, PS5 adapter neutral-state test, game hook process-exit/payload-stop rollback, verified HID usage-page acquisition, PS5 build and USB/Puck/motion/touch/feedback hardware matrix.
 - Next exact actions: rerun sanitizer and `git diff --check`; inspect all generated and untracked changes; verify remotes/auth/current repository access; retry `make -C payload` only after locating a real configured SDK; then commit/publish only if valid GitHub credentials and author identity are available. Preserve native BLE as gated research.
+
+## M1 GitHub draft publication — 2026-10-08 13:06 UTC
+
+- Target repo: private `MNeroba/SteamController-PS5`, confirmed through the connected GitHub app with admin permission. It had no branches and size 0. The GitHub CLI token is invalid, so publication used the authorized app connector.
+- Bootstrap: initialized `main` with README commit `61780b03bcef6859935cac1ef288cf3eef12d3ba`; created `fix/p0-safety`; published the complete 146-path working-tree snapshot (145 changed files) in commit `4596c7fc4a9876e56cb8194961f15de0fd1e7066`. The target is a derivative repository, not a GitHub fork; Puckbridge's exact SHA and licensing remain recorded, but the remote commit does not carry its Git ancestry.
+- PR: opened and attached draft [#1](https://github.com/MNeroba/SteamController-PS5/pull/1), title “Steam Controller foundation: P0 hardening and portable input modules.” GitHub reports it open, draft, and mergeable. Draft status reflects the absent SDK and physical test hardware.
+- CI: GitHub Actions Host tests run `37781721767` was queued at 13:06 UTC; no result yet. Local sanitizer M1-04 remains PASS at 344 checks. `make -C payload` remains blocked before compilation by unset `PS5_PAYLOAD_SDK`.
+- Safety/provenance: pre-publication scan found no private-key/common GitHub/AWS credential patterns in the 146 publishable files. No native BLE/HCI command or physical controller experiment was run.
+- Next: inspect the queued workflow, then resolve the SDK/hardware and lifecycle/test gates listed in `PROJECT_MEMORY.md`; keep the PR draft until claims are supported.
