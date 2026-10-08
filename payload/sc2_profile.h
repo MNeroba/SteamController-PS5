@@ -79,7 +79,9 @@ void sc2_active_get(sc2_profile_t *p);
 void sc2_active_get_versioned(sc2_profile_t *p, uint32_t *generation);
 
 /* ── profile store + per-game switching (sc2_profile.c) ── */
+#ifndef SC2_DIR
 #define SC2_DIR        "/data/ghostpad/profiles"
+#endif
 #define SC2_ID_MAX     32
 
 int  sc2_store_valid_id(const char *id);

@@ -314,7 +314,9 @@ int sc2_store_valid_id(const char *id) {
 }
 
 static void ensure_dir(void) {
+#ifndef SC2_PROFILE_TEST
     mkdir("/data/ghostpad", 0777);
+#endif
     mkdir(SC2_DIR, 0777);
 }
 
@@ -388,6 +390,20 @@ static char g_active_name[48] = "Default";
 static char g_title[SC2_ID_MAX + 1]    = "";
 static char g_selected[SC2_ID_MAX + 1] = "";
 static char g_override[SC2_ID_MAX + 1] = "";
+/* Invalidates profile loads that started before a newer selection request. */
+static uint32_t g_selection_generation;
+
+static void selection_changed_locked(void) {
+    if (++g_selection_generation == 0) ++g_selection_generation;
+}
+
+#ifdef SC2_PROFILE_TEST
+void sc2_profile_test_before_commit(const char *id, uint32_t generation);
+#define PROFILE_TEST_BEFORE_COMMIT(id, generation) \
+    sc2_profile_test_before_commit((id), (generation))
+#else
+#define PROFILE_TEST_BEFORE_COMMIT(id, generation) ((void)0)
+#endif
 
 static void current_title(char *out) {
     out[0] = 0;
@@ -434,6 +450,7 @@ static void apply_selection(int force) {
     pthread_mutex_lock(&g_sel_lock);
     strcpy(title, g_title);
     strcpy(tname, g_title_name);
+    uint32_t generation = g_selection_generation;
     int locked = g_override[0] != 0;
     if (locked) strcpy(want, g_override);
     pthread_mutex_unlock(&g_sel_lock);
@@ -447,9 +464,20 @@ static void apply_selection(int force) {
 
     sc2_profile_t p;
     if (sc2_store_load(want, &p) != 0) { sc2_profile_default(&p); strcpy(want, "default"); }
-    sc2_active_set(&p);
+    PROFILE_TEST_BEFORE_COMMIT(want, generation);
 
+    /* Disk lookup ran unlocked; commit only if its title/override is current. */
     pthread_mutex_lock(&g_sel_lock);
+    if (generation != g_selection_generation) {
+        pthread_mutex_unlock(&g_sel_lock);
+        return;
+    }
+    changed = strcmp(want, g_selected) != 0;
+    if (!changed && !force) {
+        pthread_mutex_unlock(&g_sel_lock);
+        return;
+    }
+    sc2_active_set(&p);
     strcpy(g_selected, want);
     snprintf(g_active_name, sizeof(g_active_name), "%s", p.name);
     pthread_mutex_unlock(&g_sel_lock);
@@ -475,11 +503,17 @@ static void apply_selection(int force) {
 void sc2_select_override(const char *id) {
     pthread_mutex_lock(&g_sel_lock);
     if (id && sc2_store_valid_id(id)) strcpy(g_override, id); else g_override[0] = 0;
+    selection_changed_locked();
     pthread_mutex_unlock(&g_sel_lock);
     apply_selection(1);
 }
 
-void sc2_select_reload(void) { apply_selection(1); }
+void sc2_select_reload(void) {
+    pthread_mutex_lock(&g_sel_lock);
+    selection_changed_locked();
+    pthread_mutex_unlock(&g_sel_lock);
+    apply_selection(1);
+}
 
 void sc2_select_title_name(char *out, size_t n) {
     pthread_mutex_lock(&g_sel_lock);
@@ -524,13 +558,17 @@ static void *watch_thread(void *arg) {
         current_title(t);
         pthread_mutex_lock(&g_sel_lock);
         int changed = strcmp(t, g_title) != 0;
-        if (changed) strcpy(g_title, t);
+        if (changed) {
+            strcpy(g_title, t);
+            selection_changed_locked();
+        }
         pthread_mutex_unlock(&g_sel_lock);
         if (changed) {
             char nm[GC_GAME_NAME_MAX] = "";
             if (t[0]) gc_game_name(t, nm, sizeof(nm));
             pthread_mutex_lock(&g_sel_lock);
             snprintf(g_title_name, sizeof(g_title_name), "%s", nm);
+            selection_changed_locked();
             pthread_mutex_unlock(&g_sel_lock);
             LOG("sc2: running title '%s' (%s)\n", t[0] ? t : "(none)", nm);
         }
