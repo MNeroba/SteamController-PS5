@@ -31,11 +31,11 @@ ADR-001 accepts PuckbridgePS5 at `78460113ef7c48502c765a1f83ba34d53c977134` as t
 | Actual PS5 FW 13.60 USB/Puck validation | BLOCKED_HARDWARE | No physical console, Steam Controller, or official Puck available in this session. |
 | Native BLE B0–B6 | RESEARCH_ONLY / BLOCKED_HARDWARE | No radio commands were run; native GAP/GATT remains unproven. |
 | Git history | PARTIAL | Local checkout retains pinned Puckbridge ancestry; target project uses an independent root and source snapshot commits because it was empty. GitHub app was used; Git CLI author identity remains unset. |
-| GitHub PR publication | OPEN_DRAFT | [PR #1](https://github.com/MNeroba/SteamController-PS5/pull/1), branch `fix/p0-safety`, head `65cd4f918f56fb2c547217e008f6b81c17853c04`; draft, open and mergeable. For this head, Actions runs `37789014753` (Host tests, pull request), `37789014700` (PS5 cross-build, pull request), `37789007214` (Host tests, push), and `37789007082` (PS5 cross-build, push) were queued at 2026-10-08 14:01 UTC; no conclusions were available at last check. |
+| GitHub PR publication | OPEN_DRAFT | [PR #1](https://github.com/MNeroba/SteamController-PS5/pull/1), branch `fix/p0-safety`; implementation commit `65cd4f918f56fb2c547217e008f6b81c17853c04`, memory/provenance sync `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c`. PR was open, draft, mergeable at last check. For head `78bcf3d`, runs `37789382680` (Host tests, PR), `37789382717` (PS5 cross-build, PR), `37789373824` (Host tests, push), and `37789374156` (PS5 cross-build, push) remained queued at 2026-10-08 14:06 UTC with no conclusions. |
 
 ## Exact next tasks
 
-1. Inspect Actions runs `37789014753`, `37789014700`, `37789007214`, and `37789007082` for head `65cd4f918f56fb2c547217e008f6b81c17853c04`; append actual conclusions to `TEST_LOG.md`.
+1. Inspect Actions runs `37789382680`, `37789382717`, `37789373824`, and `37789374156` for head `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c`; append actual conclusions to `TEST_LOG.md` and do not claim a CI pass while queued.
 2. Add host tests for session lifecycle, profile transitions, and slot generations. Cross-compilation now covers the target adapters at compile/link time, but runtime behavior still needs hardware validation.
 3. Complete game-hook rollback for process exit/payload stop and continue auditing the inherited slot/handoff lifecycle. Allocation and USB-thread creation rollback now avoid deleting invalid `-1` handles; injected failure and target runtime checks remain open as P1-SLOT-11.
 4. Obtain a physical PS5, DualSense, Steam Controller, and official Puck for USB/Puck/reconnect/motion/touch/haptics/security hardware gates.

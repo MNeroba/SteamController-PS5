@@ -150,3 +150,9 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Updated draft PR #1 description with current implementation, 446 host checks, three targeted TSan results, SDK/hash/build evidence and hardware gates. GitHub reports the PR open, draft, and mergeable.
 - New-head Actions runs: Host tests PR `37789014753`, PS5 cross-build PR `37789014700`, Host tests push `37789007214`, PS5 cross-build push `37789007082`. All four jobs were queued at the 14:01 UTC check; no conclusions were available.
 - Next: inspect those run IDs again and record the actual conclusions, then continue remaining session/slot lifecycle review. Keep hardware USB/Puck and system/game testing blocked until a real PS5 and controller are available.
+
+## M1 memory sync and queued-run recheck — 2026-10-08 14:06 UTC
+
+- Published memory/provenance sync commit `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c` on top of `65cd4f918f56fb2c547217e008f6b81c17853c04`; the PR remained open, draft and mergeable.
+- Rechecked GitHub Actions for head `78bcf3d`: Host PR `37789382680`, PS5 cross-build PR `37789382717`, Host push `37789373824`, and cross-build push `37789374156` all remained queued with unchanged timestamps and no logs. Treat this as CI queue delay, not a pass or a code failure; do not repeatedly poll without new evidence.
+- Next: resume source review or wait for a meaningful workflow status change; physical PS5/Steam Controller/Puck gates remain blocked by hardware availability.
