@@ -369,3 +369,13 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - At 17:10 UTC PR #1 remains open/draft/mergeable at old head `e77e440f11e5e91d3bf5d26a9dfdbe4ff1df5d4b`. Host Actions run `37813669678` and PS5 cross-build run `37813669565` remain queued, with empty combined status. No CI pass is claimed.
 - Hardware tasks remain blocked: no PS5, Steam Controller, official Puck, or DualSense available; no Bluetooth/HCI commands were run. P1-HAPTIC-26 remains open; this scan fix does not establish haptic ownership or multi-controller correctness.
 - Next exact action: publish `payload/controller_sc2.c`, `tests/test_sc2_usb_scan.c`, `tests/Makefile`, its host USB stubs, architecture/test-plan updates and memory to draft PR #1 with an expected-head guard on `e77e440f11e5e91d3bf5d26a9dfdbe4ff1df5d4b`; update PR validation with the new ELF SHA; inspect current-head workflow results once. Then continue source audit of Steam USB/Puck and target lifecycle without opening Bluetooth or touching physical hardware.
+
+
+## M1 concurrent endpoint scanner publication — 2026-10-08 17:12 UTC
+
+- Published the per-invocation scanner buffers, deterministic host USB ioctl regression, host declarations/Makefile target, architecture/test-plan updates, and corresponding memory as source/test/docs commit `b6f5bae3f6cb2c45be0e798c10b6cf2345ce2edf`, parent `e77e440f11e5e91d3bf5d26a9dfdbe4ff1df5d4b`, tree `7af2ecd5cf206414a414871c6a60454598028da4`.
+- All 13 GitHub blob SHAs matched local `git hash-object` values. `fix/p0-safety` advanced using expected head `e77e440f11e5e91d3bf5d26a9dfdbe4ff1df5d4b` and `force=false`.
+- PR #1 is confirmed open, draft and mergeable. Its body includes the expected-red scanner reproduction, normal/ASan/UBSan/TSan results, SDK v0.43 ELF SHA-256 `215f2f1b73c4b08be42392421f859469d6e03a17714e8bc63505e81344f19492`, and target/hardware limits.
+- At 17:12 UTC GitHub reported Host run `37814698394` and PS5 cross-build run `37814698350` queued on this source/test/docs commit; combined status was empty. No GitHub CI pass is claimed. This publication state is recorded in PUB-20/CI-50/CI-51.
+- No console or controller was available; no BLE/HCI command was run. P1-HAPTIC-26 remains open and unrelated to the scanner fix.
+- Next: finish the current PR status sync, then continue source-backed USB/Puck/session lifecycle audit and resolve the haptic producer/consumer ownership contract before any multi-controller claim.
