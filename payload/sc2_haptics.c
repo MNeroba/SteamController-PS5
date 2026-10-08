@@ -26,8 +26,12 @@ void ghostpad_status_log(const char *fmt, ...);
 
 #define QN 8
 static pthread_mutex_t q_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct { uint8_t b[12]; uint8_t n; } q[QN];
 static int q_head = 0, q_tail = 0;
+static int last_method = -1;
+static unsigned n_err_logs;
+static int logged_fail, logged_ok;
 
 static uint16_t r_left = 0, r_right = 0;
 static int64_t  r_until = 0, r_next = 0;
@@ -82,6 +86,16 @@ static int ctrl_report(int fd, int iface, int type, const uint8_t *b, uint8_t n)
 }
 
 /* Interrupt OUT on any opened FS endpoint index */
+#ifdef SC2_HAPTICS_TEST
+int sc2_haptics_test_send_out(int fd, int idx);
+static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx,
+                        const uint8_t *data, uint32_t len) {
+    (void)eps;
+    (void)data;
+    (void)len;
+    return sc2_haptics_test_send_out(fd, idx);
+}
+#else
 static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx, const uint8_t *data, uint32_t len) {
     void *bufs[1] = { (void *)data };
     uint32_t lens[1] = { len };
@@ -106,17 +120,15 @@ static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx, const uint
     ioctl(fd, USB_FS_STOP, &sp);
     return -ETIMEDOUT;
 }
-
-static int g_n_extra = 0;
+#endif
 
 static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int iface,
-                       const uint8_t *b, uint8_t n) {
-    static int last_method = -1;
+                       int n_extra, const uint8_t *b, uint8_t n) {
     int m = sc2_status_haptic_method(), r = -1, used = 0;
     if ((m == 0 || m == 1) && out_opened) { r = send_out_idx(fd, eps, 1, b, n); used = 1; }
     if (m == 4) {
         used = 4; r = out_opened ? send_out_idx(fd, eps, 1, b, n) : -1;
-        for (int k = 0; k < g_n_extra; k++) {
+        for (int k = 0; k < n_extra; k++) {
             int rk = send_out_idx(fd, eps, 2 + k, b, n);
             LOG("haptics: broadcast OUT index %d → %d\n", 2 + k, rk);
             if (rk == 0) r = 0;
@@ -125,19 +137,23 @@ static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int 
     if (r != 0 && (m == 0 || m == 2))    { r = ctrl_report(fd, iface, 2, b, n); used = 2; }
     if (r != 0 && m == 3)                { r = ctrl_report(fd, iface, 3, b, n); used = 3; }
     sc2_status_haptic_result(used, r);
-    if (m != last_method || r != 0) {
-        static int n_err_logs = 0;
-        if (r == 0 || n_err_logs++ < 10)
-            LOG("haptics: method %d, sent via %d (OUT ep %s), report 0x%02x len %u, result %d\n",
-                m, used, out_opened ? "open" : "closed", b[0], n, r);
-        last_method = m;
+    pthread_mutex_lock(&log_lock);
+    int should_log = m != last_method || r != 0;
+    if (should_log && r != 0) {
+        if (n_err_logs >= 10) should_log = 0;
+        else n_err_logs++;
     }
+    last_method = m;
+    pthread_mutex_unlock(&log_lock);
+    if (should_log)
+        LOG("haptics: method %d, sent via %d (OUT ep %s), report 0x%02x len %u, result %d\n",
+            m, used, out_opened ? "open" : "closed", b[0], n, r);
     return r;
 }
 
 void sc2_haptic_service(int fd, struct usb_fs_endpoint *eps, int out_opened, int iface, int n_extra) {
-    g_n_extra = n_extra;
-    static int logged_fail = 0, logged_ok = 0;
+    if (n_extra < 0) n_extra = 0;
+    if (n_extra > SC2_HAP_MAX_OUT) n_extra = SC2_HAP_MAX_OUT;
     uint8_t b[12]; uint8_t n;
 
     for (;;) {
@@ -147,9 +163,15 @@ void sc2_haptic_service(int fd, struct usb_fs_endpoint *eps, int out_opened, int
         q_head = (q_head + 1) % QN;
         pthread_mutex_unlock(&q_lock);
 
-        int r = send_report(fd, eps, out_opened, iface, b, n);
-        if (r && !logged_fail) { LOG("haptics: send 0x%02x failed (%d)\n", b[0], r); logged_fail = 1; }
-        if (!r && !logged_ok)  { LOG("haptics: working (%s)\n", out_opened ? "interrupt OUT" : "SET_REPORT"); logged_ok = 1; }
+        int r = send_report(fd, eps, out_opened, iface, n_extra, b, n);
+        pthread_mutex_lock(&log_lock);
+        int log_failure = r && !logged_fail;
+        int log_success = !r && !logged_ok;
+        if (log_failure) logged_fail = 1;
+        if (log_success) logged_ok = 1;
+        pthread_mutex_unlock(&log_lock);
+        if (log_failure) LOG("haptics: send 0x%02x failed (%d)\n", b[0], r);
+        if (log_success) LOG("haptics: working (%s)\n", out_opened ? "interrupt OUT" : "SET_REPORT");
     }
 
     /* rumble refresh */
@@ -163,6 +185,6 @@ void sc2_haptic_service(int fd, struct usb_fs_endpoint *eps, int out_opened, int
     pthread_mutex_unlock(&q_lock);
     if (send) {
         steam_feedback_encode_rumble(b, sizeof(b), l, r);
-        send_report(fd, eps, out_opened, iface, b, STEAM_HAPTIC_RUMBLE_SIZE);
+        send_report(fd, eps, out_opened, iface, n_extra, b, STEAM_HAPTIC_RUMBLE_SIZE);
     }
 }

@@ -1,6 +1,6 @@
 # Project memory — SteamController-PS5
 
-**Snapshot date:** 2026-10-08 16:33 UTC · **State:** M0 COMPLETE; P0 hardening, reusable modules, slot/USB lifecycles, game-hook safety, hand-off/status/hook/gyro race fixes, per-session Steam input/flick, and adaptive-trigger runtime isolation are published to draft PR #1 at `ec497365b8b173c792cef08f973cb540751b1332` · 861 counted host assertions plus 336,000 concurrent operations/snapshots PASS under ASan/UBSan · targeted ThreadSanitizer passes the trigger-effect session test · latest PS5 SDK v0.43 cross-build PASS, ELF SHA-256 `85fa67052a36945656bbf5b0c6c82ac31a8110804cc7579ad886bc00f6e1d135` · current-head Actions query returned no PR-triggered runs and no combined statuses · PS5 runtime/hardware incomplete.
+**Snapshot date:** 2026-10-08 16:41 UTC · **State:** M0 COMPLETE; P0 hardening, reusable modules, slot/USB lifecycles, game-hook safety, hand-off/status/hook/gyro race fixes, per-session input/flick and adaptive-trigger isolation are published to draft PR #1 at `ec497365b8b173c792cef08f973cb540751b1332`; the haptic service route fix is locally validated and pending publication · 873 counted host assertions plus 340,000 concurrent operations/snapshots PASS under ASan/UBSan · targeted ThreadSanitizer passes trigger-effect and haptic service session tests · latest PS5 SDK v0.43 cross-build PASS, ELF SHA-256 `4a98b147ec9026321a2f7de75ab9ed253ff0e790803a5b580c00d7d13bc2295f` · `git diff --check`, whitespace and bounded credential scans PASS · current remote PR head `e532fb1d156fb830d4ef636be6ebe63a088bcf98` has no recorded workflow runs/statuses · PS5 runtime/hardware incomplete.
 
 ## Intent locked by product owner
 
@@ -35,8 +35,8 @@ ADR-001 accepts PuckbridgePS5 at `78460113ef7c48502c765a1f83ba34d53c977134` as t
 
 ## Exact next tasks
 
-1. Audit `payload/sc2_haptics.c` queue/worker concurrency and lifecycle ownership; add a source-backed reproducer before changing it.
-2. Continue shared-state and adapter audit with fault-injection seams for any remaining tractable P0/P1 source issue; retain negative results and make no unsupported multi-device claim.
+1. Publish the validated haptic route fix and supporting tests/docs/memory from expected PR head `e532fb1d156fb830d4ef636be6ebe63a088bcf98`; update PR evidence and inspect the new-head Actions/status once.
+2. Continue source-backed shared-state and adapter audit; keep the process-wide haptic queue and simultaneous-device routing limitations explicit. Add regressions before any new code fix.
 3. Obtain PS5, Steam Controller, DualSense and official Puck hardware for USB/Puck/session/motion/touch/haptics/game-hook shutdown gates. Game hooks and gyro state have host tests and a cross-build but were not exercised on-console; no remote game-memory syscall or physical-console result is verified. Keep native BLE evidence-gated and passive until safe hardware and approval are available.
 
 Every future Codex session: update this snapshot **only after** recording detailed evidence in FINDINGS/ISSUES/TEST_LOG/DECISIONS/SESSION_LOG.
