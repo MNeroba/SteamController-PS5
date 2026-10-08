@@ -37,3 +37,8 @@ On 2026-10-08, after the portal request/response deadlines, strict game-hook set
 After adding same-host Origin checks and strict profile request-body metadata, the same command succeeded again. Current ELF64 x86-64 PIE SHA-256: `1084457bba0e35a479b6bed5e0578027567decc199d0d3ae6724c301e74cd6a1`. Compile/link only; no browser, PS5 socket, or console behavior was exercised. See M1-176 in `project-memory/TEST_LOG.md`.
 
 After adding the default IPv4 peer-scope check to the portal accept loop, the SDK v0.43 / LLVM 18.1.8 build succeeded again on Darwin 27.0.1 arm64. ELF64 x86-64 PIE SHA-256: `03c1cbdaa64b8d9d222329c51f5fe24222cda464250a4c6f52644741fa3a1948`. This verifies compile/link only; it does not validate Prospero socket address behavior or console networking. See M1-182 in `project-memory/TEST_LOG.md`.
+
+
+## Complete `main` tree validation
+
+On 2026-10-08, the complete project was published to `main` at commit `0f122c64eff0b196ba023c75af9a61ba1cc9514a`. GitHub reports 195 files; a local clean export produced the identical Git tree SHA `9834f600c9b77be4d2f7285c1b3f21fe70658e99`. From that export, `make clean test` and `make clean sanitize` both passed (1048 checks each), and the SDK v0.43 cross-build succeeded with ELF SHA-256 `26dce830d274755fc0bd6a83cafc8e3e6f660e756544d699a2b346ef445afbf0`. This is host-test and compile/link evidence only. A direct network `git clone` could not complete because this environment could not resolve `github.com`; the build ran from a clean source export verified against the exact GitHub tree. GitHub push workflows were queued after publication.

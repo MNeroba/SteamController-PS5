@@ -559,3 +559,13 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - This means earlier host tests and SDK build are local complete-tree evidence only, not clean-clone evidence for current PR head. PR #1 remains draft and unmerged.
 - Owner explicitly instructed direct-to-main commits until the first successful release. Added ADR-029 and P0-REPO-12. Plan is to build `main` as a new fast-forward commit using the preserved `e2059116` tree and all 25 current local blobs/deltas (19 modified files and six additions), verify the full tree, validate a clean source checkout, then close the obsolete draft PR. No history rewrite/delete; do not release an unverified binary.
 - M1-187 HTTP body-framing source audit completed; `make clean build/test_webui_http` then `./build/test_webui_http` in local `tests/` passes 99 checks. It does not validate the broken remote tree. No PS5 hardware, BLE/HCI/radio, or firmware/system operation was used.
+
+
+## M1-189 complete tree restored directly to main — 2026-10-08 20:09 UTC
+
+- Published complete source snapshot to `main` in fast-forward commit `0f122c64eff0b196ba023c75af9a61ba1cc9514a` (parent `61780b03bcef6859935cac1ef288cf3eef12d3ba`, tree `9834f600c9b77be4d2f7285c1b3f21fe70658e99`). Used preserved `e2059116` tree (`d887aa466949bbb17929ce17a9b92f86469b3481`) and overlaid 25 current blobs (19 modifications, six additions). No branch history was rewritten or deleted.
+- GitHub recursive tree contains 195 blobs and exactly matches every local file path, mode, and SHA; no omissions, extras, or mismatches. Clean export's `git write-tree` equals the published tree SHA.
+- From that exact-tree clean export, normal host suite passes 1048 checks; ASan/UBSan suite passes the same 1048; SDK v0.43/LLVM 18.1.8 build passes (ELF SHA-256 `26dce830d274755fc0bd6a83cafc8e3e6f660e756544d699a2b346ef445afbf0`). All are host/compile-link evidence only.
+- True `git clone` failed because the environment could not resolve `github.com`; the clean source export has the exact Git tree hash verified through GitHub's API. GitHub push Actions are queued as run `37836992181` (PS5 cross-build) and `37836992223` (Host tests); no CI pass yet.
+- Closed PR #1 unmerged and removed its task attachment; owner requested direct `main` commits until first successful release. The incomplete legacy `fix/p0-safety` branch is retained for history and must not be treated as complete.
+- No PS5/controller/Puck, BLE/HCI/radio or firmware operation; no unverified binary release. Next: inspect the two push workflows, then continue safe USB/Puck lifecycle source audit in `controller_sc2.c` and `gc_main.c`.
