@@ -107,7 +107,7 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 
 - Date/status: 2026-10-08, ACCEPTED.
 - Context: `do_remap()` ignored the profile-store result, then reloaded and displayed a success notification even when the storage operation failed.
-- Evidence: `tests/test_sc2_menu_storage.c` calls the production menu action and forces `fopen()` failure by placing a directory at the temporary path. The old path still sent “Saved”; the fixed module passes nine checks under normal and ASan/UBSan. See F054/T-P33/M1-130–136.
+- Evidence: `tests/test_sc2_menu_storage.c` calls the production menu action and forces `fopen()` failure by placing a directory at the temporary path. The old path still sent “Saved”; PR #1 commit `a3b373c281d3a3abc4d7333b7accaf555855647a` fixes it and passes nine checks under normal and ASan/UBSan. See F054/T-P33/M1-130–136.
 - Decision: report a clear save failure and return before reloading the profile or sending success feedback. Retain the normal save/reload/success sequence only when `sc2_store_save()` returns success.
 - Tradeoff: the menu closes after the action as before, but now the final notification identifies the failed persistence. Hardware notification display remains unverified.
 - Reconsider only if the menu gains a recoverable editor state that can retain unsaved changes and offer retry.
