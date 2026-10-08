@@ -1,7 +1,7 @@
 CC := clang
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 BUILD := build
-TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick
+TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state
 
 .PHONY: all test sanitize clean
 
@@ -28,6 +28,7 @@ test: $(TESTS)
 	./$(BUILD)/test_game_hooks
 	./$(BUILD)/test_sc2_gyro_state
 	./$(BUILD)/test_sc2_flick
+	./$(BUILD)/test_sc2_trigfx_state
 
 sanitize:
 	$(MAKE) clean
@@ -95,6 +96,9 @@ $(BUILD)/test_sc2_gyro_state: test_sc2_gyro_state.c ../payload/sc2_gyro.c ../pay
 
 $(BUILD)/test_sc2_flick: test_sc2_flick.c ../payload/sc2_flick.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $^ -pthread -lm -o $@
+
+$(BUILD)/test_sc2_trigfx_state: test_sc2_trigfx_state.c ../payload/sc2_trigfx.c | $(BUILD)
+	$(CC) $(CFLAGS) -Ihost_stubs -I../payload $^ -pthread -o $@
 
 clean:
 	rm -rf $(BUILD)

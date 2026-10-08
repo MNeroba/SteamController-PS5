@@ -15,10 +15,19 @@
  * the mode's parameters (positions 0-9, strengths/amplitudes 0-8). */
 enum { TFX_OFF, TFX_FEEDBACK, TFX_WEAPON, TFX_VIBRATION, TFX_MULTI_FEEDBACK, TFX_SLOPE, TFX_MULTI_VIBRATION };
 
+/* Runtime history belongs to one input reader/controller session. */
+typedef struct {
+    int zone[2];
+    int64_t buzz_until_ms[2];
+} sc2_trigfx_state_t;
+
+void sc2_trigfx_reset(sc2_trigfx_state_t *state);
+
 void sc2_trigfx_set(int trigger, const uint8_t cmd[56]);   /* 0 = L2, 1 = R2 */
 void sc2_trigfx_clear(void);
 /* Only while the Steam Controller is the active pad. */
 void sc2_trigfx_enable(int on);
 /* Every input report: physical trigger pulls (0-255), and the profile's
  * strength in % (0 = off, 100 = normal, up to 200). */
-void sc2_trigfx_apply(uint8_t l2, uint8_t r2, int64_t now_ms, int strength_pct);
+void sc2_trigfx_apply(sc2_trigfx_state_t *state, uint8_t l2, uint8_t r2,
+                      int64_t now_ms, int strength_pct);

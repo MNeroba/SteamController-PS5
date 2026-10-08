@@ -5,6 +5,7 @@
 #include "gc_types.h"
 #include "sc2_binding.h"
 #include "sc2_flick.h"
+#include "sc2_trigfx.h"
 #include "sc2_control.h"
 #include "steam_usb.h"
 
@@ -56,6 +57,7 @@ int  sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
 typedef struct {
     sc2_bind_state_t binding;
     sc2_flick_state_t flick;
+    sc2_trigfx_state_t trigfx;
     int64_t qam_since_ms;
     uint32_t previous_actions;
     uint8_t qam_latched;
