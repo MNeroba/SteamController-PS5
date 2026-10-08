@@ -145,3 +145,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: a slow-reading client may receive a truncated response after five seconds. Server runtime remains serialized, but a single response can no longer occupy the thread indefinitely at the send layer.
 - Verification gate: expected-red simulated drip sender, successful partial-write case, seven HTTP write checks, full normal and ASan/UBSan suites, and SDK v0.43 compile/link. PS5 socket timeout scheduling and live portal operation remain unverified.
 - Reconsider only if target measurements show a legitimate portal response needs a larger documented deadline.
+
+
+## ADR-026 — Match portal routes and parameters exactly
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: pinned Puckbridge's portal used prefix route checks and searched the complete target with `strstr`. A suffix route could enter a state-changing handler, and a query-key substring could be mistaken for an exact `id=`/`on=` parameter. The derived portal already requires a bearer token for `/api/`, so these cases were dispatch ambiguity and input validation defects, not an authentication bypass.
+- Evidence: pinned Puckbridge `78460113ef7c48502c765a1f83ba34d53c977134`, baseline `payload/webui.c:61-70,175-182,238-258,269-272`; current `payload/webui_route.c`, handler `payload/webui.c`; regression `tests/test_webui_route.c`; F058/T-P37/M1-163–168. The initial production-wired route extraction failed four of 17 expected checks before strict parsing was implemented.
+- Decision: register complete path strings and allowed query-key sets per route; reject unknown, duplicate, malformed and percent-encoded parameters; copy values into caller-sized buffers; enforce explicit GET/POST policy and strict values before action handlers mutate state. Keep URL values to the restricted ASCII alphabet already used for profile IDs and UI controls.
+- Tradeoff: adding API routes or parameter values now requires updating the route schema and tests. Percent-encoded or future arbitrary-text query values are rejected until their decoding and validation rules are deliberately specified.
+- Verification gate: 54 route assertions and full 1003-check normal and ASan/UBSan suites pass; SDK v0.43 compile/link succeeds. The host tests exercise the production route module, not the live socket-to-handler path. Browser behavior, PS5 socket integration and hardware remain unverified.
+- Reconsider only when introducing a route that needs a documented encoding/value schema, and retain exact path/key matching.
