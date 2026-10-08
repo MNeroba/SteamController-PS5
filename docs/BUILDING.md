@@ -33,3 +33,5 @@ The SDK repository describes most of its files as GPL-3.0-or-later and identifie
 ## Latest rebuild
 
 On 2026-10-08, after the portal request/response deadlines, strict game-hook settings, and exact portal route parsing changes, the same SDK v0.43 / LLVM 18.1.8 command succeeded on Darwin 27.0.1 arm64. Output: ELF64 x86-64 PIE, SHA-256 `2704d75b96c0c5db5756935ebb1106c7a376965242242ebc4f5965c8648d486c`. This confirms compilation and linking only; it is not evidence of console loading or firmware compatibility. See M1-170 in `project-memory/TEST_LOG.md`.
+
+After adding same-host Origin checks and strict profile request-body metadata, the same command succeeded again. Current ELF64 x86-64 PIE SHA-256: `1084457bba0e35a479b6bed5e0578027567decc199d0d3ae6724c301e74cd6a1`. Compile/link only; no browser, PS5 socket, or console behavior was exercised. See M1-176 in `project-memory/TEST_LOG.md`.

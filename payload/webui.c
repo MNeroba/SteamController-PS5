@@ -47,6 +47,7 @@ static void send_response_chunks(int fd, const webui_http_chunk_t *chunks,
 static void reply(int fd, int code, const char *type, const char *body, size_t n) {
     char h[256];
     const char *reason = code == 200 ? "OK" : code == 401 ? "Unauthorized" :
+                         code == 403 ? "Forbidden" :
                          code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" :
                          code == 413 ? "Payload Too Large" :
                          code == 408 ? "Request Timeout" :
@@ -172,6 +173,10 @@ static void handle(int fd) {
             REPLY_TXT(fd, 400, "incomplete request");
         return;
     }
+    if (!webui_http_origin_matches_host(&request)) {
+        REPLY_TXT(fd, 403, "request origin does not match host");
+        return;
+    }
     path = request.target;
     is_post = strcmp(request.method, "POST") == 0;
     if (!webui_auth_path_allows(path, request.authorization, g_webui_token)) {
@@ -280,6 +285,10 @@ static void handle(int fd) {
         if (get_id(&route, id) != 1) { REPLY_TXT(fd, 400, "bad id"); return; }
         sc2_profile_t p;
         if (is_post) {
+            if (!webui_http_profile_body_valid(&request, body)) {
+                REPLY_TXT(fd, 400, "profile requires a non-empty text/plain UTF-8 body");
+                return;
+            }
             if (sc2_store_load(id, &p) != 0) sc2_profile_default(&p);
             sc2_profile_parse(body, &p);
             if (sc2_store_save(id, &p) != 0) { REPLY_TXT(fd, 400, "save failed"); return; }
