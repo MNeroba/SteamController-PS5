@@ -143,3 +143,10 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Validation: `make -C payload clean && make -C payload` PASS; `llvm-readobj --file-headers --needed-libs` confirmed ELF64 x86-64 shared object and six expected PS5 runtime imports; `llvm-nm -u` showed expected `scePad*`/`sceUserService*` unresolved dynamic imports. ELF SHA-256: `34aaef13a4911147c6342469486aeaee6b2e10ec8ffa6d2d455f78c4ccdb80a4`. This is compile/link evidence only; no PS5, FW 13.60, game, Steam Controller or Puck runtime test occurred.
 - Reproducibility changes: added `docs/BUILDING.md`, ignored `.build-cache/`, and pinned/verifies the SDK archive digest in `.github/workflows/release.yml`. `README.md`, provenance, issues, test log and project snapshot now distinguish cross-build success from hardware validation.
 - Next: publish the current working-tree code and documentation to the open draft PR #1, then inspect the resulting Host tests, PS5 cross-build workflow, and release workflow; retain physical USB/Puck and game runtime gates.
+
+## M1 publication and CI queue — 2026-10-08 14:03 UTC
+
+- Published the 34 paths that differed from PR head `2088cd639087b135940c7fc318223c6d3adeeca1` as commit `65cd4f918f56fb2c547217e008f6b81c17853c04` (tree `98868818861c84f241f17f02b77e3811dec8a877`). Each uploaded Git blob SHA was checked against `git hash-object`; `.build-cache/` and the ELF remain ignored and were not sent.
+- Updated draft PR #1 description with current implementation, 446 host checks, three targeted TSan results, SDK/hash/build evidence and hardware gates. GitHub reports the PR open, draft, and mergeable.
+- New-head Actions runs: Host tests PR `37789014753`, PS5 cross-build PR `37789014700`, Host tests push `37789007214`, PS5 cross-build push `37789007082`. All four jobs were queued at the 14:01 UTC check; no conclusions were available.
+- Next: inspect those run IDs again and record the actual conclusions, then continue remaining session/slot lifecycle review. Keep hardware USB/Puck and system/game testing blocked until a real PS5 and controller are available.
