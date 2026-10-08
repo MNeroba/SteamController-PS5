@@ -172,3 +172,11 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - CI: before publishing this patch, PR #1 head was `057955b8716987f4171071f14b97a3eefe0537a7`; Host run `37790078829` and PS5 cross-build run `37790078672` remained queued at 14:30 UTC. Do not infer a pass.
 - Changed paths: `payload/gc_main.c`, `payload/sc2_control.c`, `payload/sc2_control.h`, `tests/test_sc2_control.c`, `README.md`, `docs/ARCHITECTURE.md`, `docs/TEST_PLAN.md`, and project-memory evidence files.
 - Next exact action: publish these validated file contents as a fast-forward commit on `fix/p0-safety`, then fetch the new head's workflow runs once; continue with the full slot/session ownership audit in `payload/gc_main.c` and portable fault-injection tests.
+
+## M1 assignment lease publication — 2026-10-08 14:35 UTC
+
+- Published the validated assignment lease, test, documentation, and evidence files to PR #1 as commit `7ded26db0465992d9ce4c3f03163470727ec5ae6`, parent `057955b8716987f4171071f14b97a3eefe0537a7`. The 12 uploaded Git blob SHAs matched local `git hash-object` results before tree/commit creation; the branch update used expected-head validation and succeeded.
+- PR #1 remains open, draft, and mergeable. The PR description now reports 477 ASan/UBSan checks, targeted TSan results, and current ELF SHA-256 `21c7ac20345a685f065743243f44488ad0a206554a511344a34adc2d80263542`.
+- PR-triggered Host tests run `37793500940` and PS5 cross-build run `37793500959` are queued; combined commit status has no completed checks. This is pending, not a CI pass.
+- The assignment-dialog lease issue P1-ASGN-16 is fixed in the published branch. The full slot/session manager and physical target behavior remain open.
+- Next exact action: publish the updated memory/provenance snapshot on top of `7ded26db0465992d9ce4c3f03163470727ec5ae6`; then continue auditing slot ownership and teardown in `payload/gc_main.c`.
