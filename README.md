@@ -21,7 +21,7 @@ SteamController-PS5 is a focused payload project for carrying Steam Controller i
 | Area | Progress | What the evidence says |
 |---|---|---|
 | **M0 · foundation and licensing** | Complete | PuckbridgePS5 was selected after a pinned source comparison with OmniPad-PS5. See [ADR-001](docs/BASE_SELECTION_ADR.md) and [provenance](docs/PROVENANCE.md). |
-| **P0 · safety and architecture** | In progress | Host-tested input parsing, exact authenticated portal routes, bounded requests, session/slot lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
+| **P0 · safety and architecture** | In progress | Host-tested input parsing, exact authenticated portal routes, bounded requests, local IPv4 peer filtering, session/slot lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
 | **M1 · USB-C and official Puck** | Partial | Steam report and USB descriptor code cross-builds and has portable tests. Live USB/Puck enumeration and reconnect behavior are unverified. |
 | **M2 · Steam controls and motion** | Partial | Input, mapping, motion, touch, profiles, and extra-control paths exist in source; end-to-end behavior on a console and controller is unverified. |
 | **M3 · haptics and feedback** | Partial | A generation-tagged lease admits one active SC2 USB/Puck reader, rejects a second SC2 reader, and gates queue service and teardown by owner token. Host tests cover the policy; `gc_main.c`, USB output and physical haptics remain target-unverified. Multi-SC2 use is not supported. |
@@ -70,7 +70,7 @@ make -C tests clean test
 make -C tests clean sanitize
 ```
 
-The latest recorded run passes 1030 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, and rejection of empty or incorrectly declared profile bodies. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
+The latest recorded run passes 1048 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, rejection of empty or incorrectly declared profile bodies, and an IPv4 peer-scope policy. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
 ### PS5 payload cross-build
 
@@ -107,7 +107,7 @@ make -C payload deploy PS5_HOST=192.168.1.50 PORT=9021
 
 Use this only when you have independently confirmed that your **development** console, firmware, and payload loader support this ELF and the loader is listening on the selected port. Port `9021` is the inherited Makefile default, not a compatibility guarantee. This project's deploy path has not been tested on a physical PS5. Do not use this as an installation recipe for a stock console or infer support for firmware 13.60 from upstream claims.
 
-If the payload starts and its portal is available, it listens at `http://<PS5-IP>:8090`. The portal token is stored at `/data/ghostpad/webui.token`; retrieve it through trusted local console access. Portal traffic is plain HTTP, so use it only on a trusted local network and never expose the port to the public internet. See the P0 web-security requirements in [CODEX_TASK.md](CODEX_TASK.md) and the repository's [security issue list](project-memory/ISSUES.md).
+If the payload starts and its portal is available, it listens at `http://<PS5-IP>:8090`. The server accepts loopback, RFC1918 private, and IPv4 link-local peers only; public IPv4 peers and IPv6 are rejected. The portal token is stored at `/data/ghostpad/webui.token`; retrieve it through trusted local console access. Portal traffic is plain HTTP, so use it only on a trusted local network and never expose the port to the public internet. API requests still require the bearer token. See the P0 web-security requirements in [CODEX_TASK.md](CODEX_TASK.md) and the repository's [security issue list](project-memory/ISSUES.md).
 
 ## Repository map
 
