@@ -9,7 +9,9 @@
 
 int steam_usb_parse_config(const uint8_t *data, unsigned length,
                            int puck_only, steam_usb_map_t *out) {
-    unsigned total, offset;
+    unsigned total, offset, interface_count = 0;
+    unsigned current_expected_endpoints = 0, current_endpoint_count = 0;
+    uint8_t seen_default_interface[256] = {0};
     int current = -1;
     int have_interface = 0;
     if (!data || !out) return -1;
@@ -31,19 +33,33 @@ int steam_usb_parse_config(const uint8_t *data, unsigned length,
         if (type == USB_DESC_INTERFACE) {
             uint8_t iface, alt;
             if (descriptor_length < 9) return -1;
+            if (have_interface &&
+                current_endpoint_count != current_expected_endpoints)
+                return -1;
             have_interface = 1;
             current = -1;
             iface = data[offset + 2];
             alt = data[offset + 3];
-            if (alt == 0 && out->n < STEAM_USB_MAX_INTERFACES &&
-                (!puck_only || (iface >= 2 && iface <= 5))) {
-                current = out->n++;
-                out->it[current].iface = iface;
-                out->it[current].iclass = data[offset + 5];
+            current_expected_endpoints = data[offset + 4];
+            current_endpoint_count = 0;
+            if (alt == 0) {
+                if (seen_default_interface[iface]) return -1;
+                seen_default_interface[iface] = 1;
+                interface_count++;
+                if (interface_count > data[4]) return -1;
+                if (!puck_only || (iface >= 2 && iface <= 5)) {
+                    if (out->n >= STEAM_USB_MAX_INTERFACES) return -1;
+                    current = out->n++;
+                    out->it[current].iface = iface;
+                    out->it[current].iclass = data[offset + 5];
+                }
             }
         } else if (type == USB_DESC_ENDPOINT) {
             uint8_t address, attributes;
             if (descriptor_length < 7 || !have_interface) return -1;
+            current_endpoint_count++;
+            if (current_endpoint_count > current_expected_endpoints)
+                return -1;
             if (current >= 0) {
                 address = data[offset + 2];
                 attributes = data[offset + 3];
@@ -58,5 +74,8 @@ int steam_usb_parse_config(const uint8_t *data, unsigned length,
         }
         offset += descriptor_length;
     }
+    if (have_interface && current_endpoint_count != current_expected_endpoints)
+        return -1;
+    if (interface_count != data[4]) return -1;
     return out->n;
 }

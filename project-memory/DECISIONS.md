@@ -223,3 +223,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: an unexpected but recoverable descriptor parsing incompatibility will now fail discovery rather than guess. The target kernel's exact error codes and live configuration/report descriptors remain unverified.
 - Verification gate: expected-red then fixed status checks for unavailable, malformed, ENXIO, valid-empty Puck filter, and valid candidate map; full host/ASan/UBSan, targeted scanner TSan, SDK v0.43 cross-build. No real USB ioctl or hardware behavior is claimed.
 - Reconsider if PS5 hardware evidence shows a non-ENXIO ioctl failure that returns usable descriptor data or if the Puck's valid interface topology differs from the pinned parser contract.
+
+
+## ADR-034 — Validate declared USB configuration and interface counts
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: the bounded configuration parser validated descriptor byte lengths but ignored `bNumInterfaces` and each interface/alternate setting's `bNumEndpoints`; duplicate altsetting-zero records could inflate the map, while more selected interfaces than the fixed map capacity were silently dropped.
+- Evidence: `payload/steam_usb.c::steam_usb_parse_config()`, regression `tests/test_steam_usb.c::test_declared_descriptor_counts()` and `test_interface_map_capacity()`, USB-IF HID 1.11 Appendix E.2–E.5 (S11), F069/T-P45/M1-197. Before the fix, the three initial count/capacity regressions failed against the production parser.
+- Decision: count distinct altsetting-zero interfaces and require that count to equal configuration `bNumInterfaces`; reject duplicate default interfaces; count endpoint descriptors separately for every interface/alternate setting and require each to match its declaration; reject selected maps that exceed `STEAM_USB_MAX_INTERFACES` rather than truncating them.
+- Tradeoff: malformed or unusual descriptors now fail discovery. The count checks do not validate a device's HID report-descriptor contents, PS5 ioctl semantics, or physical hardware compatibility.
+- Verification gate: 24 production parser checks, the full normal and ASan/UBSan suites, and the pinned SDK v0.43 cross-build pass. No PS5, Steam Controller, Puck, live descriptor, or USB ioctl was tested. See T-P45.
+- Reconsider only if a captured, standards-conforming target descriptor demonstrates a legitimate topology that this bounded map cannot represent; preserve strict count validation.

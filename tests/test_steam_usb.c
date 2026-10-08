@@ -70,10 +70,63 @@ static void test_invalid_descriptors(void) {
     CHECK(steam_usb_parse_config(no_interface, sizeof(no_interface), 0, &map) == -1);
 }
 
+static void test_declared_descriptor_counts(void) {
+    uint8_t bad_interface_count[sizeof(valid_config)];
+    uint8_t bad_endpoint_count[sizeof(valid_config)];
+    uint8_t bad_alt_endpoint_count[sizeof(valid_config)];
+    static const uint8_t duplicate_default_interface[] = {
+        9, 2, 27, 0, 1, 1, 0, 0x80, 50,
+        9, 4, 2, 0, 0, 3, 0, 0, 0,
+        9, 4, 2, 0, 0, 3, 0, 0, 0
+    };
+    steam_usb_map_t map;
+
+    memcpy(bad_interface_count, valid_config, sizeof(valid_config));
+    bad_interface_count[4] = 3; /* four distinct altsetting-zero interfaces */
+    CHECK(steam_usb_parse_config(bad_interface_count,
+                                 sizeof(bad_interface_count), 0, &map) == -1);
+
+    memcpy(bad_endpoint_count, valid_config, sizeof(valid_config));
+    bad_endpoint_count[22] = 1; /* interface 2 declares two endpoints */
+    CHECK(steam_usb_parse_config(bad_endpoint_count,
+                                 sizeof(bad_endpoint_count), 0, &map) == -1);
+
+    memcpy(bad_alt_endpoint_count, valid_config, sizeof(valid_config));
+    bad_alt_endpoint_count[45] = 0; /* interface 2 altsetting 1 has one */
+    CHECK(steam_usb_parse_config(bad_alt_endpoint_count,
+                                 sizeof(bad_alt_endpoint_count), 0, &map) == -1);
+
+    CHECK(steam_usb_parse_config(duplicate_default_interface,
+                                 sizeof(duplicate_default_interface), 0,
+                                 &map) == -1);
+}
+
+static void test_interface_map_capacity(void) {
+    enum { INTERFACE_COUNT = STEAM_USB_MAX_INTERFACES + 1,
+           CONFIG_LENGTH = 9 + INTERFACE_COUNT * 9 };
+    uint8_t config[CONFIG_LENGTH] = {
+        9, 2, CONFIG_LENGTH, 0, INTERFACE_COUNT, 1, 0, 0x80, 50
+    };
+    steam_usb_map_t map;
+
+    for (unsigned i = 0; i < INTERFACE_COUNT; i++) {
+        unsigned offset = 9 + i * 9;
+        config[offset] = 9;
+        config[offset + 1] = 4;
+        config[offset + 2] = (uint8_t)i;
+        config[offset + 3] = 0;
+        config[offset + 4] = 0;
+        config[offset + 5] = 3;
+    }
+    CHECK(steam_usb_parse_config(config, sizeof(config), 0, &map) == -1);
+}
+
 int main(void) {
     test_complete_configuration_map();
     test_puck_interface_filter();
     test_invalid_descriptors();
+    test_declared_descriptor_counts();
+    test_interface_map_capacity();
     if (failures) {
         fprintf(stderr, "%d of %d Steam USB descriptor checks failed\n", failures, checks);
         return 1;
