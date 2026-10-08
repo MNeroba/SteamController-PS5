@@ -47,6 +47,7 @@
 #include "controller_steam.h"
 #include "controller_sc2.h"
 #include "sc2_profile.h"
+#include "sc2_control.h"
 #include "webui.h"
 #include "sc2_haptics.h"
 #include "sc2_menu.h"
@@ -125,11 +126,6 @@ static pthread_mutex_t g_slot_lock = PTHREAD_MUTEX_INITIALIZER;
  * concurrent Steam reader threads cannot bind each other's virtual pads. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
 static int32_t         g_inject_uid = 0x10000000;
-
-/* Assignment serialization: only ONE controller may show its assignment
- * dialog at a time. g_assign_slot = slot awaiting user confirmation, or -1.
- * Without this, multiple dialogs stack and all bind to the same user. */
-static volatile int    g_assign_slot = -1;
 
 /* ── klog device-ID queue ─────────────────────────────────────────────── */
 #define KLOG_QSIZE 16
@@ -535,7 +531,9 @@ static void sc2_vda_detach(int slot, const char *why) {
     g_slots[slot].handle = -1;
     g_slots[slot].confirmed = 0;
     pthread_mutex_unlock(&g_slot_lock);
-    if (g_assign_slot == slot) g_assign_slot = -1;
+    sc2_assignment_token_t assignment = sc2_assignment_owner();
+    if (sc2_assignment_slot(assignment) == slot)
+        sc2_assignment_release(assignment);
     if (h >= 0) {
         scePadVirtualDeviceDeleteDevice(h);
         gp_log("slot[%d] SC2 virtual pad removed (%s)\n", slot, why);
@@ -550,6 +548,7 @@ typedef struct {
     int      slot;
     char     dev_path[32];
     uint16_t vid, pid;
+    sc2_assignment_token_t assignment_token;
 } usb_thread_arg_t;
 
 static void *usb_hid_thread(void *arg) {
@@ -557,6 +556,7 @@ static void *usb_hid_thread(void *arg) {
     int slot = targ->slot;
     char dev_path[32]; memcpy(dev_path, targ->dev_path, sizeof(dev_path));
     uint16_t vid = targ->vid, pid = targ->pid;
+    sc2_assignment_token_t assignment_token = targ->assignment_token;
     free(targ);
 
     struct usb_fs_endpoint eps[2 + SC2_HAP_MAX_OUT];
@@ -956,7 +956,8 @@ main_loop: ;
              * so the manager can start the next controller's dialog. */
             if (!g_slots[slot].confirmed && pad.buttons != 0) {
                 g_slots[slot].confirmed = 1;
-                if (g_assign_slot == slot) g_assign_slot = -1;
+                sc2_assignment_release(assignment_token);
+                assignment_token = 0;
                 gp_log("slot[%d] assignment confirmed (button press)\n", slot);
             }
             inject_pad(slot, &pad);
@@ -978,6 +979,7 @@ uninit_exit:
 
 exit_slot:
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
+    sc2_assignment_release(assignment_token);
     sc2_bind_reset(&g_slots[slot].binding_state);
     if (g_slots[slot].handle >= 0) scePadVirtualDeviceDeleteDevice(g_slots[slot].handle);
     pthread_mutex_lock(&g_slot_lock);
@@ -1004,7 +1006,7 @@ static void *controller_manager_thread(void *arg) {
 
             /* Serialize assignment: if a controller is still awaiting the user's
              * button press to confirm its dialog, do not start another one. */
-            if (g_assign_slot >= 0) break;
+            if (sc2_assignment_owner() != 0) break;
 
             /* Skip if already claimed by an active slot */
             int busy = 0;
@@ -1055,20 +1057,30 @@ static void *controller_manager_thread(void *arg) {
             g_slots[slot].vid = vid;
             g_slots[slot].pid = pid;
             pthread_mutex_unlock(&g_slot_lock);
+            sc2_assignment_token_t assignment_token = 0;
             int32_t handle = -1;
             if (!lazy) {
-            g_assign_slot = slot;
-
-            /* Create VDA and force_bind (shows PS5 assignment dialog) */
-            handle = create_vda_for_slot(slot);
-            if (handle < 0) {
-                gp_log("manager: slot[%d] VDA failed — releasing\n", slot);
+            assignment_token = sc2_assignment_claim(slot);
+            if (assignment_token == 0) {
+                gp_log("manager: assignment lease unavailable for slot[%d]\n", slot);
                 pthread_mutex_lock(&g_slot_lock);
                 g_slots[slot].usb_active = 0;
                 g_slots[slot].dev_path[0] = '\0';
                 g_slots[slot].handle = -1;
                 pthread_mutex_unlock(&g_slot_lock);
-                g_assign_slot = -1;
+                continue;
+            }
+
+            /* Create VDA and force_bind (shows PS5 assignment dialog) */
+            handle = create_vda_for_slot(slot);
+            if (handle < 0) {
+                gp_log("manager: slot[%d] VDA failed — releasing\n", slot);
+                sc2_assignment_release(assignment_token);
+                pthread_mutex_lock(&g_slot_lock);
+                g_slots[slot].usb_active = 0;
+                g_slots[slot].dev_path[0] = '\0';
+                g_slots[slot].handle = -1;
+                pthread_mutex_unlock(&g_slot_lock);
                 continue;
             }
 
@@ -1083,28 +1095,29 @@ static void *controller_manager_thread(void *arg) {
             usb_thread_arg_t *targ = malloc(sizeof(*targ));
             if (!targ) {
                 gp_log("manager: malloc fail for slot[%d]\n", slot);
+                sc2_assignment_release(assignment_token);
                 if (handle >= 0) scePadVirtualDeviceDeleteDevice(handle);
                 pthread_mutex_lock(&g_slot_lock);
                 g_slots[slot].handle=-1; g_slots[slot].vdi_ready=0;
                 g_slots[slot].usb_active=0; g_slots[slot].dev_path[0]='\0';
                 pthread_mutex_unlock(&g_slot_lock);
-                g_assign_slot = -1;
                 continue;
             }
             targ->slot = slot;
             strncpy(targ->dev_path, path, sizeof(targ->dev_path)-1);
             targ->vid=vid; targ->pid=pid;
+            targ->assignment_token = assignment_token;
 
             pthread_t tid;
             if (pthread_create(&tid, NULL, usb_hid_thread, targ) != 0) {
                 gp_log("manager: pthread_create fail slot[%d]\n", slot);
                 free(targ);
+                sc2_assignment_release(assignment_token);
                 if (handle >= 0) scePadVirtualDeviceDeleteDevice(handle);
                 pthread_mutex_lock(&g_slot_lock);
                 g_slots[slot].handle=-1; g_slots[slot].vdi_ready=0;
                 g_slots[slot].usb_active=0; g_slots[slot].dev_path[0]='\0';
                 pthread_mutex_unlock(&g_slot_lock);
-                g_assign_slot = -1;
             } else {
                 pthread_detach(tid);
                 gp_log("manager: slot[%d] USB thread started handle=0x%x\n",
@@ -1119,14 +1132,23 @@ static void *controller_manager_thread(void *arg) {
         /* Assignment timeout: if the user never presses a button, release the
          * gate after ~30s so the queue does not stall forever. */
         static int assign_wait = 0;
-        if (g_assign_slot >= 0) {
-            if (++assign_wait > 15) {  /* 15 * 2s = 30s */
-                gp_log("manager: assignment timeout slot[%d] — releasing gate\n", g_assign_slot);
-                g_assign_slot = -1;
+        static sc2_assignment_token_t assign_wait_token = 0;
+        sc2_assignment_token_t current_assignment = sc2_assignment_owner();
+        if (current_assignment != 0) {
+            if (current_assignment != assign_wait_token) {
+                assign_wait_token = current_assignment;
                 assign_wait = 0;
+            }
+            if (++assign_wait > 15) {  /* 15 * 2s = 30s */
+                int assign_slot = sc2_assignment_slot(current_assignment);
+                if (sc2_assignment_release(current_assignment))
+                    gp_log("manager: assignment timeout slot[%d] — releasing gate\n", assign_slot);
+                assign_wait = 0;
+                assign_wait_token = 0;
             }
         } else {
             assign_wait = 0;
+            assign_wait_token = 0;
         }
 
         scan++;
@@ -1178,8 +1200,6 @@ int main(void) {
         g_slots[s].dev_path[0]= '\0';
         sc2_bind_reset(&g_slots[s].binding_state);
     }
-    g_assign_slot = -1;
-
     sceUserServiceInitialize(NULL);
     sceUserServiceGetInitialUser(&userId);
     sceUserServiceGetForegroundUser(&fgUser);

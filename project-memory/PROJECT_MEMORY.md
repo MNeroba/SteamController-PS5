@@ -1,6 +1,6 @@
 # Project memory — SteamController-PS5
 
-**Snapshot date:** 2026-10-08 · **State:** M0 COMPLETE; M1 host hardening and reusable pure modules implemented · 446 HOST ASAN/UBSAN CHECKS PASS · targeted ThreadSanitizer runs PASS · PS5 SDK v0.43 cross-build PASS · target runtime/hardware incomplete · draft PR #1 open; host CI queued.
+**Snapshot date:** 2026-10-08 · **State:** M0 COMPLETE; M1 host hardening and reusable pure modules implemented · 477 HOST ASAN/UBSAN CHECKS PASS · targeted ThreadSanitizer runs PASS, including assignment-lease contention · PS5 SDK v0.43 cross-build PASS · target runtime/hardware incomplete · draft PR #1 open; latest CI runs queued.
 
 ## Intent locked by product owner
 
@@ -25,7 +25,7 @@ ADR-001 accepts PuckbridgePS5 at `78460113ef7c48502c765a1f83ba34d53c977134` as t
 | Gate | Status | Reason |
 |---|---|---|
 | M0: source and license selection | COMPLETE WITH LIMITS | Exact source commits compared; Puckbridge selected. Upstream hardware statements are not independently confirmed; inline drawing has repo-level GPL notice and author credit, with no separate asset license. |
-| Host tests | PARTIAL_PASS | ASan/UBSan suite passes 446 checks: HTTP/auth/token storage (57), bounded JSON (9), USB config parsing (19), Steam report decoding (190), mapping transforms (24), motion math (25), feedback encoding (20), strict/concurrent profile parsing (33), per-session binding transitions (49), and atomic pause state (20). ThreadSanitizer passes the concurrent profile, binding-reset, and pause-state targets. Full session/slot lifecycle, menu/input-thread integration, USB lifecycle, and physical hardware coverage remain. |
+| Host tests | PARTIAL_PASS | ASan/UBSan suite passes 477 checks: HTTP/auth/token storage (57), bounded JSON (9), USB config parsing (19), Steam report decoding (190), mapping transforms (24), motion math (25), feedback encoding (20), strict/concurrent profile parsing (33), per-session binding transitions (49), and atomic pause/assignment control (51). ThreadSanitizer passes profile parsing, binding reset, and pause/assignment-control contention. Assignment leases now reject stale releases; full session/slot lifecycle, menu/input-thread integration, USB lifecycle, and physical hardware coverage remain. |
 | OmniPad baseline host tests | FAIL | Three present tests pass; target exits 2 at missing `tests/test_normalization.c`. |
 | PS5 SDK ELF build | PASS_CROSS_BUILD_ONLY | SDK v0.43 (`d9c9519116944a7f1c22d262012c53b80b3520b7`, archive SHA-256 `a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb`) and Homebrew LLVM 18.1.8 built the ELF cleanly on Darwin 27.0.0 arm64. ELF SHA-256 `34aaef13a4911147c6342469486aeaee6b2e10ec8ffa6d2d455f78c4ccdb80a4`; see M1-15. No PS5 runtime or firmware behavior was exercised. SDK is local in ignored `.build-cache/`; Homebrew installed LLVM at `/opt/homebrew/opt/llvm@18`. |
 | Actual PS5 FW 13.60 USB/Puck validation | BLOCKED_HARDWARE | No physical console, Steam Controller, or official Puck available in this session. |
@@ -35,10 +35,10 @@ ADR-001 accepts PuckbridgePS5 at `78460113ef7c48502c765a1f83ba34d53c977134` as t
 
 ## Exact next tasks
 
-1. Inspect Actions runs `37789861487`, `37789861783`, `37789868606`, and `37789868667` for head `014f418ade3c7d09655ed302b09cf9a4d0e508fc`; append actual conclusions to `TEST_LOG.md` and do not claim a CI pass while queued.
-2. Add host tests for session lifecycle, profile transitions, and slot generations. Cross-compilation now covers the target adapters at compile/link time, but runtime behavior still needs hardware validation.
-3. Complete game-hook rollback for process exit/payload stop and continue auditing the inherited slot/handoff lifecycle. Allocation and USB-thread creation rollback now avoid deleting invalid `-1` handles; injected failure and target runtime checks remain open as P1-SLOT-11.
+1. The current PR head before this assignment-lease change was `057955b8716987f4171071f14b97a3eefe0537a7`; its PR-triggered Host tests run `37790078829` and PS5 cross-build run `37790078672` were queued with no conclusion at the 2026-10-08 14:08 UTC check. After publication, inspect the new head's PR workflows once and record actual outcomes.
+2. Add portable session/slot lifecycle tests and audit ownership/generation behavior in `payload/gc_main.c`; the assignment-dialog lease is only a small race-safe gate, not a slot manager.
+3. Complete game-hook rollback for process exit/payload stop and continue auditing inherited slot/handoff lifecycle. Allocation and USB-thread creation rollback avoid deleting invalid `-1` handles; injected failure and target runtime checks remain open as P1-SLOT-11.
 4. Obtain a physical PS5, DualSense, Steam Controller, and official Puck for USB/Puck/reconnect/motion/touch/haptics/security hardware gates.
-5. Continue BLE only under passive/evidence gates in `docs/BLE_FEASIBILITY.md`; no stock DualSense risk.
+5. Continue BLE only under passive/evidence gates in `docs/BLE_FEASIBILITY.md`; do not use native radio commands without an approved, safe hardware gate.
 
 Every future Codex session: update this snapshot **only after** recording detailed evidence in FINDINGS/ISSUES/TEST_LOG/DECISIONS/SESSION_LOG.
