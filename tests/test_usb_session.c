@@ -211,6 +211,31 @@ int main(void) {
     CHECK(fake.stopped_endpoints == 0);
     CHECK(fake.closed_endpoints == (UINT32_C(1) << 0 | UINT32_C(1) << 1));
 
+    /* A multiplexed caller has no single expected endpoint: COMPLETE returns
+     * whichever active transfer finished. The common session owner must
+     * account for that exact endpoint and expose it to the caller. */
+    usb_resources_init(&resources);
+    fake = (fake_session_t){0};
+    CHECK(usb_session_open(&resources, &ops, "/dev/fake", 7, &fake) == 0);
+    CHECK(usb_session_init_fs(&resources, &ops, &config, &fake) == 0);
+    CHECK(usb_session_open_endpoint(&resources, &ops, 0, &config, &fake) == 0);
+    CHECK(usb_session_open_endpoint(&resources, &ops, 1, &config, &fake) == 0);
+    CHECK(usb_session_start_transfer(&resources, &ops, 0, &config, &fake) == 0);
+    CHECK(usb_session_start_transfer(&resources, &ops, 1, &config, &fake) == 0);
+    fake.completed_endpoint = 1;
+    CHECK(usb_session_complete_any_transfer(&resources, &ops, &completion,
+                                            &completed_endpoint, &fake) ==
+          USB_SESSION_OK);
+    CHECK(completed_endpoint == 1);
+    CHECK(resources.active_transfers == UINT32_C(1));
+    fake.completed_endpoint = 0;
+    CHECK(usb_session_complete_any_transfer(&resources, &ops, &completion,
+                                            &completed_endpoint, &fake) ==
+          USB_SESSION_OK);
+    CHECK(completed_endpoint == 0);
+    CHECK(resources.active_transfers == 0);
+    CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
+
     printf("USB session fault-injection checks passed (%d checks)\n", checks);
     return 0;
 }

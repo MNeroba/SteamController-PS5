@@ -36,10 +36,19 @@ int usb_session_open_endpoint(usb_resources_t *resources,
                               const usb_session_ops_t *ops,
                               uint8_t endpoint_index, void *configuration,
                               void *context);
+int usb_session_close_endpoint(usb_resources_t *resources,
+                               const usb_session_ops_t *ops,
+                               uint8_t endpoint_index, void *context);
 int usb_session_start_transfer(usb_resources_t *resources,
                                const usb_session_ops_t *ops,
                                uint8_t endpoint_index, void *configuration,
                                void *context);
+/* Complete and account whichever active endpoint the USB FS queue reports. */
+int usb_session_complete_any_transfer(usb_resources_t *resources,
+                                      const usb_session_ops_t *ops,
+                                      void *configuration,
+                                      uint8_t *completed_endpoint_index,
+                                      void *context);
 int usb_session_complete_transfer(usb_resources_t *resources,
                                   const usb_session_ops_t *ops,
                                   uint8_t endpoint_index, void *configuration,

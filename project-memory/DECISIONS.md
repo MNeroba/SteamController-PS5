@@ -201,3 +201,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: a caller may observe and drain completions for other active endpoints while waiting on its own transfer. The SC2 candidate scanner still handles multiplexed completions through its direct but tracked scan loop.
 - Verification gate: expected-red then fixed endpoint-accounting test, fail-once STOP cleanup retry, full normal/ASan/UBSan host suites, and pinned SDK cross-build. Real PS5 ioctl scheduling, controller/Puck behavior, device removal, and kernel STOP semantics remain unverified.
 - Reconsider if target measurements reveal different COMPLETE semantics or if scanner operations are moved to a transport-specific multiplexing interface.
+
+
+## ADR-032 — Reuse the USB session operation table for SC2 endpoint scans
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: after M1-193, `sc2_find_active_ep()` updated the shared resource bitmap but still issued raw endpoint ioctls directly. That made operation failures difficult to inject and left scanner lifecycle behavior outside the existing `usb_session_ops_t` abstraction. USB FS COMPLETE is multiplexed across active endpoints, so any seam must report and account the endpoint the kernel actually returns.
+- Evidence: `payload/controller_sc2.c::sc2_find_active_ep()`, `payload/usb_session.c::usb_session_complete_any_transfer()` and `usb_session_close_endpoint()`, `tests/test_sc2_usb_scan.c`, T-P42/M1-194; SDK v0.43 header evidence retained in ADR-031.
+- Decision: pass the owning `usb_session_ops_t` and context into the SC2 scanner. Reuse shared open/start/complete/stop/close lifecycle helpers; do not create a scanner-specific duplicate ops table. Add a general COMPLETE-any-active-transfer helper, which accounts the returned endpoint before scanner report classification. Reject a scan while any pre-existing transfer is active, because COMPLETE consumes from the whole FS session queue and must not drain another owner's completion.
+- Tradeoff: the scanner now depends explicitly on the session operation interface, and a session with an unrelated active transfer must finish or clean up before discovery starts. `gc_main.c` performs discovery in that exclusive pre-reader phase. The fake table validates portable ownership/dispatch only; Prospero scheduling, unplug semantics and actual USB behavior remain unverified.
+- Verification gate: endpoint 1 completes before endpoint 0 and the scanner selects the valid endpoint; active-transfer conflict leaves state unchanged; fail-once STOP/CLOSE remains owned and cleanup retries; full normal and ASan/UBSan suites, targeted scanner TSan, and pinned SDK v0.43 compile/link.
+- Reconsider if hardware evidence shows the Prospero USB FS completion queue can safely be consumed concurrently by independent endpoint owners.

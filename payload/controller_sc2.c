@@ -106,7 +106,13 @@ static int sc2_scan_errno(void) {
     return errno ? -errno : USB_RESOURCES_ERROR;
 }
 
+static int sc2_scan_operation_error(int result) {
+    return result == USB_SESSION_BAD_STATE ? USB_RESOURCES_BAD_STATE :
+           sc2_scan_errno();
+}
+
 int sc2_find_active_ep(int fd, usb_resources_t *resources,
+                       const usb_session_ops_t *ops, void *ops_context,
                        struct usb_fs_endpoint *eps,
                        const uint8_t *addrs, int n, int timeout_ms) {
     uint8_t bufs[SC2_MAX_EPS][64];
@@ -115,9 +121,18 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
     int opened[SC2_MAX_EPS] = {0}, started[SC2_MAX_EPS] = {0};
     int found = 0, first_error = 0;
     if (!resources || resources->fd != fd || !resources->fs_initialized ||
-        !eps || !addrs || n < 0 || timeout_ms < 0)
+        !ops || !ops->open_endpoint || !ops->start_transfer ||
+        !ops->complete_transfer || !ops->resources.stop_transfer ||
+        !ops->resources.close_endpoint || !eps || !addrs || n < 0 ||
+        timeout_ms < 0)
         return USB_RESOURCES_BAD_STATE;
     if (n > SC2_MAX_EPS) n = SC2_MAX_EPS;
+    if (n == 0) return 0;
+    /* COMPLETE is multiplexed for the whole FS session. Do not consume a
+     * completion owned by another endpoint before the scan has opened its
+     * candidate set. */
+    if (resources->active_transfers != 0)
+        return USB_RESOURCES_BAD_STATE;
     for (int i = 0; i < n; i++) {
         if (resources->opened_endpoints & (UINT32_C(1) << i))
             return USB_RESOURCES_BAD_STATE;
@@ -126,23 +141,20 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
     for (int i = 0; i < n; i++) {
         struct usb_fs_open o; memset(&o, 0, sizeof(o));
         o.ep_index = i; o.ep_no = addrs[i]; o.max_bufsize = 64; o.max_frames = 1;
-        if (ioctl(fd, USB_FS_OPEN, &o) != 0) {
+        errno = 0;
+        int open_result = usb_session_open_endpoint(resources, ops,
+                                                     (uint8_t)i, &o,
+                                                     ops_context);
+        if (open_result != 0) {
+            if (open_result == USB_SESSION_BAD_STATE) {
+                found = USB_SESSION_BAD_STATE;
+                break;
+            }
             if (errno == ENXIO) {
                 found = -ENXIO;
                 break;
             }
             continue;
-        }
-        if (usb_resources_note_endpoint_open(resources, (uint8_t)i) !=
-            USB_RESOURCES_OK) {
-            struct usb_fs_close close_endpoint;
-            memset(&close_endpoint, 0, sizeof(close_endpoint));
-            close_endpoint.ep_index = (uint8_t)i;
-            if (ioctl(fd, USB_FS_CLOSE, &close_endpoint) != 0)
-                sc2_scan_remember_error(&first_error, sc2_scan_errno());
-            sc2_scan_remember_error(&first_error, USB_RESOURCES_BAD_STATE);
-            found = USB_RESOURCES_BAD_STATE;
-            break;
         }
         opened[i] = 1;
         bp[i][0] = bufs[i]; bl[i][0] = 64;
@@ -157,25 +169,28 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             if (!started[i]) {
                 bl[i][0] = 64; eps[i].aFrames = 0; eps[i].status = 0;
                 struct usb_fs_start s; memset(&s, 0, sizeof(s)); s.ep_index = i;
-                if (usb_resources_note_transfer_start(resources,
-                        (uint8_t)i) != USB_RESOURCES_OK) {
-                    found = USB_RESOURCES_BAD_STATE;
+                errno = 0;
+                int start_result = usb_session_start_transfer(resources, ops,
+                        (uint8_t)i, &s, ops_context);
+                if (start_result == 0) started[i] = 1;
+                else if (start_result == USB_SESSION_BAD_STATE) {
+                    found = USB_SESSION_BAD_STATE;
                     break;
-                }
-                if (ioctl(fd, USB_FS_START, &s) == 0) started[i] = 1;
-                else if (errno == ENXIO) { found = -ENXIO; break; }
+                } else if (errno == ENXIO) { found = -ENXIO; break; }
                 else if (errno == EBUSY) started[i] = 1;
             }
         }
         struct usb_fs_complete c; memset(&c, 0, sizeof(c));
-        while (!found && ioctl(fd, USB_FS_COMPLETE, &c) == 0) {
-            int i = c.ep_index;
+        uint8_t completed_endpoint = UINT8_MAX;
+        int complete_result = USB_SESSION_OK;
+        while (!found && complete_result == USB_SESSION_OK &&
+               resources->active_transfers != 0) {
+            errno = 0;
+            complete_result = usb_session_complete_any_transfer(resources,
+                    ops, &c, &completed_endpoint, ops_context);
+            if (complete_result != USB_SESSION_OK) break;
+            int i = completed_endpoint;
             if (i >= 0 && i < n && opened[i] && started[i]) {
-                if (usb_resources_note_transfer_complete(resources,
-                        (uint8_t)i) != USB_RESOURCES_OK) {
-                    found = USB_RESOURCES_BAD_STATE;
-                    break;
-                }
                 started[i] = 0;
                 steam_report_t report;
                 if (bl[i][0] > 0 &&
@@ -187,6 +202,11 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             }
             memset(&c, 0, sizeof(c));
         }
+        if (!found && complete_result == USB_SESSION_BAD_STATE) {
+            sc2_scan_remember_error(&first_error,
+                                    sc2_scan_operation_error(complete_result));
+            found = first_error;
+        }
         if (!found && errno == ENXIO) found = -ENXIO;
         if (!found) usleep(5000);
     }
@@ -194,28 +214,20 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
     for (int i = 0; i < n; i++) {
         if (!opened[i]) continue;
         if (resources->active_transfers & (UINT32_C(1) << i)) {
-            struct usb_fs_stop stop;
-            memset(&stop, 0, sizeof(stop));
-            stop.ep_index = (uint8_t)i;
-            if (ioctl(fd, USB_FS_STOP, &stop) == 0) {
-                if (usb_resources_note_transfer_stop(resources,
-                        (uint8_t)i) != USB_RESOURCES_OK)
-                    sc2_scan_remember_error(&first_error,
-                                            USB_RESOURCES_BAD_STATE);
-            } else {
-                sc2_scan_remember_error(&first_error, sc2_scan_errno());
+            errno = 0;
+            int stop_result = usb_session_stop_transfer(resources, ops,
+                    (uint8_t)i, ops_context);
+            if (stop_result != 0) {
+                sc2_scan_remember_error(&first_error,
+                        sc2_scan_operation_error(stop_result));
             }
         }
-        struct usb_fs_close close_endpoint;
-        memset(&close_endpoint, 0, sizeof(close_endpoint));
-        close_endpoint.ep_index = (uint8_t)i;
-        if (ioctl(fd, USB_FS_CLOSE, &close_endpoint) == 0) {
-            if (usb_resources_note_endpoint_close(resources,
-                    (uint8_t)i) != USB_RESOURCES_OK)
-                sc2_scan_remember_error(&first_error,
-                                        USB_RESOURCES_BAD_STATE);
-        } else {
-            sc2_scan_remember_error(&first_error, sc2_scan_errno());
+        errno = 0;
+        int close_result = usb_session_close_endpoint(resources, ops,
+                (uint8_t)i, ops_context);
+        if (close_result != 0) {
+            sc2_scan_remember_error(&first_error,
+                    sc2_scan_operation_error(close_result));
         }
     }
     return first_error != 0 ? first_error : found;

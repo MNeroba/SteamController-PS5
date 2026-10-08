@@ -70,7 +70,7 @@ make -C tests clean test
 make -C tests clean sanitize
 ```
 
-The latest recorded run passes 1048 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, rejection of empty or incorrectly declared profile bodies, and an IPv4 peer-scope policy. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
+The latest full normal and AddressSanitizer/UndefinedBehaviorSanitizer runs pass 1148 checks, including injected USB scanner operations, multiplexed endpoint completion, and cleanup retries. The suite also exercises 100,000 deterministic Steam reports and 100,000 USB descriptor inputs. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, rejection of empty or incorrectly declared profile bodies, and IPv4 peer-scope policy. Targeted ThreadSanitizer runs pass for recorded concurrency tests, including the SC2 scanner. These host tests use production portable modules and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
 ### PS5 payload cross-build
 

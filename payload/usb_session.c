@@ -69,6 +69,21 @@ int usb_session_open_endpoint(usb_resources_t *resources,
     return USB_SESSION_BAD_STATE;
 }
 
+int usb_session_close_endpoint(usb_resources_t *resources,
+                               const usb_session_ops_t *ops,
+                               uint8_t endpoint_index, void *context) {
+    if (!resources || !ops || !ops->resources.close_endpoint)
+        return USB_SESSION_ERROR;
+    if (resources->fd < 0 || endpoint_index >= USB_RESOURCES_MAX_ENDPOINTS ||
+        !(resources->opened_endpoints & (UINT32_C(1) << endpoint_index)))
+        return USB_SESSION_BAD_STATE;
+    int result = ops->resources.close_endpoint(resources->fd, endpoint_index,
+                                               context);
+    if (result != 0) return result;
+    result = usb_resources_note_endpoint_close(resources, endpoint_index);
+    return result == USB_RESOURCES_OK ? USB_SESSION_OK : USB_SESSION_BAD_STATE;
+}
+
 int usb_session_start_transfer(usb_resources_t *resources,
                                const usb_session_ops_t *ops,
                                uint8_t endpoint_index, void *configuration,
@@ -84,17 +99,15 @@ int usb_session_start_transfer(usb_resources_t *resources,
     return ops->start_transfer(resources->fd, configuration, context);
 }
 
-int usb_session_complete_transfer(usb_resources_t *resources,
-                                  const usb_session_ops_t *ops,
-                                  uint8_t endpoint_index, void *configuration,
-                                  uint8_t *completed_endpoint_index,
-                                  void *context) {
+int usb_session_complete_any_transfer(usb_resources_t *resources,
+                                      const usb_session_ops_t *ops,
+                                      void *configuration,
+                                      uint8_t *completed_endpoint_index,
+                                      void *context) {
     if (!resources || !ops || !ops->complete_transfer ||
         !completed_endpoint_index)
         return USB_SESSION_ERROR;
-    if (resources->fd < 0 || endpoint_index >= USB_RESOURCES_MAX_ENDPOINTS ||
-        !(resources->opened_endpoints & (UINT32_C(1) << endpoint_index)) ||
-        !(resources->active_transfers & (UINT32_C(1) << endpoint_index)))
+    if (resources->fd < 0 || resources->active_transfers == 0)
         return USB_SESSION_BAD_STATE;
     uint8_t completed = UINT8_MAX;
     int result = ops->complete_transfer(resources->fd, configuration,
@@ -107,6 +120,26 @@ int usb_session_complete_transfer(usb_resources_t *resources,
         errno = EPROTO;
         return USB_SESSION_BAD_STATE;
     }
+    *completed_endpoint_index = completed;
+    return USB_SESSION_OK;
+}
+
+int usb_session_complete_transfer(usb_resources_t *resources,
+                                  const usb_session_ops_t *ops,
+                                  uint8_t endpoint_index, void *configuration,
+                                  uint8_t *completed_endpoint_index,
+                                  void *context) {
+    if (!resources || !ops || !completed_endpoint_index)
+        return USB_SESSION_ERROR;
+    if (resources->fd < 0 || endpoint_index >= USB_RESOURCES_MAX_ENDPOINTS ||
+        !(resources->opened_endpoints & (UINT32_C(1) << endpoint_index)) ||
+        !(resources->active_transfers & (UINT32_C(1) << endpoint_index)))
+        return USB_SESSION_BAD_STATE;
+    uint8_t completed = UINT8_MAX;
+    int result = usb_session_complete_any_transfer(resources, ops,
+                                                    configuration, &completed,
+                                                    context);
+    if (result != USB_SESSION_OK) return result;
     *completed_endpoint_index = completed;
     return completed == endpoint_index ? USB_SESSION_OK :
            USB_SESSION_COMPLETED_OTHER;

@@ -814,8 +814,10 @@ static void *usb_hid_thread(void *arg) {
 
         /* Wait for the controller to wake / pick the puck slot it's paired to */
         int active = 0, told = 0;
-        while ((active = sc2_find_active_ep(fd, &usb_resources, sc2_eps,
-                                             addrs, n_eps, 2000)) == 0) {
+        while ((active = sc2_find_active_ep(fd, &usb_resources,
+                                             &g_usb_session_ops, NULL,
+                                             sc2_eps, addrs, n_eps,
+                                             2000)) == 0) {
             if (!told) { gp_log("slot[%d] Puck idle — waiting for the controller to turn on\n", slot); told = 1; }
         }
         if (usb_resources.opened_endpoints != 0 ||

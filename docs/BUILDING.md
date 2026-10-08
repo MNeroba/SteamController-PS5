@@ -42,3 +42,7 @@ After adding the default IPv4 peer-scope check to the portal accept loop, the SD
 ## Complete `main` tree validation
 
 On 2026-10-08, the complete project was published to `main` at commit `0f122c64eff0b196ba023c75af9a61ba1cc9514a`. GitHub reports 195 files; a local clean export produced the identical Git tree SHA `9834f600c9b77be4d2f7285c1b3f21fe70658e99`. From that export, `make clean test` and `make clean sanitize` both passed (1048 checks each), and the SDK v0.43 cross-build succeeded with ELF SHA-256 `26dce830d274755fc0bd6a83cafc8e3e6f660e756544d699a2b346ef445afbf0`. This is host-test and compile/link evidence only. A direct network `git clone` could not complete because this environment could not resolve `github.com`; the build ran from a clean source export verified against the exact GitHub tree. GitHub push workflows were queued after publication.
+
+## M1-194 scanner operation-table rebuild
+
+On 2026-10-08, the scanner operation-table change built with the same pinned SDK v0.43 and LLVM 18.1.8 command. The ELF is 64-bit x86-64, with SHA-256 `1af60f12c8d5f34860beb82975db609d29dc1d8e1635d1b17cc7084f134e0e78`; `llvm-readobj` lists the expected PS5 SDK runtime libraries. This verifies compilation/linking only. No real USB FS ioctl, console, Steam Controller, Puck, or firmware behavior was tested. Exact environment and command are in M1-194 of `project-memory/TEST_LOG.md`; this record was written before its source delta was published to `main`.
