@@ -35,7 +35,7 @@ The comparison used the exact public `main` snapshots below. These are source ob
 
 Adopt **Option 1: PuckbridgePS5 as the executable foundation**, pinned to `78460113ef7c48502c765a1f83ba34d53c977134`. The direct Steam-controller support and existing PS5 lifecycle outweigh OmniPad's stronger-looking generic slot separation. OmniPad remains a source-level design reference only; no OmniPad source is imported.
 
-The source snapshot and pinned Git metadata are now present in this workspace. `HEAD` is the selected Puckbridge SHA; the active branch is `fix/p0-safety`. `puckbridge-upstream` and `omnipad-reference` are fetch-only remotes; the user-supplied `MNeroba/SteamController-PS5` URL is configured as `origin`. The changes remain uncommitted because local Git author identity is unset and GitHub authentication is invalid. The pristine comparison trees remain available at `/private/tmp/SteamController-PS5-audit/` for this session.
+The source snapshot and pinned Git metadata are present in this workspace. The local `HEAD` remains the selected Puckbridge SHA; local `fix/p0-safety` changes are published through the connected GitHub app to the user's derivative repository and draft PR #1. The local Git author identity and GitHub CLI credentials are not configured, so the local branch cannot create those commits; GitHub app publication has been confirmed by the host. `puckbridge-upstream` and `omnipad-reference` are fetch-only remotes; the user-supplied `MNeroba/SteamController-PS5` URL is configured as `origin`. The pristine comparison trees remain available at `/private/tmp/SteamController-PS5-audit/` for this session.
 
 ### Keep and stage for refactor
 

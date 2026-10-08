@@ -18,7 +18,7 @@ Game-process input merging and game-driven vibration hooks are disabled by defau
 
 ## Build and host tests
 
-PS5 payload build requires a compatible `ps5-payload-sdk` checkout configured through `PS5_PAYLOAD_SDK`:
+PS5 payload builds use the pinned `ps5-payload-sdk` v0.43 release and LLVM 18. See [the build guide](docs/BUILDING.md) for the verified asset digest, macOS setup, and exact commands. A successful cross-build confirms compilation and linking against the SDK; it does not confirm runtime or firmware compatibility.
 
 ```sh
 export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
@@ -31,7 +31,7 @@ Portable protocol, descriptor, portal security/JSON, profile parsing, mapping, m
 make -C tests sanitize
 ```
 
-The latest ASan/UBSan run passes 374 assertions. Profile tests include concurrent parsing through independent parser calls. These host tests do not build or exercise most PS5 adapter code and do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility. The current environment has no configured PS5 SDK or physical console. A missing hardware test is reported as blocked, not as a compatibility failure or pass.
+The latest ASan/UBSan run passes 446 assertions. ThreadSanitizer also passes the concurrent binding-reset, profile-parser, and pause-state suites. A clean SDK v0.43 cross-build now produces the x86-64 PS5 ELF on macOS. Host tests and cross-compilation do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility; no physical console or Steam Controller/Puck is available here. Hardware validation remains blocked, not passed or failed.
 
 ## Source pins and attribution
 

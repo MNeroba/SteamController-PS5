@@ -84,6 +84,7 @@ extern int kernel_set_vmem_protection(pid_t pid, intptr_t addr, size_t size, int
 #define GHOSTPAD_VDA_PS4_CAVE_OFF              0x0dd2u
 #define GHOSTPAD_VDA_PS4_CAVE_LEN              14u
 
+#ifdef __ORBIS__
 static uint64_t
 ghostpad_fnv1a64(const uint8_t *buf, size_t len)
 {
@@ -105,6 +106,7 @@ ghostpad_all_byte(const uint8_t *buf, size_t len, uint8_t value)
     }
     return 1;
 }
+#endif
 
 /* PT_IO fallback for shellui_pad_update — always enabled */
 
@@ -3929,4 +3931,3 @@ shellui_pad_unpatch(void)
     }
     return 0;
 }
-

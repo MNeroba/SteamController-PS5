@@ -121,8 +121,10 @@ static void check_concurrent_combo_parsing(void) {
 
 int main(void) {
     sc2_profile_t p;
+    sc2_profile_t active_copy;
     char digits[181];
     char bad[1024];
+    uint32_t active_generation, next_generation;
 
     sc2_profile_default(&p);
     CHECK(p.long_ms == 400);
@@ -169,6 +171,14 @@ int main(void) {
     sc2_profile_parse("LONG_MS=2147483648\nTURBO_MS=-2147483648\n", &p);
     CHECK(p.long_ms == 2000);  /* outside int range is ignored */
     CHECK(p.turbo_ms == 20);   /* in-range signed values are clamped */
+
+    sc2_active_set(&p);
+    sc2_active_get_versioned(&active_copy, &active_generation);
+    CHECK(active_generation != 0);
+    CHECK(active_copy.long_ms == p.long_ms);
+    sc2_active_set(&p);
+    sc2_active_get_versioned(&active_copy, &next_generation);
+    CHECK(next_generation != active_generation);
 
     check_concurrent_combo_parsing();
 

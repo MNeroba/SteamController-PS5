@@ -1,26 +1,29 @@
 # Verification matrix and reproducible testing
 
-Tests are evidence, not intentions. Codex must create/verify actual runnable commands in selected source tree and update `project-memory/TEST_LOG.md` with exit status and exact environment. Commands below are **targets/examples**, not claims that the current unmodified repo provides these targets.
+Tests are evidence, not intentions. `project-memory/TEST_LOG.md` records executed commands, exits, and environments. The matrix below distinguishes complete host verification from partial tests, unrun target work, and research blockers.
 
-Current portable targets are in `tests/Makefile`: `make -C tests test` and `make -C tests sanitize`. The latest suite passes 374 checks under ASan/UBSan: HTTP/auth/token storage 57, JSON writer 9, USB configuration parsing 19, Steam report decoding 190, mapping transforms 24, motion math 25, feedback serialization 20, and profile parsing 30. Profile coverage includes malformed/overflowing integers and concurrent calls. It does not validate session/slot lifecycle, profile transitions, the PS5 adapter's neutral-publication branch, live USB/Puck I/O, or physical console behavior. See the latest entry in `project-memory/TEST_LOG.md` for environment and command.
+Current portable targets are in `tests/Makefile`: `make -C tests test` and `make -C tests sanitize`. The latest suite passes 446 checks under ASan/UBSan: HTTP/auth/token storage 57, JSON writer 9, USB configuration parsing 19, Steam report decoding 190, mapping transforms 24, motion math 25, feedback serialization 20, profile parsing/concurrency 33, binding transitions/session isolation/reset epochs 49, and atomic pause state 20. Separate ThreadSanitizer runs pass for the profile parser, binding-reset, and pause-state concurrency tests. This does not validate complete session/slot lifecycle, profile persistence/browser integration, menu/input-thread integration, the PS5 adapter's neutral-publication branch, live USB/Puck I/O, or physical console behavior. See the latest entries in `project-memory/TEST_LOG.md` for exact commands and environment.
 
 ## Host tests
 
 | ID | Subsystem | Required test cases | Gate |
 |---|---|---|---|
-| T-P01 | HID/Steam decoder | report 0x42/0x45/0x47 variations, truncation 0..N bytes, oversized, malformed ID, valid vectors, endian/sign | HOST_VERIFIED |
-| T-P02 | HCI/L2CAP parser | length shorter than header, len==8, claims > received, invalid CID, ACL-handle-to-device index mismatch | HOST_VERIFIED |
-| T-P03 | Puck USB | multiple HID interfaces, dock vs game input usage, wrong PID, conflicting receiver, wake/sleep, no double attach | HOST_VERIFIED |
-| T-P04 | Session | lizard mode state, heartbeat timing, keepalive errors, reconnect, state neutralization | HOST_VERIFIED |
-| T-P05 | Slot manager | duplicate same device across transports, atomic attach, stale generation, conflicts, rebind, multiple users | HOST_VERIFIED |
-| T-P06 | Mapping | hold/tap/double, toggle, chord, action layers, turbo rate, profile change during hold, invalid profile | HOST_VERIFIED |
-| T-P07 | Motion/touch | 3 axes, units, calibration, mirrored coordinates, missing contact, invalid reports, timestamp drift | HOST_VERIFIED |
-| T-P08 | Feedback | output report validation, haptics bounds, cancellation, disconnect, device sleep, feedback routing | HOST_VERIFIED |
-| T-P09 | USB lifecycle | failure-injected pthread_create, USB read/write fail, rapid hotplug, double cleanup, blocked readers | HOST_VERIFIED |
-| T-P10 | HTTP/API | auth required, unauthorized mutation denied, bad tokens/Origin, invalid slots, escaping, overflow, partial reads/writes | HOST_VERIFIED |
-| T-P11 | Debug transport | disabled by default, authorized opt-in, exact framing, partial TCP, occupied slot cannot be stolen | HOST_VERIFIED |
-| T-P12 | BLE decoders | LE events, ATT/GATT notifications, reconnect, truncated characteristic, reconstructed report ID, negative SMP tests | HOST_VERIFIED |
-| T-P13 | Persistence | version migration, atomic write/recovery, invalid paths, truncated files, profile undo/export/import | HOST_VERIFIED |
+| T-P01 | HID/Steam decoder | report 0x42/0x45 variants, truncation, malformed IDs, signed fields and decoded controls | PARTIAL_HOST_VERIFIED |
+| T-P02 | HCI/L2CAP parser | length/header bounds, invalid CID, ACL-handle/device-index mismatch | NOT_IMPLEMENTED — no HCI/L2CAP code is in the selected USB/Puck release path |
+| T-P03 | Puck USB | configuration bounds and interface filters | PARTIAL_HOST_VERIFIED — no live HID usage/report-descriptor validation |
+| T-P04 | Session | lizard mode, heartbeat, keepalive errors, reconnect, state neutralization | NOT_RUN — target session remains in inherited PS5 integration |
+| T-P05 | Slot manager | duplicate identity, atomic attach, generations, rebind and multiple users | NOT_RUN — no portable slot manager or lifecycle fault-injection test exists |
+| T-P06 | Mapping/bindings | mapping bounds, toggles, long press, initial neutral frame, profile-generation reset, asynchronous invalidation, per-session binding state | PARTIAL_HOST_VERIFIED — chords, action layers, turbo timing and full adapter profile switching remain untested |
+| T-P07 | Motion/touch | unit conversion, quaternion input, coordinate mapping and contact states | PARTIAL_HOST_VERIFIED — physical calibration, sensor traces and PS5 touch behavior remain untested |
+| T-P08 | Feedback | report serialization and haptic bounds | PARTIAL_HOST_VERIFIED — output routing, cancellation, disconnect and physical feedback remain untested |
+| T-P09 | USB lifecycle | thread creation failure, I/O failure, rapid hotplug, cleanup and blocked readers | NOT_RUN — requires target adapters/fault injection |
+| T-P10 | HTTP/API | auth policy, tokens, framing, escaping, overflow, partial requests | PARTIAL_HOST_VERIFIED — Origin/CSRF policy and live server integration remain untested |
+| T-P11 | Debug transport | anonymous injection disabled or authenticated | NOT_APPLICABLE — selected release path has no raw TCP gamepad-input transport |
+| T-P12 | BLE decoders | LE events, ATT/GATT notifications, truncated characteristic and negative SMP | BLOCKED_RESEARCH — BLE remains gated; no native PS5 BLE decoder/transport is implemented |
+| T-P13 | Persistence | migration, atomic write/recovery, path safety, import/export | NOT_RUN — no end-to-end storage/browser integration test exists |
+| T-P14 | Shared control state | atomic pause access/exchange, concurrent invalidation | PARTIAL_HOST_VERIFIED — pause module is host-tested; portal/menu/manager integration and other shared telemetry remain target-unverified |
+
+Gate labels describe the cases actually executed, not the intended target coverage. `PARTIAL_HOST_VERIFIED` means the pure module has host checks but at least one listed integration or edge case is still open.
 
 ### Host build / CI
 
@@ -50,7 +53,7 @@ Record actual iterations and scenarios, not planned numbers. If no physical cons
 
 ## Security/ABI/build gates
 
-- PS5 cross ELF build: actual SDK installed, exact binary SHA256, dynamic symbol availability inspected, no proprietary objects included. `PS5_BUILD_VERIFIED` only after success.
+- PS5 cross ELF build: use the pinned SDK v0.43 asset and verify its SHA-256, build the payload, record the ELF SHA-256, and inspect target dependencies/imports. M1-15 passes those compile/link checks. This is build-only evidence and does not verify firmware/runtime or USB/Puck behavior; keep those hardware gates separate.
 - Native radio: **no active HCI experiment** without approval and safe plan. Strong evidence required for LE scan, not Bluetooth UI visibility.
 - Game hooks: per-game/process build fingerprint, rollback, basic input unaffected when hook disabled/fails.
 - Licenses: scanned code and assets, required notices, no BTstack copying without review, no official NDA SDK redistribution.

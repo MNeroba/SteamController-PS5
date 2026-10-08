@@ -75,6 +75,8 @@ void sc2_combo_name(uint32_t mask, char *out, size_t n);
 /* Active profile used by the input path (thread-safe copy). */
 void sc2_active_set(const sc2_profile_t *p);
 void sc2_active_get(sc2_profile_t *p);
+/* Atomically copy the active profile and its change generation. */
+void sc2_active_get_versioned(sc2_profile_t *p, uint32_t *generation);
 
 /* Live physical input bitmask (1 << IN_*), for the web UI's "press to find". */
 extern volatile uint32_t sc2_live_inputs;

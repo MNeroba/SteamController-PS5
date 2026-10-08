@@ -113,6 +113,7 @@ typedef struct {
     volatile int     confirmed;     /* user pressed a button — assignment done */
     char             dev_path[32];  /* ugen path claimed by this slot */
     uint16_t         vid, pid;
+    sc2_bind_state_t binding_state; /* input activators are scoped to this slot */
     volatile uint32_t inject_count;
     volatile int     bind_ok;       /* virtual pad bound to the user (force_bind ret 0) */
     volatile int32_t last_vdi_ret;  /* result of the last scePadVirtualDeviceInsertData */
@@ -649,8 +650,8 @@ static void *usb_hid_thread(void *arg) {
         }
         memset(&uninit,0,sizeof(uninit)); ioctl(fd,USB_FS_UNINIT,&uninit);
         if (active < 0) { gp_log("slot[%d] SC2 puck removed\n",slot); close(fd); goto exit_slot; }
-        if (!sc2_paused) sc2_vda_attach(slot);
-        ds_handoff_sc2_session(!sc2_paused);
+        if (!sc2_pause_is_active()) sc2_vda_attach(slot);
+        ds_handoff_sc2_session(!sc2_pause_is_active());
 
         /* Re-init with the single active endpoint at index 0 for the main loop */
         memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
@@ -818,7 +819,7 @@ main_loop: ;
      * parked (no virtual pad, hooks see it as off) until its Steam button is
      * pressed and released, or it's turned off and on. Stage: 0 wait for the
      * Steam button to be up, 1 wait for a press, 2 wait for its release. */
-    int sc2_parked = 0, sc2_park_stage = 0, sc2_pause_seen = sc2_paused;
+    int sc2_parked = 0, sc2_park_stage = 0, sc2_pause_seen = sc2_pause_is_active();
     uint32_t steam_pkts = 0;
     uint8_t nintendo_seq = 1;
 
@@ -865,22 +866,24 @@ main_loop: ;
             injected = xbox_handle_packet(fd, eps, buf, len, &pad);
         } else if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
             int was = sc2_link;
-            injected = sc2_handle_packet(buf, len, &pad, &sc2_link);
-            if (sc2_paused != sc2_pause_seen) {             /* paused or resumed (hold … 5 s) */
-                sc2_pause_seen = sc2_paused;
-                if (sc2_paused) ds_handoff_sc2_session(0);
+            injected = sc2_handle_packet(buf, len, &pad, &sc2_link,
+                                         &g_slots[slot].binding_state);
+            int paused_now = sc2_pause_is_active();
+            if (paused_now != sc2_pause_seen) {             /* paused or resumed (hold … 5 s) */
+                sc2_pause_seen = paused_now;
+                if (paused_now) ds_handoff_sc2_session(0);
                 else if (sc2_link && !sc2_parked) ds_handoff_sc2_session(1);
             }
-            if (!was && sc2_link) { sc2_parked = 0; ds_handoff_sc2_session(!sc2_paused); }   /* woke up */
+            if (!was && sc2_link) { sc2_parked = 0; ds_handoff_sc2_session(!sc2_pause_is_active()); }   /* woke up */
 
             /* DualSense came back after a hand-off: it takes over. Ask the Steam
              * Controller to power off, and park it whether or not it does. */
-            if (ds_handoff_take_release() && !sc2_parked && !sc2_paused) {
+            if (ds_handoff_take_release() && !sc2_parked && !sc2_pause_is_active()) {
                 sc2_parked = 1; sc2_park_stage = 0;
                 sc2_power_off(fd, sc2_iface);
                 notify("Puckbridge: DualSense in control. Press the Steam button to switch back.");
             }
-            if (sc2_paused || sc2_parked) {
+            if (sc2_pause_is_active() || sc2_parked) {
                 /* Paused (hold … 5 s) or the DualSense is in control: release
                  * everything and remove the virtual pad; the hooks see it as
                  * off. Reports are still read to catch the resume / Steam button. */
@@ -892,11 +895,11 @@ main_loop: ;
                     rel.leftStick.x = rel.leftStick.y = rel.rightStick.x = rel.rightStick.y = 128;
                     rel.connected = 1; rel.quat.w = 1.0f;
                     inject_pad(slot, &rel);                     /* release everything first */
-                    sc2_vda_detach(slot, sc2_paused ? "paused" : "DualSense in control");
+                    sc2_vda_detach(slot, sc2_pause_is_active() ? "paused" : "DualSense in control");
                 }
                 if (was && !sc2_link) ds_handoff_sc2_session(0);   /* it did power off */
                 int steam = sc2_link && (sc2_live_inputs & (1u << IN_STEAM)) != 0;
-                if (sc2_paused) ;                               /* only the … hold resumes */
+                if (sc2_pause_is_active()) ;                    /* only the … hold resumes */
                 else if (sc2_park_stage == 0 && !steam) sc2_park_stage = 1;
                 else if (sc2_park_stage == 1 &&  steam) sc2_park_stage = 2;
                 else if (sc2_park_stage == 2 && !steam) {
@@ -962,7 +965,7 @@ main_loop: ;
 
 reinit:
     if (usb_ready_notified) { notify("Puckbridge: slot[%d] controller disconnected", slot); usb_ready_notified=0; }
-    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) { sc2_haptic_available = 0; sc2_menu_open = 0; sc2_gyro_reset(); sc2_battery_reset(); ds_handoff_sc2_session(0); }
+    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) { sc2_haptic_available = 0; sc2_menu_request_close(); sc2_gyro_reset(); sc2_battery_reset(); ds_handoff_sc2_session(0); }
     memset(&stop,0,sizeof(stop)); stop.ep_index=0; ioctl(fd,USB_FS_STOP,&stop);
     if (out_opened) {
         memset(&fs_close,0,sizeof(fs_close)); fs_close.ep_index=1; ioctl(fd,USB_FS_CLOSE,&fs_close);
@@ -975,6 +978,7 @@ uninit_exit:
 
 exit_slot:
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
+    sc2_bind_reset(&g_slots[slot].binding_state);
     if (g_slots[slot].handle >= 0) scePadVirtualDeviceDeleteDevice(g_slots[slot].handle);
     pthread_mutex_lock(&g_slot_lock);
     g_slots[slot].handle    = -1;
@@ -1172,6 +1176,7 @@ int main(void) {
         g_slots[s].usb_active = 0;
         g_slots[s].confirmed  = 0;
         g_slots[s].dev_path[0]= '\0';
+        sc2_bind_reset(&g_slots[s].binding_state);
     }
     g_assign_slot = -1;
 

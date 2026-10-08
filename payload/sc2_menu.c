@@ -16,7 +16,17 @@
 #include <stdarg.h>
 
 
-volatile int sc2_menu_open = 0;
+static int g_menu_open;
+static int g_menu_close_requested;
+
+int sc2_menu_is_open(void) {
+    return __atomic_load_n(&g_menu_open, __ATOMIC_ACQUIRE) &&
+           !__atomic_load_n(&g_menu_close_requested, __ATOMIC_ACQUIRE);
+}
+
+void sc2_menu_request_close(void) {
+    __atomic_store_n(&g_menu_close_requested, 1, __ATOMIC_RELEASE);
+}
 
 static const char *k_in_nice[SC2_IN_COUNT] = {
     "A","B","X","Y","LB","RB","LT","RT","Left stick click","Right stick click",
@@ -72,14 +82,16 @@ static void show_item(void) {
 }
 
 static void open_menu(void) {
-    sc2_menu_open = 1; st = ST_MAIN; item = IT_PROFILE; src = -1;
+    __atomic_store_n(&g_menu_open, 1, __ATOMIC_RELEASE);
+    st = ST_MAIN; item = IT_PROFILE; src = -1;
     build_list();
     sc2_haptic_pulse(SC2_PAD_BOTH, 0x1F4, 0x1F4, 0x1E);
     show_item();
 }
 
 static void close_menu(const char *why) {
-    sc2_menu_open = 0; st = ST_MAIN;
+    __atomic_store_n(&g_menu_open, 0, __ATOMIC_RELEASE);
+    st = ST_MAIN;
     sc2_haptic_tick();
     if (why) say("%s", why);
 }
@@ -102,13 +114,17 @@ static void do_remap(int from, int to) {
 }
 
 void sc2_menu_toggle(void) {
-    if (sc2_menu_open) close_menu("Puckbridge menu closed");
+    if (sc2_menu_is_open()) close_menu("Puckbridge menu closed");
     else { open_menu(); wait_release = 0xFFFFFFFFu; }   /* ignore whatever is held now */
 }
 
 int sc2_menu_filter(uint32_t *in) {
     uint32_t cur = *in;
-    if (!sc2_menu_open) { prev = cur; return 0; }
+    if (__atomic_exchange_n(&g_menu_close_requested, 0, __ATOMIC_ACQ_REL)) {
+        if (__atomic_load_n(&g_menu_open, __ATOMIC_ACQUIRE)) close_menu(NULL);
+        else { st = ST_MAIN; src = -1; }
+    }
+    if (!sc2_menu_is_open()) { prev = cur; return 0; }
 
     /* the input bound to the menu action closes it again */
     uint32_t menu_keys = 0;

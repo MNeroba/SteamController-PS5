@@ -3,6 +3,8 @@
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ioctl.h>
 #include "gc_types.h"
+#include "sc2_binding.h"
+#include "sc2_control.h"
 #include "steam_usb.h"
 
 /*
@@ -51,7 +53,8 @@ int  sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
 /* Returns 1 if pad updated (inject), 0 skip.
  * *link is set to 0 on wireless disconnect, 1 on connect/input. */
 int  sc2_handle_packet(const uint8_t *buf, uint32_t len,
-                       ScePadData *out_pad, int *link);
+                       ScePadData *out_pad, int *link,
+                       sc2_bind_state_t *binding_state);
 
 /* Paused (hold … for 5 s, or the portal): the Steam Controller is still read,
  * so the same hold resumes, but nothing is sent to the PS5 and the game hooks
@@ -61,7 +64,6 @@ enum { SC2_BATT_DISCHARGING = 1, SC2_BATT_CHARGING, SC2_BATT_FULL };
 extern volatile int sc2_battery_level, sc2_battery_state;
 void sc2_battery_reset(void);
 
-extern volatile int sc2_paused;
 void sc2_set_paused(int on);
 
 /* Ask the controller to power itself off (ID_TURN_OFF_CONTROLLER, 0x9F "off!",

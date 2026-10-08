@@ -13,6 +13,7 @@
 #include "steam_mapping.h"
 #include <time.h>
 #include <string.h>
+#include <pthread.h>
 #include <errno.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -150,14 +151,18 @@ int sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
 
 /* ── pause / resume ───────────────────────────────────────────────────── */
 
-volatile int sc2_paused = 0;
+static pthread_mutex_t g_pause_transition_lock = PTHREAD_MUTEX_INITIALIZER;
 
 void sc2_set_paused(int on) {
     on = on ? 1 : 0;
-    if (on == sc2_paused) return;
-    sc2_paused = on;
-    sc2_menu_open = 0;
-    sc2_bind_reset();
+    pthread_mutex_lock(&g_pause_transition_lock);
+    int previous = sc2_pause_exchange(on);
+    if (on == previous) {
+        pthread_mutex_unlock(&g_pause_transition_lock);
+        return;
+    }
+    sc2_menu_request_close();
+    sc2_bind_invalidate_sessions();
     if (on) {
         sc2_haptic_rumble_set(0, 0);
         sc2_haptic_rumble_for(0x8000, 0x8000, 450);      /* one long buzz */
@@ -168,6 +173,7 @@ void sc2_set_paused(int on) {
         LOG("sc2: Puckbridge resumed\n");
         if (sc2_notify_fn) sc2_notify_fn("Puckbridge resumed.");
     }
+    pthread_mutex_unlock(&g_pause_transition_lock);
 }
 
 /* ── power off ────────────────────────────────────────────────────────── */
@@ -203,6 +209,14 @@ static void pad_touch(ScePadTouch *t, int16_t x, int16_t y, int right, uint8_t i
     t->x = position.x;
     t->y = position.y;
     t->finger = position.finger;
+}
+
+static void sc2_neutralize_pad(ScePadData *pad) {
+    memset(pad, 0, sizeof(*pad));
+    pad->leftStick.x = pad->leftStick.y = 128;
+    pad->rightStick.x = pad->rightStick.y = 128;
+    pad->connected = 1;
+    pad->quat.w = 1.0f;
 }
 
 /* Pad position → d-pad direction (outer 40% of travel only) */
@@ -256,24 +270,21 @@ static uint32_t profile_input_mask(const steam_input_report_t *report) {
     return mask;
 }
 
-int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link) {
+int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
+                      sc2_bind_state_t *binding_state) {
     steam_report_t decoded;
-    if (!o || !link || !b || len == 0) return 0;
+    if (!o || !link || !b || !binding_state || len == 0) return 0;
     int decoded_ok = steam_report_decode(b, len, &decoded);
     if (decoded_ok != 1) {
         if (decoded.kind != STEAM_REPORT_INPUT) return 0;
         /* A truncated known input frame must release prior controls. Unknown
          * reports are ignored, but malformed input cannot leave stale buttons
          * or touch contacts held in the virtual pad. */
-        memset(o, 0, sizeof(*o));
-        o->leftStick.x = o->leftStick.y = 128;
-        o->rightStick.x = o->rightStick.y = 128;
-        o->connected = 1;
-        o->quat.w = 1.0f;
+        sc2_neutralize_pad(o);
         *link = 1;
         sc2_live_inputs = 0;
         sc2_live_connected = 1;
-        sc2_bind_reset();
+        sc2_bind_reset(binding_state);
         sc2_flick_reset();
         sc2_gyro_reset();
         sc2_gyro_moving = 0;
@@ -282,11 +293,11 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link) 
     if (decoded.kind == STEAM_REPORT_WIRELESS) {
         if (decoded.data.wireless.event == 1) {
             *link = 0; sc2_live_connected = 0; sc2_live_inputs = 0;
+            sc2_bind_reset(binding_state);
             sc2_gyro_reset();
             sc2_flick_reset();
             sc2_battery_reset();
-            o->leftStick.x = o->leftStick.y = o->rightStick.x = o->rightStick.y = 128;
-            o->connected = 1; o->quat.w = 1.0f;
+            sc2_neutralize_pad(o);
             return 1;
         }
         if (decoded.data.wireless.event == 2) *link = 1;
@@ -301,7 +312,8 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link) 
     const steam_input_report_t *report = &decoded.data.input;
 
     sc2_profile_t P;
-    sc2_active_get(&P);
+    uint32_t profile_generation;
+    sc2_active_get_versioned(&P, &profile_generation);
 
     uint8_t lt = steam_trigger_to_u8(report->left_trigger_raw);
     uint8_t rt = steam_trigger_to_u8(report->right_trigger_raw);
@@ -326,14 +338,17 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link) 
         if (!qam_since) qam_since = now;
         else if (!qam_latched && now - qam_since >= SC2_PAUSE_HOLD_MS) {
             qam_latched = 1;
-            sc2_set_paused(!sc2_paused);
+            sc2_set_paused(!sc2_pause_is_active());
         }
     } else {
         qam_since = 0;
         qam_latched = 0;
     }
     in &= ~(1u << IN_QAM);
-    if (sc2_paused) return 0;                 /* nothing reaches the PS5 */
+    if (sc2_pause_is_active()) {
+        sc2_bind_reset(binding_state);
+        return 0;                             /* nothing reaches the PS5 */
+    }
 
 #ifndef SC2_RAW_LOG
 #define SC2_RAW_LOG 0   /* bit table verified on hardware; set 1 to re-check */
@@ -357,16 +372,23 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link) 
     if (sc2_menu_filter(&in)) {
         o->leftStick.x = o->leftStick.y = o->rightStick.x = o->rightStick.y = 128;
         o->buttons = 0; o->connected = 1; o->quat.w = 1.0f;
-        sc2_bind_reset();
+        sc2_bind_reset(binding_state);
         sc2_gyro_moving = 0;
         return 1;
     }
 
     /* 2. Steam Input-style bindings */
     static uint32_t prev_act = 0;
-    uint32_t btn = sc2_bind_eval(&P, in,
+    uint32_t btn = sc2_bind_eval(binding_state, &P, profile_generation, in,
         (report->controls & ((uint32_t)1u << STEAM_CTL_LT)) != 0,
         (report->controls & ((uint32_t)1u << STEAM_CTL_RT)) != 0, now);
+    if (binding_state->neutral_report) {
+        sc2_flick_reset();
+        sc2_gyro_reset();
+        sc2_gyro_moving = 0;
+        sc2_neutralize_pad(o);
+        return 1;
+    }
     uint32_t act = btn & PB_ACT_MASK;
     if ((act & PB_ACT_MENU) && !(prev_act & PB_ACT_MENU)) sc2_menu_toggle();
     prev_act = act;

@@ -5,4 +5,5 @@
  * sc2_menu_filter returns 1 while open: the caller sends a neutral pad. */
 int sc2_menu_filter(uint32_t *in);
 void sc2_menu_toggle(void);
-extern volatile int sc2_menu_open;
+int sc2_menu_is_open(void);
+void sc2_menu_request_close(void);

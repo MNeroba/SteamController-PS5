@@ -193,7 +193,7 @@ static void handle(int fd) {
         sb_put(&sb, ",\"active_name\":"); json_str(&sb, pn);
         sb_put(&sb, ",\"override\":"); json_str(&sb, ov);
         sb_printf(&sb, ",\"inputs\":%u,\"connected\":%d,\"menu\":%d,\"haptics\":%d,\"paused\":%d",
-                  (unsigned)sc2_live_inputs, sc2_live_connected, sc2_menu_open, sc2_haptic_available, sc2_paused);
+                  (unsigned)sc2_live_inputs, sc2_live_connected, sc2_menu_is_open(), sc2_haptic_available, sc2_pause_is_active());
         sb_printf(&sb, ",\"battery\":%d,\"charging\":%d",
                   sc2_battery_level, sc2_battery_state == SC2_BATT_CHARGING ? 1 : sc2_battery_state == SC2_BATT_FULL ? 2 : 0);
         sb_printf(&sb, ",\"hap\":{\"q\":%u,\"sent\":%u,\"fail\":%u,\"err\":%d,\"via\":%d,\"out\":%d}",
@@ -309,7 +309,7 @@ static void handle(int fd) {
         const char *o = strstr(path, "on=");
         if (!o) { REPLY_TXT(fd, 400, "missing on="); return; }
         sc2_set_paused(o[3] == '1');
-        REPLY_TXT(fd, 200, sc2_paused ? "paused" : "running");
+        REPLY_TXT(fd, 200, sc2_pause_is_active() ? "paused" : "running");
         return;
     }
     if (!strncmp(path, "/api/dualsense", 14)) {

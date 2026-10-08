@@ -102,3 +102,44 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Updated PR #1 body; GitHub reports it open, draft, and mergeable at the new head.
 - Local `make -C tests clean sanitize` passes 374 checks. The PR's Host tests run `37784104792` is queued with no conclusion; earlier queued runs also remain unresolved.
 - Next: monitor run `37784104792`; target SDK and hardware gates remain as listed in this memory.
+
+## M1 project-memory synchronization — 2026-10-08 13:26 UTC
+
+- Published findings, issues, test/session logs, project snapshot, and provenance to PR #1 in commit `2088cd639087b135940c7fc318223c6d3adeeca1` (parent `ade3a334d4af408102c7b149e01dd3cc087fbc1a`).
+- Current head is `2088cd639087b135940c7fc318223c6d3adeeca1`; the PR API reports open/draft, mergeable true, `mergeable_state=unstable` while Actions is pending.
+- Host-test runs `37784387092` (`pull_request`) and `37784376678` (`push`) are queued without logs or conclusions.
+- Next: inspect these current-head runs once; do not report a CI pass unless a completed job confirms it.
+
+## M1 profile-binding state and transition fix — 2026-10-08 13:35 UTC
+
+- Source finding: `sc2_binding.c` used one process-global activator array. A reproduced regression showed a toggled button returned after switching to another profile and then back; multiple slots could also share that state. The controller did not consume an active-profile generation, so state could remain latched across profile replacement.
+- Changes: binding state is now caller-owned per slot; `sc2_active_get_versioned` copies a profile and generation under one mutex; each generation change clears activators and emits one neutral report. `gc_main.c` owns a binding context per slot and resets it at slot startup/exit. Corrected the test matrix to label only actual coverage as partial host-verified or unrun.
+- Regression evidence: before the fix, `make -C tests build/test_sc2_binding && ./tests/build/test_sc2_binding` failed on the stale-toggle assertion. After the fix, the binding target passes 16 checks; profile parser/active-generation target passes 33.
+- Validation: `make -C tests clean sanitize` PASS, 393 ASan/UBSan checks on Darwin 27.0.0 arm64 with Apple clang 21.0.0. Full PS5 adapter files remain uncompiled because `PS5_PAYLOAD_SDK` is unset; no slot lifecycle injection or hardware test was run.
+- Publication state: per-slot binding/profile-generation follow-up and refreshed docs are not yet on PR #1; current published branch head is `2088cd639087b135940c7fc318223c6d3adeeca1`.
+- Next: publish these changes and memory/test-plan updates to draft PR #1, then check the new Host tests run. Keep target-build/hardware/ BLE gates explicit.
+
+## M1 pause/resume binding invalidation — 2026-10-08 13:36 UTC
+
+- Follow-up audit found the portal can pause/resume between input reports. A direct `memset` from the portal thread would race with the slot's binding evaluator, while resetting only on the next paused packet would miss a pause/resume cycle with no packets in between.
+- Change: added an atomic reset epoch. Pause/resume advances it; each slot's input owner notices the mismatch at its next binding evaluation, clears local state, seeds current held inputs, and emits neutral output for one frame. No external thread mutates slot state.
+- Test: `make -C tests clean sanitize` PASS, 397 ASan/UBSan checks; the binding test asserts asynchronous invalidation clears a latched toggle. This does not substitute for ThreadSanitizer or PS5 portal/input-thread integration.
+- Next: publish the per-slot/profile-generation/async-reset changes, current 397-check test record, and corrected partial-coverage labels to PR #1.
+
+## M1 neutral output and shared control-state audit — 2026-10-08 13:44 UTC
+
+- Source finding: the wireless-disconnect branch reset stick centers but left prior buttons, analog triggers, and touch contacts in the reused pad structure. A profile-generation boundary returned an empty binding mask while still allowing analog/touch output from the same report, so it was not a fully neutral report.
+- Changes: added one full `ScePadData` neutralizer for malformed known input, wireless disconnect, and binding-state initialization/profile/reset transitions; held inputs are seeded on transitions to prevent synthetic toggle/double edges. Binding tests now cover startup with a held toggle input and invalidator/input-owner concurrency.
+- Shared state: moved pause flag operations to atomic load/exchange helpers in `sc2_control.c`; menu close from portal/manager-side code is a request applied by `sc2_menu_filter`, and all direct `sc2_paused`/`sc2_menu_open` references were removed. Other live telemetry remains shared volatile state and is still an open audit item.
+- Validation: `make -C tests clean sanitize` PASS, 446 checks. ThreadSanitizer PASS for `test_sc2_profile` (33), `test_sc2_binding` (49), and `test_sc2_control` (20). `git diff --check` PASS. The host suite does not compile the PS5 adapter, menu, web server or manager.
+- Build: `make -C payload` BLOCKED before compilation because `PS5_PAYLOAD_SDK` is unset; no ELF was produced.
+- Publication: these local changes are not yet on PR #1; remote head is still `2088cd639087b135940c7fc318223c6d3adeeca1`. The earlier current-head Actions runs remain queued as last observed. Publish a source/docs commit, update the PR description, sync memory, then inspect the new workflow runs.
+
+## M1 SDK v0.43 cross-build — 2026-10-08 13:53 UTC
+
+- SDK decision: install was worthwhile because the target sources can now be compiled and linked locally. The official [`ps5-payload-sdk` v0.43 release](https://github.com/ps5-payload-dev/sdk/releases/tag/v0.43) points to commit `d9c9519116944a7f1c22d262012c53b80b3520b7`; its `ps5-payload-sdk.zip` asset matched the GitHub release API SHA-256 `a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb`. GitHub metadata marks the source commit unsigned. SDK and archive are in ignored `.build-cache/ps5-payload-sdk-v0.43/`; no SDK contents enter source publication.
+- Environment: installed Homebrew `llvm@18` version 18.1.8 (Homebrew reported 1.7 GB installed); `LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config`. This is the SDK README's documented macOS toolchain.
+- Initial cross-build showed two unused-function warnings for helpers only called in the `__ORBIS__` VDA path. Guarded those helpers with `#ifdef __ORBIS__`; the clean rebuild then completed without warnings. An initial `make -C payload clean` without `PS5_PAYLOAD_SDK` stopped at the Makefile's environment guard; reran clean/build with both SDK variables set.
+- Validation: `make -C payload clean && make -C payload` PASS; `llvm-readobj --file-headers --needed-libs` confirmed ELF64 x86-64 shared object and six expected PS5 runtime imports; `llvm-nm -u` showed expected `scePad*`/`sceUserService*` unresolved dynamic imports. ELF SHA-256: `34aaef13a4911147c6342469486aeaee6b2e10ec8ffa6d2d455f78c4ccdb80a4`. This is compile/link evidence only; no PS5, FW 13.60, game, Steam Controller or Puck runtime test occurred.
+- Reproducibility changes: added `docs/BUILDING.md`, ignored `.build-cache/`, and pinned/verifies the SDK archive digest in `.github/workflows/release.yml`. `README.md`, provenance, issues, test log and project snapshot now distinguish cross-build success from hardware validation.
+- Next: publish the current working-tree code and documentation to the open draft PR #1, then inspect the resulting Host tests, PS5 cross-build workflow, and release workflow; retain physical USB/Puck and game runtime gates.

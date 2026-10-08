@@ -283,18 +283,25 @@ void sc2_combo_name(uint32_t mask, char *out, size_t n) {
 static pthread_mutex_t g_act_lock = PTHREAD_MUTEX_INITIALIZER;
 static sc2_profile_t   g_active;
 static int             g_active_init = 0;
+static uint32_t        g_active_generation = 0;
 
 void sc2_active_set(const sc2_profile_t *p) {
     pthread_mutex_lock(&g_act_lock);
     g_active = *p; g_active_init = 1;
+    if (++g_active_generation == 0) ++g_active_generation;
+    pthread_mutex_unlock(&g_act_lock);
+}
+
+void sc2_active_get_versioned(sc2_profile_t *p, uint32_t *generation) {
+    pthread_mutex_lock(&g_act_lock);
+    if (!g_active_init) { sc2_profile_default(&g_active); g_active_init = 1; }
+    *p = g_active;
+    if (generation) *generation = g_active_generation;
     pthread_mutex_unlock(&g_act_lock);
 }
 
 void sc2_active_get(sc2_profile_t *p) {
-    pthread_mutex_lock(&g_act_lock);
-    if (!g_active_init) { sc2_profile_default(&g_active); g_active_init = 1; }
-    *p = g_active;
-    pthread_mutex_unlock(&g_act_lock);
+    sc2_active_get_versioned(p, NULL);
 }
 
 /* ── storage ──────────────────────────────────────────────────────────── */

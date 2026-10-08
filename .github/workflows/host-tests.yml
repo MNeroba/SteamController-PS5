@@ -9,5 +9,5 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run portable portal parser and authentication tests
+      - name: Run portable host and sanitizer suite
         run: make -C tests sanitize
