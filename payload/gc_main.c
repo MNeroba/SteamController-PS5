@@ -56,6 +56,7 @@
 #include "bridge_probe.h"
 #include "game_hooks.h"
 #include "bridge/wireless_ds4.h"
+#include "slot_registry.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -105,23 +106,9 @@ extern int32_t sceKernelSendNotificationRequest(int unk0, void *req, size_t size
 #define VIRTUAL_DEVICE_TYPE_DUALSENSE 3
 
 /* ── Multi-controller slots ───────────────────────────────────────────── */
-#define MAX_SLOTS 4
+#define MAX_SLOTS SLOT_REGISTRY_MAX_SLOTS
 
-typedef struct {
-    volatile int32_t handle;        /* VDA handle, -1 = slot free */
-    volatile int     vdi_ready;
-    volatile int     usb_active;    /* USB reader thread is running */
-    volatile int     confirmed;     /* user pressed a button — assignment done */
-    char             dev_path[32];  /* ugen path claimed by this slot */
-    uint16_t         vid, pid;
-    sc2_bind_state_t binding_state; /* input activators are scoped to this slot */
-    volatile uint32_t inject_count;
-    volatile int     bind_ok;       /* virtual pad bound to the user (force_bind ret 0) */
-    volatile int32_t last_vdi_ret;  /* result of the last scePadVirtualDeviceInsertData */
-} ctrl_slot_t;
-
-static ctrl_slot_t     g_slots[MAX_SLOTS];
-static pthread_mutex_t g_slot_lock = PTHREAD_MUTEX_INITIALIZER;
+static slot_registry_t g_slots;
 /* VDA identity is correlated through one klog queue; serialize AddDevice so
  * concurrent Steam reader threads cannot bind each other's virtual pads. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -238,12 +225,30 @@ static void *klog_capture_thread(void *arg) {
 }
 
 /* ── VDI injection ────────────────────────────────────────────────────── */
-static void inject_pad(int slot, const ScePadData *pad) {
-    int32_t h = g_slots[slot].handle;
-    if (h < 0 || !g_slots[slot].vdi_ready) return;
+typedef struct {
+    sc2_bind_state_t binding_state;
+    uint32_t inject_count;
+    int bind_ok;
+    int32_t last_vdi_ret;
+} usb_session_state_t;
+
+static int slot_virtual_ready(slot_registry_token_t token) {
+    slot_registry_entry_t entry;
+    return slot_registry_snapshot(&g_slots, token, &entry) == SLOT_REGISTRY_OK &&
+           entry.virtual_ready;
+}
+
+static void inject_pad(slot_registry_token_t token, int slot,
+                       usb_session_state_t *session, const ScePadData *pad) {
+    slot_registry_entry_t entry;
+    if (!session ||
+        slot_registry_snapshot(&g_slots, token, &entry) != SLOT_REGISTRY_OK ||
+        !entry.virtual_ready)
+        return;
+    int32_t h = entry.virtual_handle;
     int vr = scePadVirtualDeviceInsertData(h, pad);
-    g_slots[slot].last_vdi_ret = vr;
-    uint32_t n = ++g_slots[slot].inject_count;
+    session->last_vdi_ret = vr;
+    uint32_t n = ++session->inject_count;
     if ((n % 600) == 0)
         gp_log("slot[%d] VDI #%u ret=0x%08x\n", slot, n, (uint32_t)vr);
     static int vdi_err_logged = 0;
@@ -445,15 +450,14 @@ done:
 }
 
 /* ── Create VDA and force_bind for a slot ─────────────────────────────── */
-static int32_t create_vda_for_slot(int slot) {
+static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
     struct { int32_t size; int32_t userId; int32_t pad[6]; } vdp;
     const int32_t SEN = (int32_t)0xDEADBEEFu;
     pthread_mutex_lock(&g_vda_create_lock);
     memset(&vdp,0,sizeof(vdp)); vdp.size=sizeof(vdp); vdp.userId=1;
     for(int k=0;k<6;k++) vdp.pad[k]=SEN;
 
-    g_slots[slot].bind_ok = 0;
-    g_slots[slot].last_vdi_ret = -1;
+    if (out_bind_ok) *out_bind_ok = 0;
     klog_drain();                             /* the next id must be this pad's */
     int ret = scePadVirtualDeviceAddDevice(&vdp, VIRTUAL_DEVICE_TYPE_DUALSENSE);
     gp_log("slot[%d] VDA ret=0x%08x\n", slot, (uint32_t)ret);
@@ -469,7 +473,7 @@ static int32_t create_vda_for_slot(int slot) {
         pb_kernel_lock();                     /* game hooks read kernel memory too */
         int br = shellui_pad_force_bind(dev_id, g_inject_uid);
         pb_kernel_unlock();
-        g_slots[slot].bind_ok = (br == 0);
+        if (out_bind_ok) *out_bind_ok = (br == 0);
         gp_log("slot[%d] force_bind(0x%llx, 0x%08x) ret=%d\n",
                slot, (unsigned long long)dev_id, (uint32_t)g_inject_uid, br);
     } else if (handle >= 0) {
@@ -501,42 +505,97 @@ static int sc2_pad_in_use(const ScePadData *p) {
     return p->analogButtons.l2 > 40 || p->analogButtons.r2 > 40;
 }
 
+typedef struct {
+    int slot;
+    const char *why;
+} vda_delete_context_t;
+
+static int delete_vda_handle(int32_t handle, void *opaque) {
+    vda_delete_context_t *context = (vda_delete_context_t *)opaque;
+    int result = scePadVirtualDeviceDeleteDevice(handle);
+    if (result != 0)
+        gp_log("slot[%d] VDA delete handle=0x%x failed (%s), ret=0x%08x\n",
+               context->slot, (uint32_t)handle, context->why, (uint32_t)result);
+    return result;
+}
+
+static int delete_slot_vda(slot_registry_token_t token, int slot,
+                           const char *why) {
+    vda_delete_context_t context = { slot, why };
+    return slot_registry_delete_virtual(&g_slots, token, delete_vda_handle,
+                                        &context);
+}
+
 /* ── Lazy virtual pad for the Steam Controller (2026) ───────────────────
  * The Puck stays plugged in while the controller sleeps. Creating the
  * virtual DualSense only while the controller is actually on means the PS5
  * never waits on it (e.g. after rest mode) and a real DualSense keeps
  * working alongside it. */
-static int sc2_vda_attach(int slot) {
-    pthread_mutex_lock(&g_slot_lock);
-    int have = g_slots[slot].vdi_ready;
-    pthread_mutex_unlock(&g_slot_lock);
-    if (have) return 1;
+static int sc2_vda_attach(slot_registry_token_t token, int slot,
+                          usb_session_state_t *session) {
+    slot_registry_entry_t entry;
+    if (slot_registry_snapshot(&g_slots, token, &entry) != SLOT_REGISTRY_OK ||
+        entry.state != SLOT_REGISTRY_ACTIVE)
+        return 0;
+    if (entry.virtual_ready) return 1;
 
-    int32_t h = create_vda_for_slot(slot);
+    int bind_ok = 0;
+    int32_t h = create_vda_for_slot(slot, &bind_ok);
     if (h < 0) { gp_log("slot[%d] SC2 virtual pad create failed\n", slot); return 0; }
-    pthread_mutex_lock(&g_slot_lock);
-    g_slots[slot].handle = h;
-    g_slots[slot].vdi_ready = 1;
-    g_slots[slot].inject_count = 0;
-    g_slots[slot].confirmed = 0;
-    pthread_mutex_unlock(&g_slot_lock);
+    int result = slot_registry_set_virtual(&g_slots, token, h);
+    if (result != SLOT_REGISTRY_OK) {
+        /* A failed registration cannot prove whether this handle aliases a
+         * device already owned by another slot. Never delete an ambiguous ID. */
+        gp_log("slot[%d] SC2 virtual pad was not registered (result=%d); keeping handle untouched\n",
+               slot, result);
+        return 0;
+    }
+    session->bind_ok = bind_ok;
+    session->last_vdi_ret = -1;
+    session->inject_count = 0;
     notify("Puckbridge: Steam Controller connected");
     return 1;
 }
 
-static void sc2_vda_detach(int slot, const char *why) {
-    pthread_mutex_lock(&g_slot_lock);
-    int32_t h = g_slots[slot].vdi_ready ? g_slots[slot].handle : -1;
-    g_slots[slot].vdi_ready = 0;
-    g_slots[slot].handle = -1;
-    g_slots[slot].confirmed = 0;
-    pthread_mutex_unlock(&g_slot_lock);
-    sc2_assignment_token_t assignment = sc2_assignment_owner();
-    if (sc2_assignment_slot(assignment) == slot)
-        sc2_assignment_release(assignment);
-    if (h >= 0) {
-        scePadVirtualDeviceDeleteDevice(h);
-        gp_log("slot[%d] SC2 virtual pad removed (%s)\n", slot, why);
+static void sc2_vda_detach(slot_registry_token_t token, int slot,
+                           usb_session_state_t *session,
+                           sc2_assignment_token_t *assignment_token,
+                           const char *why) {
+    int result = delete_slot_vda(token, slot, why);
+    if (result != SLOT_REGISTRY_OK) {
+        gp_log("slot[%d] SC2 virtual pad detach deferred (registry result=%d)\n",
+               slot, result);
+        return;
+    }
+    if (session) {
+        session->bind_ok = 0;
+        session->last_vdi_ret = -1;
+        session->inject_count = 0;
+    }
+    if (assignment_token && *assignment_token) {
+        sc2_assignment_release(*assignment_token);
+        *assignment_token = 0;
+    }
+    gp_log("slot[%d] SC2 virtual pad removed (%s)\n", slot, why);
+}
+
+static void slot_release(slot_registry_token_t token, const char *why) {
+    int result = slot_registry_request_release(&g_slots, token);
+    if (result == SLOT_REGISTRY_OK)
+        result = delete_slot_vda(token, (int)token.index, why);
+    if (result == SLOT_REGISTRY_OK)
+        result = slot_registry_release(&g_slots, token);
+    if (result != SLOT_REGISTRY_OK && result != SLOT_REGISTRY_STALE)
+        gp_log("slot[%u] release failed (%s), registry result=%d\n",
+               token.index, why, result);
+}
+
+static void retry_releasing_slots(void) {
+    for (uint32_t i = 0; i < MAX_SLOTS; i++) {
+        slot_registry_entry_t entry;
+        if (slot_registry_snapshot_index(&g_slots, i, &entry) == SLOT_REGISTRY_OK &&
+            entry.state == SLOT_REGISTRY_RELEASING)
+            slot_release(entry.token, "deferred VDA cleanup retry");
     }
 }
 
@@ -545,19 +604,32 @@ static void sc2_vda_detach(int slot, const char *why) {
  * Manager thread handles re-detection after exit. */
 
 typedef struct {
-    int      slot;
-    char     dev_path[32];
-    uint16_t vid, pid;
+    slot_registry_token_t slot_token;
     sc2_assignment_token_t assignment_token;
+    int bind_ok;
 } usb_thread_arg_t;
 
 static void *usb_hid_thread(void *arg) {
     usb_thread_arg_t *targ = (usb_thread_arg_t *)arg;
-    int slot = targ->slot;
-    char dev_path[32]; memcpy(dev_path, targ->dev_path, sizeof(dev_path));
-    uint16_t vid = targ->vid, pid = targ->pid;
+    slot_registry_token_t slot_token = targ->slot_token;
     sc2_assignment_token_t assignment_token = targ->assignment_token;
+    usb_session_state_t session;
+    memset(&session, 0, sizeof(session));
+    session.bind_ok = targ->bind_ok;
+    session.last_vdi_ret = -1;
+    sc2_bind_reset(&session.binding_state);
     free(targ);
+
+    slot_registry_entry_t slot_entry;
+    if (slot_registry_snapshot(&g_slots, slot_token, &slot_entry) != SLOT_REGISTRY_OK) {
+        sc2_assignment_release(assignment_token);
+        return NULL;
+    }
+    int slot = (int)slot_token.index;
+    char dev_path[SLOT_REGISTRY_ID_MAX];
+    memcpy(dev_path, slot_entry.identity, sizeof(dev_path));
+    dev_path[sizeof(dev_path) - 1] = '\0';
+    uint16_t vid = slot_entry.vendor_id, pid = slot_entry.product_id;
 
     struct usb_fs_endpoint eps[2 + SC2_HAP_MAX_OUT];
     sc2_ep_map_t sc2_map; memset(&sc2_map, 0, sizeof(sc2_map));
@@ -650,7 +722,7 @@ static void *usb_hid_thread(void *arg) {
         }
         memset(&uninit,0,sizeof(uninit)); ioctl(fd,USB_FS_UNINIT,&uninit);
         if (active < 0) { gp_log("slot[%d] SC2 puck removed\n",slot); close(fd); goto exit_slot; }
-        if (!sc2_pause_is_active()) sc2_vda_attach(slot);
+        if (!sc2_pause_is_active()) sc2_vda_attach(slot_token, slot, &session);
         ds_handoff_sc2_session(!sc2_pause_is_active());
 
         /* Re-init with the single active endpoint at index 0 for the main loop */
@@ -867,7 +939,7 @@ main_loop: ;
         } else if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
             int was = sc2_link;
             injected = sc2_handle_packet(buf, len, &pad, &sc2_link,
-                                         &g_slots[slot].binding_state);
+                                         &session.binding_state);
             int paused_now = sc2_pause_is_active();
             if (paused_now != sc2_pause_seen) {             /* paused or resumed (hold … 5 s) */
                 sc2_pause_seen = paused_now;
@@ -890,12 +962,13 @@ main_loop: ;
                 game_hooks_feed(NULL, 0);
                 sc2_haptic_service(fd, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
-                if (g_slots[slot].vdi_ready) {
+                if (slot_virtual_ready(slot_token)) {
                     ScePadData rel; memset(&rel, 0, sizeof(rel));
                     rel.leftStick.x = rel.leftStick.y = rel.rightStick.x = rel.rightStick.y = 128;
                     rel.connected = 1; rel.quat.w = 1.0f;
-                    inject_pad(slot, &rel);                     /* release everything first */
-                    sc2_vda_detach(slot, sc2_pause_is_active() ? "paused" : "DualSense in control");
+                    inject_pad(slot_token, slot, &session, &rel); /* release everything first */
+                    sc2_vda_detach(slot_token, slot, &session, &assignment_token,
+                                   sc2_pause_is_active() ? "paused" : "DualSense in control");
                 }
                 if (was && !sc2_link) ds_handoff_sc2_session(0);   /* it did power off */
                 int steam = sc2_link && (sc2_live_inputs & (1u << IN_STEAM)) != 0;
@@ -917,8 +990,8 @@ main_loop: ;
                  * its virtual pad is bound to the user and input is going in. In a
                  * game with merged input it plays through the DualSense, so never. */
                 if (injected && sc2_link && sc2_pad_in_use(&pad) &&
-                    g_slots[slot].vdi_ready && g_slots[slot].bind_ok &&
-                    g_slots[slot].last_vdi_ret == 0 && !game_hooks_input_active())
+                    slot_virtual_ready(slot_token) && session.bind_ok &&
+                    session.last_vdi_ret == 0 && !game_hooks_input_active())
                     ds_handoff_sc2_used();
                 if (injected) game_hooks_feed(&pad, sc2_link);
                 else if (!sc2_link) game_hooks_feed(NULL, 0);
@@ -926,8 +999,9 @@ main_loop: ;
                 sc2_gyro_service(fd, sc2_iface);
                 if (was && !sc2_link) {
                     ds_handoff_sc2_session(0);
-                    inject_pad(slot, &pad);                     /* release everything first */
-                    sc2_vda_detach(slot, "controller asleep / out of range");
+                    inject_pad(slot_token, slot, &session, &pad); /* release everything first */
+                    sc2_vda_detach(slot_token, slot, &session, &assignment_token,
+                                   "controller asleep / out of range");
                     notify("Puckbridge: Steam Controller disconnected");
                     injected = 0;
                 }
@@ -936,9 +1010,12 @@ main_loop: ;
                  * (it would only take rumble away from the DualSense). It comes
                  * back for the home screen and games that couldn't be hooked. */
                 if (game_hooks_input_active()) {
-                    if (g_slots[slot].vdi_ready) sc2_vda_detach(slot, "game uses merged input");
+                    if (slot_virtual_ready(slot_token))
+                        sc2_vda_detach(slot_token, slot, &session, &assignment_token,
+                                       "game uses merged input");
                     injected = 0;
-                } else if (sc2_link && !g_slots[slot].vdi_ready) sc2_vda_attach(slot);
+                } else if (sc2_link && !slot_virtual_ready(slot_token))
+                    sc2_vda_attach(slot_token, slot, &session);
             }
         } else if (pid == PID_STEAM_WIRED) {
             injected = steam_handle_packet(buf, len, &pad);
@@ -954,13 +1031,13 @@ main_loop: ;
             }
             /* First real button press confirms the assignment — release the gate
              * so the manager can start the next controller's dialog. */
-            if (!g_slots[slot].confirmed && pad.buttons != 0) {
-                g_slots[slot].confirmed = 1;
-                sc2_assignment_release(assignment_token);
+            if (pad.buttons != 0 &&
+                slot_registry_mark_confirmed(&g_slots, slot_token) == 1) {
+                if (assignment_token) sc2_assignment_release(assignment_token);
                 assignment_token = 0;
                 gp_log("slot[%d] assignment confirmed (button press)\n", slot);
             }
-            inject_pad(slot, &pad);
+            inject_pad(slot_token, slot, &session, &pad);
         }
     }
 
@@ -980,14 +1057,8 @@ uninit_exit:
 exit_slot:
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
     sc2_assignment_release(assignment_token);
-    sc2_bind_reset(&g_slots[slot].binding_state);
-    if (g_slots[slot].handle >= 0) scePadVirtualDeviceDeleteDevice(g_slots[slot].handle);
-    pthread_mutex_lock(&g_slot_lock);
-    g_slots[slot].handle    = -1;
-    g_slots[slot].vdi_ready = 0;
-    g_slots[slot].usb_active= 0;
-    g_slots[slot].dev_path[0] = '\0';
-    pthread_mutex_unlock(&g_slot_lock);
+    sc2_bind_reset(&session.binding_state);
+    slot_release(slot_token, "USB reader exit");
     return NULL;
 }
 
@@ -1000,6 +1071,7 @@ static void *controller_manager_thread(void *arg) {
     while (1) {
         static char devs[MAX_UGEN_DEVS][32];
         int n_devs = scan_ugen_devices(devs, MAX_UGEN_DEVS);
+        retry_releasing_slots();
 
         for (int i = 0; i < n_devs; i++) {
             const char *path = devs[i];
@@ -1008,33 +1080,26 @@ static void *controller_manager_thread(void *arg) {
              * button press to confirm its dialog, do not start another one. */
             if (sc2_assignment_owner() != 0) break;
 
-            /* Skip if already claimed by an active slot */
-            int busy = 0;
-            pthread_mutex_lock(&g_slot_lock);
-            for (int s = 0; s < MAX_SLOTS; s++) {
-                if (g_slots[s].usb_active && strcmp(g_slots[s].dev_path, path) == 0) {
-                    busy = 1; break;
-                }
-            }
-            pthread_mutex_unlock(&g_slot_lock);
-            if (busy) continue;
+            /* Identity is unique only for this live USB session. The registry
+             * owns both duplicate detection and free-slot selection atomically. */
+            uint32_t existing_slot;
+            if (slot_registry_find_identity(&g_slots, path, &existing_slot) ==
+                SLOT_REGISTRY_OK)
+                continue;
 
             /* Try to identify controller */
             uint16_t vid=0, pid=0;
             if (!probe_one_path(path, &vid, &pid)) continue;
 
-            /* Find free slot */
-            int slot = -1;
-            pthread_mutex_lock(&g_slot_lock);
-            for (int s = 0; s < MAX_SLOTS; s++) {
-                if (g_slots[s].handle < 0 && !g_slots[s].usb_active) { slot=s; break; }
-            }
-            pthread_mutex_unlock(&g_slot_lock);
-
-            if (slot < 0) {
-                if ((scan % 5) == 0) gp_log("manager: all %d slots full\n", MAX_SLOTS);
+            slot_registry_token_t slot_token;
+            int claim_result = slot_registry_claim(&g_slots, path, vid, pid,
+                                                  &slot_token);
+            if (claim_result != SLOT_REGISTRY_OK) {
+                if (claim_result == SLOT_REGISTRY_FULL && (scan % 5) == 0)
+                    gp_log("manager: all %d slots full\n", MAX_SLOTS);
                 continue;
             }
+            int slot = (int)slot_token.index;
 
             const char *name =
                 (vid==VID_SWITCH && pid==PID_SWITCH) ? "Nintendo Switch Pro / 8BitDo" :
@@ -1048,76 +1113,59 @@ static void *controller_manager_thread(void *arg) {
             int lazy = (vid==VID_STEAM && (pid==PID_SC2_PUCK || pid==PID_SC2_WIRED));
             if (!lazy) notify("Puckbridge: %s detected — assign user on screen", name);
 
-            /* Claim the slot path before VDA so manager skips it if we retry.
-             * Set the assignment gate — released when user confirms (button press). */
-            pthread_mutex_lock(&g_slot_lock);
-            strncpy(g_slots[slot].dev_path, path, sizeof(g_slots[slot].dev_path)-1);
-            g_slots[slot].usb_active = 1; /* tentatively claimed */
-            g_slots[slot].confirmed  = 0;
-            g_slots[slot].vid = vid;
-            g_slots[slot].pid = pid;
-            pthread_mutex_unlock(&g_slot_lock);
+            /* The assignment lease serializes the PS5 dialog. Slot ownership
+             * remains generation-tagged even if that dialog times out. */
             sc2_assignment_token_t assignment_token = 0;
             int32_t handle = -1;
+            int bind_ok = 0;
             if (!lazy) {
-            assignment_token = sc2_assignment_claim(slot);
-            if (assignment_token == 0) {
-                gp_log("manager: assignment lease unavailable for slot[%d]\n", slot);
-                pthread_mutex_lock(&g_slot_lock);
-                g_slots[slot].usb_active = 0;
-                g_slots[slot].dev_path[0] = '\0';
-                g_slots[slot].handle = -1;
-                pthread_mutex_unlock(&g_slot_lock);
-                continue;
+                assignment_token = sc2_assignment_claim(slot);
+                if (assignment_token == 0) {
+                    gp_log("manager: assignment lease unavailable for slot[%d]\n", slot);
+                    slot_release(slot_token, "assignment lease unavailable");
+                    continue;
+                }
+
+                /* Create VDA and force_bind (shows PS5 assignment dialog). */
+                handle = create_vda_for_slot(slot, &bind_ok);
+                int attach_result = handle < 0 ? SLOT_REGISTRY_ERROR :
+                    slot_registry_set_virtual(&g_slots, slot_token, handle);
+                if (attach_result != SLOT_REGISTRY_OK) {
+                    gp_log("manager: slot[%d] VDA registration failed (handle=0x%x, result=%d); not deleting an unowned/ambiguous handle\n",
+                           slot, (uint32_t)handle, attach_result);
+                    sc2_assignment_release(assignment_token);
+                    /* Do not delete a handle whose registry ownership was not
+                     * established; a duplicate value may belong to another slot. */
+                    slot_release(slot_token, "VDA setup failed");
+                    continue;
+                }
             }
 
-            /* Create VDA and force_bind (shows PS5 assignment dialog) */
-            handle = create_vda_for_slot(slot);
-            if (handle < 0) {
-                gp_log("manager: slot[%d] VDA failed — releasing\n", slot);
+            /* SC2's virtual pad is created later when the controller wakes. */
+            if (slot_registry_activate(&g_slots, slot_token) != SLOT_REGISTRY_OK) {
                 sc2_assignment_release(assignment_token);
-                pthread_mutex_lock(&g_slot_lock);
-                g_slots[slot].usb_active = 0;
-                g_slots[slot].dev_path[0] = '\0';
-                g_slots[slot].handle = -1;
-                pthread_mutex_unlock(&g_slot_lock);
+                slot_release(slot_token, "slot activation failed");
                 continue;
             }
-
-            pthread_mutex_lock(&g_slot_lock);
-            g_slots[slot].handle      = handle;
-            g_slots[slot].vdi_ready   = 1;
-            g_slots[slot].inject_count = 0;
-            pthread_mutex_unlock(&g_slot_lock);
-            }   /* !lazy — SC2 creates its virtual pad when the controller turns on */
 
             /* Launch USB reader thread */
             usb_thread_arg_t *targ = malloc(sizeof(*targ));
             if (!targ) {
                 gp_log("manager: malloc fail for slot[%d]\n", slot);
                 sc2_assignment_release(assignment_token);
-                if (handle >= 0) scePadVirtualDeviceDeleteDevice(handle);
-                pthread_mutex_lock(&g_slot_lock);
-                g_slots[slot].handle=-1; g_slots[slot].vdi_ready=0;
-                g_slots[slot].usb_active=0; g_slots[slot].dev_path[0]='\0';
-                pthread_mutex_unlock(&g_slot_lock);
+                slot_release(slot_token, "USB thread allocation failed");
                 continue;
             }
-            targ->slot = slot;
-            strncpy(targ->dev_path, path, sizeof(targ->dev_path)-1);
-            targ->vid=vid; targ->pid=pid;
+            targ->slot_token = slot_token;
             targ->assignment_token = assignment_token;
+            targ->bind_ok = bind_ok;
 
             pthread_t tid;
             if (pthread_create(&tid, NULL, usb_hid_thread, targ) != 0) {
                 gp_log("manager: pthread_create fail slot[%d]\n", slot);
                 free(targ);
                 sc2_assignment_release(assignment_token);
-                if (handle >= 0) scePadVirtualDeviceDeleteDevice(handle);
-                pthread_mutex_lock(&g_slot_lock);
-                g_slots[slot].handle=-1; g_slots[slot].vdi_ready=0;
-                g_slots[slot].usb_active=0; g_slots[slot].dev_path[0]='\0';
-                pthread_mutex_unlock(&g_slot_lock);
+                slot_release(slot_token, "USB thread creation failed");
             } else {
                 pthread_detach(tid);
                 gp_log("manager: slot[%d] USB thread started handle=0x%x\n",
@@ -1154,9 +1202,7 @@ static void *controller_manager_thread(void *arg) {
         scan++;
         if ((scan % 5) == 0) {
             /* Log active slots every 10s */
-            int active = 0;
-            for (int s = 0; s < MAX_SLOTS; s++)
-                if (g_slots[s].usb_active) active++;
+            uint32_t active = slot_registry_count_claimed(&g_slots);
             if (active == 0 && (scan % 10) == 0)
                 gp_log("manager: scan #%d — no controllers\n", scan);
         }
@@ -1178,6 +1224,10 @@ int main(void) {
     int32_t userId=-1, fgUser=-1; int ret;
 
     ghostpad_status_log_reset();
+    if (slot_registry_init(&g_slots) != SLOT_REGISTRY_OK) {
+        gp_log("slot registry initialization failed\n");
+        return 1;
+    }
     gp_log("Ghost-Control v5 starting — %d slots\n", MAX_SLOTS);
     notify("PuckbridgePS5 (built on Ghostcontrol by StonedModder) — plug in controllers now");
 
@@ -1191,15 +1241,6 @@ int main(void) {
       if(pfd2>=0){char pb[16];snprintf(pb,sizeof(pb),"%d",getpid());write(pfd2,pb,strlen(pb));close(pfd2);}
     }
 
-    /* Init slots */
-    for (int s = 0; s < MAX_SLOTS; s++) {
-        g_slots[s].handle     = -1;
-        g_slots[s].vdi_ready  = 0;
-        g_slots[s].usb_active = 0;
-        g_slots[s].confirmed  = 0;
-        g_slots[s].dev_path[0]= '\0';
-        sc2_bind_reset(&g_slots[s].binding_state);
-    }
     sceUserServiceInitialize(NULL);
     sceUserServiceGetInitialUser(&userId);
     sceUserServiceGetForegroundUser(&fgUser);
@@ -1253,9 +1294,8 @@ int main(void) {
         usleep(1000000);
         tick++;
         if (tick % 10 == 0) {
-            int active = 0;
-            for (int s = 0; s < MAX_SLOTS; s++) if (g_slots[s].usb_active) active++;
-            gp_log("alive tick=%u active_slots=%d\n", tick, active);
+            uint32_t active = slot_registry_count_claimed(&g_slots);
+            gp_log("alive tick=%u active_slots=%u\n", tick, active);
         }
     }
     return 0;

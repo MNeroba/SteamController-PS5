@@ -31,7 +31,7 @@ Portable protocol, descriptor, portal security/JSON, profile parsing, mapping, m
 make -C tests sanitize
 ```
 
-The latest ASan/UBSan run passes 477 assertions. ThreadSanitizer also passes the concurrent binding-reset, profile-parser, and pause/assignment-control suites. A clean SDK v0.43 cross-build now produces the x86-64 PS5 ELF on macOS. Host tests and cross-compilation do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility; no physical console or Steam Controller/Puck is available here. Hardware validation remains blocked, not passed or failed.
+The latest ASan/UBSan run passes 600 checks, including a 123-check portable slot registry suite. ThreadSanitizer passes the registry contention test as well as concurrent binding-reset, profile-parser, and pause/assignment-control suites. The payload cross-builds with SDK v0.43 and produces an x86-64 PS5 ELF on macOS. Host tests and cross-compilation do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility; no physical console or Steam Controller/Puck is available here. Hardware validation remains blocked, not passed or failed.
 
 ## Source pins and attribution
 
