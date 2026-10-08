@@ -1,7 +1,7 @@
 CC := clang
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 BUILD := build
-TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue
+TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue
 
 .PHONY: all test sanitize clean
 
@@ -9,6 +9,7 @@ all: test
 
 test: $(TESTS)
 	./$(BUILD)/test_webui_http
+	./$(BUILD)/test_webui_peer_policy
 	./$(BUILD)/test_webui_route
 	./$(BUILD)/test_webui_json
 	./$(BUILD)/test_steam_usb
@@ -48,6 +49,9 @@ $(BUILD):
 	mkdir -p $@
 
 $(BUILD)/test_webui_http: test_webui_http.c ../payload/webui_http.c ../payload/webui_auth.c | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload $^ -o $@
+
+$(BUILD)/test_webui_peer_policy: test_webui_peer_policy.c ../payload/webui_peer_policy.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $^ -o $@
 
 $(BUILD)/test_webui_route: test_webui_route.c ../payload/webui_route.c | $(BUILD)
