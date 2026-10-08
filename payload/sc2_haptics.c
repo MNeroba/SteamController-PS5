@@ -29,6 +29,8 @@ static pthread_mutex_t q_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t log_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct { uint8_t b[12]; uint8_t n; } q[QN];
 static int q_head = 0, q_tail = 0;
+static slot_registry_token_t q_owner;
+static int q_owner_valid;
 static int last_method = -1;
 static unsigned n_err_logs;
 static int logged_fail, logged_ok;
@@ -36,6 +38,56 @@ static int logged_fail, logged_ok;
 static uint16_t r_left = 0, r_right = 0;
 static int64_t  r_until = 0, r_next = 0;
 static int      r_active = 0;
+
+static int token_equal(slot_registry_token_t a, slot_registry_token_t b) {
+    return a.index == b.index && a.generation == b.generation;
+}
+
+static int is_owner_locked(slot_registry_token_t owner) {
+    return q_owner_valid && token_equal(q_owner, owner);
+}
+
+static void clear_session_locked(void) {
+    q_head = q_tail = 0;
+    memset(q, 0, sizeof(q));
+    r_left = r_right = 0;
+    r_until = r_next = 0;
+    r_active = 0;
+}
+
+int sc2_haptic_session_claim(slot_registry_token_t owner) {
+    if (owner.index >= SLOT_REGISTRY_MAX_SLOTS || owner.generation == 0)
+        return 0;
+    pthread_mutex_lock(&q_lock);
+    int claimed = 0;
+    if (q_owner_valid) {
+        claimed = token_equal(q_owner, owner);
+    } else {
+        clear_session_locked();
+        q_owner = owner;
+        q_owner_valid = 1;
+        claimed = 1;
+    }
+    pthread_mutex_unlock(&q_lock);
+    return claimed;
+}
+
+int sc2_haptic_session_is_owner(slot_registry_token_t owner) {
+    pthread_mutex_lock(&q_lock);
+    int result = is_owner_locked(owner);
+    pthread_mutex_unlock(&q_lock);
+    return result;
+}
+
+void sc2_haptic_session_abandon(slot_registry_token_t owner) {
+    pthread_mutex_lock(&q_lock);
+    if (is_owner_locked(owner)) {
+        q_owner_valid = 0;
+        memset(&q_owner, 0, sizeof(q_owner));
+        clear_session_locked();
+    }
+    pthread_mutex_unlock(&q_lock);
+}
 
 static int64_t now_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -45,7 +97,12 @@ static int64_t now_ms(void) {
 static void push(const uint8_t *b, uint8_t n) {
     pthread_mutex_lock(&q_lock);
     int nx = (q_tail + 1) % QN;
-    if (nx != q_head) { memcpy(q[q_tail].b, b, n); q[q_tail].n = n; q_tail = nx; sc2_status_haptic_queued(); }
+    if (q_owner_valid && nx != q_head) {
+        memcpy(q[q_tail].b, b, n);
+        q[q_tail].n = n;
+        q_tail = nx;
+        sc2_status_haptic_queued();
+    }
     pthread_mutex_unlock(&q_lock);
 }
 
@@ -59,16 +116,20 @@ void sc2_haptic_tick(void) { sc2_haptic_pulse(SC2_PAD_BOTH, 0x190, 0, 1); }
 
 void sc2_haptic_rumble_set(uint16_t left, uint16_t right) {
     pthread_mutex_lock(&q_lock);
-    r_left = left; r_right = right;
-    if (left || right) { r_until = INT64_MAX; r_active = 1; r_next = 0; }
-    else               { r_until = 0; }                 /* service sends the stop */
+    if (q_owner_valid) {
+        r_left = left; r_right = right;
+        if (left || right) { r_until = INT64_MAX; r_active = 1; r_next = 0; }
+        else               { r_until = 0; }             /* service sends the stop */
+    }
     pthread_mutex_unlock(&q_lock);
 }
 
 void sc2_haptic_rumble_for(uint16_t left, uint16_t right, int ms) {
     pthread_mutex_lock(&q_lock);
-    r_left = left; r_right = right;
-    r_until = now_ms() + ms; r_next = 0; r_active = 1;
+    if (q_owner_valid) {
+        r_left = left; r_right = right;
+        r_until = now_ms() + ms; r_next = 0; r_active = 1;
+    }
     pthread_mutex_unlock(&q_lock);
 }
 
@@ -87,13 +148,11 @@ static int ctrl_report(int fd, int iface, int type, const uint8_t *b, uint8_t n)
 
 /* Interrupt OUT on any opened FS endpoint index */
 #ifdef SC2_HAPTICS_TEST
-int sc2_haptics_test_send_out(int fd, int idx);
+int sc2_haptics_test_send_out(int fd, int idx, const uint8_t *data, uint32_t len);
 static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx,
                         const uint8_t *data, uint32_t len) {
     (void)eps;
-    (void)data;
-    (void)len;
-    return sc2_haptics_test_send_out(fd, idx);
+    return sc2_haptics_test_send_out(fd, idx, data, len);
 }
 #else
 static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx, const uint8_t *data, uint32_t len) {
@@ -151,13 +210,40 @@ static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int 
     return r;
 }
 
-void sc2_haptic_service(int fd, struct usb_fs_endpoint *eps, int out_opened, int iface, int n_extra) {
+int sc2_haptic_session_release(slot_registry_token_t owner, int fd,
+                               struct usb_fs_endpoint *eps, int out_opened,
+                               int iface, int n_extra) {
+    pthread_mutex_lock(&q_lock);
+    if (!is_owner_locked(owner)) {
+        pthread_mutex_unlock(&q_lock);
+        return 0;
+    }
+    int stop_rumble = r_active;
+    q_owner_valid = 0;
+    memset(&q_owner, 0, sizeof(q_owner));
+    clear_session_locked();
+    pthread_mutex_unlock(&q_lock);
+
+    if (!stop_rumble || fd < 0) return 1;
+    if (n_extra < 0) n_extra = 0;
+    if (n_extra > SC2_HAP_MAX_OUT) n_extra = SC2_HAP_MAX_OUT;
+    uint8_t report[STEAM_HAPTIC_RUMBLE_SIZE];
+    int n = steam_feedback_encode_rumble(report, sizeof(report), 0, 0);
+    if (n <= 0) return 0;
+    return send_report(fd, eps, out_opened, iface, n_extra, report,
+                       (uint8_t)n) == 0;
+}
+
+void sc2_haptic_service(slot_registry_token_t owner, int fd,
+                        struct usb_fs_endpoint *eps, int out_opened,
+                        int iface, int n_extra) {
     if (n_extra < 0) n_extra = 0;
     if (n_extra > SC2_HAP_MAX_OUT) n_extra = SC2_HAP_MAX_OUT;
     uint8_t b[12]; uint8_t n;
 
     for (;;) {
         pthread_mutex_lock(&q_lock);
+        if (!is_owner_locked(owner)) { pthread_mutex_unlock(&q_lock); return; }
         if (q_head == q_tail) { pthread_mutex_unlock(&q_lock); break; }
         memcpy(b, q[q_head].b, q[q_head].n); n = q[q_head].n;
         q_head = (q_head + 1) % QN;
@@ -176,6 +262,7 @@ void sc2_haptic_service(int fd, struct usb_fs_endpoint *eps, int out_opened, int
 
     /* rumble refresh */
     pthread_mutex_lock(&q_lock);
+    if (!is_owner_locked(owner)) { pthread_mutex_unlock(&q_lock); return; }
     int64_t t = now_ms();
     int send = 0; uint16_t l = 0, r = 0;
     if (r_active) {

@@ -24,7 +24,7 @@ SteamController-PS5 is a focused payload project for carrying Steam Controller i
 | **P0 · safety and architecture** | In progress | Host-tested parser, portal, session, slot-lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
 | **M1 · USB-C and official Puck** | Partial | Steam report and USB descriptor code cross-builds and has portable tests. Live USB/Puck enumeration and reconnect behavior are unverified. |
 | **M2 · Steam controls and motion** | Partial | Input, mapping, motion, touch, profiles, and extra-control paths exist in source; end-to-end behavior on a console and controller is unverified. |
-| **M3 · haptics and feedback** | Partial | Feedback encoding and selected service paths have host coverage. The process-wide queue still lacks an explicit session owner; see `P1-HAPTIC-26` in [issues](project-memory/ISSUES.md). |
+| **M3 · haptics and feedback** | Partial | A generation-tagged lease admits one active SC2 USB/Puck reader, rejects a second SC2 reader, and gates queue service and teardown by owner token. Host tests cover the policy; `gc_main.c`, USB output and physical haptics remain target-unverified. Multi-SC2 use is not supported. |
 | **M4 · native PS5 Bluetooth LE** | Research only | No native PS5 GAP/GATT path is proven. No HCI or radio operation has been run. See [BLE decision](docs/BLE_DECISION.md). |
 | **M5 · Edge identity and ShellUI** | Research backlog | Separate experiments; not part of the verified DualSense path. |
 | **M6 · portal and diagnostics** | Partial | Authentication and request handling have host tests. The portal uses plain HTTP and has not been validated on-console. |
@@ -70,7 +70,7 @@ make -C tests clean test
 make -C tests clean sanitize
 ```
 
-The latest recorded run passes 873 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer, alongside fixed-seed parser samples and concurrency regressions. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
+The latest recorded run passes 889 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer, alongside fixed-seed parser samples and concurrency regressions. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
 ### PS5 payload cross-build
 

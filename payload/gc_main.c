@@ -698,6 +698,7 @@ static void *usb_hid_thread(void *arg) {
 
     slot_registry_entry_t slot_entry;
     if (slot_registry_snapshot(&g_slots, slot_token, &slot_entry) != SLOT_REGISTRY_OK) {
+        sc2_haptic_session_abandon(slot_token);
         sc2_assignment_release(assignment_token);
         return NULL;
     }
@@ -1092,7 +1093,7 @@ main_loop: ;
                  * everything and remove the virtual pad; the hooks see it as
                  * off. Reports are still read to catch the resume / Steam button. */
                 game_hooks_feed(NULL, 0);
-                sc2_haptic_service(fd, eps, out_opened, sc2_iface, sc2_n_out);
+                sc2_haptic_service(slot_token, fd, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
                 if (slot_virtual_ready(slot_token)) {
                     ScePadData rel; memset(&rel, 0, sizeof(rel));
@@ -1129,7 +1130,7 @@ main_loop: ;
                     ds_handoff_sc2_used();
                 if (injected) game_hooks_feed(&pad, sc2_link);
                 else if (!sc2_link) game_hooks_feed(NULL, 0);
-                sc2_haptic_service(fd, eps, out_opened, sc2_iface, sc2_n_out);
+                sc2_haptic_service(slot_token, fd, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
                 if (was && !sc2_link) {
                     ds_handoff_sc2_session(0);
@@ -1181,6 +1182,9 @@ reinit:
     goto cleanup_usb;
 uninit_exit:
 cleanup_usb:
+    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED)
+        (void)sc2_haptic_session_release(slot_token, fd, eps, out_opened,
+                                         sc2_iface, sc2_n_out);
     if (usb_resources.fd >= 0) {
         int cleanup_result = usb_session_cleanup(&usb_resources,
             &g_usb_session_ops, NULL);
@@ -1191,6 +1195,8 @@ cleanup_usb:
     fd = -1;
 
 exit_slot:
+    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED)
+        sc2_haptic_session_abandon(slot_token);
     if (usb_resources.fd >= 0) {
         int cleanup_result = usb_session_cleanup(&usb_resources,
             &g_usb_session_ops, NULL);
@@ -1299,6 +1305,18 @@ static void *controller_manager_thread(void *arg) {
             int lazy = (vid==VID_STEAM && (pid==PID_SC2_PUCK || pid==PID_SC2_WIRED));
             if (!lazy) notify("Puckbridge: %s detected — assign user on screen", name);
 
+            int owns_sc2_haptics = 0;
+            if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
+                if (!sc2_haptic_session_claim(slot_token)) {
+                    if ((scan % 5) == 0)
+                        gp_log("manager: Steam Controller at %s skipped; slot[%u] already owns the single SC2 session\n",
+                               path, slot_token.index);
+                    slot_release(slot_token, "another Steam Controller session owns haptics");
+                    continue;
+                }
+                owns_sc2_haptics = 1;
+            }
+
             /* The assignment lease serializes the PS5 dialog. Slot ownership
              * remains generation-tagged even if that dialog times out. */
             sc2_assignment_token_t assignment_token = 0;
@@ -1324,6 +1342,8 @@ static void *controller_manager_thread(void *arg) {
                 &g_slots, slot_token, !lazy, &start_ops, &start_context,
                 &cleanup_result);
             if (start_result != SLOT_LIFECYCLE_OK) {
+                if (owns_sc2_haptics)
+                    sc2_haptic_session_abandon(slot_token);
                 if (assignment_token)
                     sc2_assignment_release(assignment_token);
                 if (start_result == SLOT_LIFECYCLE_VDA_ATTACH_FAILED) {
