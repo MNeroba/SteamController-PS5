@@ -320,6 +320,10 @@ static void ensure_dir(void) {
     mkdir(SC2_DIR, 0777);
 }
 
+/* Profile writes are small and infrequent; serialize replacement and delete so
+ * concurrent menu/portal/watcher operations cannot share the same .tmp file. */
+static pthread_mutex_t g_store_lock = PTHREAD_MUTEX_INITIALIZER;
+
 int sc2_store_load(const char *id, sc2_profile_t *p) {
     if (!sc2_store_valid_id(id)) return -1;
     char path[128]; snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
@@ -334,23 +338,42 @@ int sc2_store_load(const char *id, sc2_profile_t *p) {
 
 int sc2_store_save(const char *id, const sc2_profile_t *p) {
     if (!sc2_store_valid_id(id)) return -1;
+    pthread_mutex_lock(&g_store_lock);
     ensure_dir();
     char path[128], tmp[136];
     snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
     char buf[8192]; int n = sc2_profile_format(p, buf, sizeof(buf));
     FILE *f = fopen(tmp, "w");
-    if (!f) return -1;
+    if (!f) { pthread_mutex_unlock(&g_store_lock); return -1; }
+#ifdef SC2_PROFILE_STORE_TEST
+    extern void sc2_profile_test_store_critical_enter(void);
+    sc2_profile_test_store_critical_enter();
+#endif
     size_t w = fwrite(buf, 1, (size_t)n, f);
-    fclose(f);
-    if ((int)w != n) { unlink(tmp); return -1; }
-    return rename(tmp, path);
+    int close_error = fclose(f);
+    if ((int)w != n || close_error != 0) {
+        unlink(tmp);
+        pthread_mutex_unlock(&g_store_lock);
+        return -1;
+    }
+    int result = rename(tmp, path);
+    if (result != 0) unlink(tmp);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
 }
 
 int sc2_store_delete(const char *id) {
     if (!sc2_store_valid_id(id) || !strcmp(id, "default")) return -1;
     char path[128]; snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
-    return unlink(path);
+    pthread_mutex_lock(&g_store_lock);
+#ifdef SC2_PROFILE_STORE_TEST
+    extern void sc2_profile_test_store_critical_enter(void);
+    sc2_profile_test_store_critical_enter();
+#endif
+    int result = unlink(path);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
 }
 
 void sc2_store_list(void (*cb)(const char *, const char *, void *), void *u) {

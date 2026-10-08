@@ -86,6 +86,7 @@ void sc2_active_get_versioned(sc2_profile_t *p, uint32_t *generation);
 
 int  sc2_store_valid_id(const char *id);
 int  sc2_store_load(const char *id, sc2_profile_t *p);   /* 0 ok */
+/* Save/delete mutations serialize process-wide; save replaces the complete file atomically. */
 int  sc2_store_save(const char *id, const sc2_profile_t *p);
 int  sc2_store_delete(const char *id);
 /* Calls cb for every saved profile id. */

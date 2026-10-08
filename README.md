@@ -70,7 +70,7 @@ make -C tests clean test
 make -C tests clean sanitize
 ```
 
-The latest recorded run passes 899 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer, alongside fixed-seed parser samples and concurrency regressions. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
+The latest recorded run passes 921 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer, including concurrent profile save/delete coverage, fixed-seed parser samples, and other concurrency regressions. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
 ### PS5 payload cross-build
 
