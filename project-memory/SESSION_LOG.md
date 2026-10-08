@@ -682,3 +682,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - GitHub: current `main` is M1-196 memory-sync commit `cdb7b911462218cb0cd815f2ca6b9cc953ee6b7d`; its Host and PS5 Actions runs `37846785391` and `37846785551` are still queued. The M1-197 source/docs/memory update has not yet been published. `git diff --check` must be repeated after the final edits and before tree creation.
 - Hardware/safety: no physical PS5, Steam Controller, Puck, or DualSense was available; no target ioctl, BLE/HCI/radio, firmware/system write, or release action occurred. Do not claim PS5 runtime or firmware compatibility.
 - Next exact action: `git diff --check`, run credential scan, compute full local blob manifest and compare to `main` tree `424028c8ce429cb9eaf38b0764b6386929b3a177`; then create a new main tree over that base and update `main` only with expected-head `cdb7b911462218cb0cd815f2ca6b9cc953ee6b7d`, `force=false`.
+
+
+### M1-197 direct-main publication reconciliation — 2026-10-08 21:36 UTC
+
+- Published the USB configuration count fix, tests, source-backed evidence, architecture/test/build documentation, and project-memory records directly to main as commit bd833e3f1914610e2e9250e721796da3b3ceec2f, parent cdb7b911462218cb0cd815f2ca6b9cc953ee6b7d, tree 2db08d87687c3e5381bb1f81fd8a14a1ac10e762. The update used an expected-head guard and force=false; no PR or history rewrite was used.
+- All 13 modified blob IDs matched local Git object hashes before tree creation. Re-fetched main and recursive tree: commit and tree match, 209 entries/196 blobs, truncated=false; every path, mode, and blob hash matches the complete local manifest with no missing or extra paths.
+- Host tests run 37847899123 and PS5 cross-build run 37847899130 are queued; combined status has no completed checks. No CI pass is claimed.
+- M1-197 local evidence: full normal and ASan/UBSan suites pass; parser test passes 24 checks; fixed-seed property test covers 100,000 Steam reports and 100,000 USB configurations. SDK v0.43/LLVM 18.1.8 compile/link passes with ELF SHA-256 5b4ab572d235b2a5e87f4e4f4d031d37ac9b0d3e84ce2a6b2d6103e89055f551. No physical PS5, controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio command, firmware write, or binary release was used.
+- P0-USB-DESC-09 is fixed at the parser/host-test level. Keep P0-USB-DESC-10 blocked until a safely identified Steam Controller/Puck descriptor and target ioctl behavior can be obtained. Next: recheck the two Actions runs and continue a separate host-only source audit.
