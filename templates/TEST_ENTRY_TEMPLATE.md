@@ -1,0 +1,11 @@
+## TEST-XXXX — descriptive name
+- Date UTC:
+- Commit SHA:
+- OS/compiler/SDK/PS5 FW/console model/controller FW:
+- Preconditions and dependencies:
+- Exact command or manual steps:
+- Expected behavior:
+- Actual output (link to immutable/redacted log):
+- Exit code: 
+- Result: PASS | FAIL | BLOCKED | NOT_RUN
+- Regression issue and remediation:

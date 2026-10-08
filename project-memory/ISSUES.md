@@ -1,0 +1,22 @@
+# Issues and blockers — project register
+
+Severity refers to possible impact **if relevant code is part of chosen base**. These are not automatically open issues for a future derivative. Codex must first establish presence and reproducer on pinned source.
+
+| ID | Priority | Status | Issue or blocker | Evidence / required action |
+|---|---|---|---|---|
+| P0-SEC-01 | P0 | IN_PROGRESS | Anonymous LAN portal/control endpoints | Confirmed in selected Puckbridge `payload/webui.c:175-281,288-315` at `78460113ef7c48502c765a1f83ba34d53c977134`; bearer auth, private token provisioning and exact HTTP framing are now wired. Needs PS5 build/runtime regression and review of plaintext HTTP limitation. |
+| P0-MEM-02 | P0 | CONDITIONAL_ON_CODE | Unchecked Bluetooth ACL/L2CAP lengths, out-of-bounds access | OmniPad `bt_host.c`; fix only if code used; malformed tests + sanitizer |
+| P0-MEM-03 | P0 | CONDITIONAL_ON_CODE | JSON builder overflow/escaping/HTTP parser errors | OmniPad `web.c`; source audit and safe builder tests |
+| P0-USB-04 | P0 | REFERENCE_ONLY | Unchecked USB reader thread creation and teardown races | Observed in OmniPad only; selected Puckbridge checks reader `pthread_create` and rolls back at `gc_main.c:1073-1103`. Do not import OmniPad implementation. |
+| P0-SLOT-05 | P0 | IN_PROGRESS | Duplicate or stale virtual controller during transport switch/handoff | Audited the selected slot table; VDA creation now serializes the global klog identity queue to prevent concurrent SC sessions from consuming each other's IDs. Generation IDs, atomic ownership and multi-device hardware tests remain. |
+| P0-HOOK-06 | P0 | IN_PROGRESS | Game hook could outlive process or fail to roll back | Input/vibration hooks now default off and the prior title is unhooked when the selected game changes. Cooperative payload shutdown and live PS5/game rollback remain unverified. |
+| P0-CI-07 | P0 | IN_PROGRESS | Selected base had no host tests | Added ASan/UBSan tests for portal HTTP/auth/token storage, bounded JSON, typed Steam report decoding (including malformed-input classification), bounded USB config parsing, mapping, motion math, and feedback serialization (344 checks pass). Session/slot lifecycle, profile transitions, PS5 adapter and USB lifecycle coverage remains. |
+| P0-HTTP-08 | P0 | IN_PROGRESS | Selected web server accepted partial/ambiguous HTTP input and unsafely capped Content-Length | Replaced the old read path with bounded framing in `payload/webui.c` and `payload/webui_http.c`; malformed lengths, duplicate auth/length, transfer encoding, partial and oversized bodies are covered by portable tests. Needs integration/build verification. |
+| P0-USB-DESC-09 | P0 | IN_PROGRESS | Steam USB descriptor parser read fields beyond reported descriptor boundaries | Replaced duplicated endpoint walkers with `payload/steam_usb.c`, which validates total length and every descriptor before reading it; active endpoint selection also requires a complete decoded input report. 19 malformed/valid host checks pass. Needs PS5 compilation and real wired/Puck descriptor confirmation. |
+| P0-USB-DESC-10 | P0 | BLOCKED_HARDWARE | USB HID usage-page and official device interface validation | Runtime matches exact Steam VID/PID and complete input-report shape; pure config parser validates descriptor bounds. Usage page is not yet checked by a live report-descriptor read. Requires a legal SDK build and Steam Controller/Puck descriptor capture before adding that path. |
+| P1-PUCK-01 | P1 | UNVERIFIED | Multi-controller simultaneous use through one Valve Puck | Puckbridge explicitly says first only; hardware+protocol study |
+| P1-BLE-01 | P1 RESEARCH | BLOCKED_HARDWARE | No proved native PS5 FW13.60 arbitrary BLE scan/GATT | Follow B0-B6 in `docs/BLE_FEASIBILITY.md`; no radio takeover |
+| P2-EDGE-01 | P2 RESEARCH | UNKNOWN | Edge virtual device extra button value to games | Require PS5 API/game proof, not Linux HID bit observation |
+| P2-UI-01 | P2 RESEARCH | UNKNOWN | PS5 ShellUI Steam Controller name/icon override | Per-virtual-device reversible hook research only |
+
+Add new items as `ID`, severity, date, source+SHA, exact repro, expected/observed, test ID, affected branch, commit, status (`OPEN/IN_PROGRESS/FIXED/VERIFIED/BLOCKED/CLOSED`) and follow-up. Do not assign an issue "FIXED" solely because code compiled.
