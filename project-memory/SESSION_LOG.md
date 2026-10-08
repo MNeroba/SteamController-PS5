@@ -379,3 +379,14 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - At 17:12 UTC GitHub reported Host run `37814698394` and PS5 cross-build run `37814698350` queued on this source/test/docs commit; combined status was empty. No GitHub CI pass is claimed. This publication state is recorded in PUB-20/CI-50/CI-51.
 - No console or controller was available; no BLE/HCI command was run. P1-HAPTIC-26 remains open and unrelated to the scanner fix.
 - Next: finish the current PR status sync, then continue source-backed USB/Puck/session lifecycle audit and resolve the haptic producer/consumer ownership contract before any multi-controller claim.
+
+
+## M1 game-title metadata buffer race — 2026-10-08 17:17 UTC
+
+- Source audit: `sc2_profile.c`'s background watcher calls `gc_game_name()` when the active title changes, while the portal thread calls `gc_game_list()`. Both reach `json_title()` in `game_list.c`, whose inherited 64 KiB static buffer was shared. This can return the wrong game title/name and is a real C data race when the calls overlap.
+- Added `tests/test_game_list_concurrency.c` using production `game_list.c`, private fixture paths and a barrier after JSON file reads. M1-86 expected-red failed deterministically: both `CUSA00001` and `CUSA00002` received `Wired Title`.
+- Fixed by extracting pure `json_title_buffer()` and giving each file read its own bounded 64 KiB heap buffer, freed after parsing. Added test-only directory/hook controls and the target to normal and sanitizer suites. No protocol parser was duplicated and no borrowed code was used.
+- Verification: M1-87 normal suite and M1-88 ASan/UBSan suite PASS; new target outputs `concurrent game-title lookups keep independent JSON buffers`. M1-89 targeted TSan PASS using `make -C tests clean`, then `make -C tests CFLAGS='-std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=thread -fno-omit-frame-pointer' build/test_game_list_concurrency`, then `./build/test_game_list_concurrency` from `tests/`; no race warning. M1-90 SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `e35e08672fbb61d1758d05b4ff9faee1700323c14bb2d206191f924a64086c97`, six SDK libraries inspected. These checks do not test PS5 appmeta filesystem permissions/content or portal/watcher runtime.
+- M1-91 final `git diff --check`, trailing-whitespace scan and bounded credential/private-key pattern scan pass.
+- Evidence tracked as F048/P2-GAME-META-28/ADR-016/T-P27. The latest implementation increment awaits publication on PR head `1179594c4555699d2346d78fb4cf389f61977f4e`; publish with expected-head guard, including all code/test/doc/memory changes. Refresh the PR body to the new ELF SHA and report any queued Actions accurately.
+- Continue source audit for remaining mutable function statics called from concurrent contexts. P1-HAPTIC-26 remains open; PS5 hardware and native BLE remain blocked and untouched.

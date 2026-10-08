@@ -14,8 +14,21 @@
 #include <ctype.h>
 #include <sys/stat.h>
 
-static const char *const k_dirs[] = { "/user/appmeta", "/system_data/priv/appmeta" };
+#ifndef GC_APP_META_DIR_USER
+#define GC_APP_META_DIR_USER "/user/appmeta"
+#endif
+#ifndef GC_APP_META_DIR_SYSTEM
+#define GC_APP_META_DIR_SYSTEM "/system_data/priv/appmeta"
+#endif
+static const char *const k_dirs[] = { GC_APP_META_DIR_USER, GC_APP_META_DIR_SYSTEM };
 #define N_DIRS 2
+
+#ifdef GAME_LIST_TEST_HOOKS
+extern void gc_game_list_test_after_json_read(void);
+#define GAME_LIST_AFTER_JSON_READ() gc_game_list_test_after_json_read()
+#else
+#define GAME_LIST_AFTER_JSON_READ() ((void)0)
+#endif
 
 int gc_is_title_id(const char *s) {
     for (int i = 0; i < 4; i++) if (!isupper((unsigned char)s[i])) return 0;
@@ -57,13 +70,7 @@ static int sfo_title(const char *path, char *out, size_t outsz) {
 
 /* PS5: first "titleName" in param.json (the default-language entry comes first
  * in practice; good enough for a label). Minimal scan, no JSON library. */
-static int json_title(const char *path, char *out, size_t outsz) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return -1;
-    static char buf[64 * 1024];
-    size_t n = fread(buf, 1, sizeof(buf) - 1, f); buf[n] = 0;
-    fclose(f);
-
+static int json_title_buffer(const char *buf, char *out, size_t outsz) {
     /* Prefer the defaultLanguage block if we can find it */
     const char *start = buf;
     const char *dl = strstr(buf, "\"defaultLanguage\"");
@@ -92,6 +99,20 @@ static int json_title(const char *path, char *out, size_t outsz) {
     }
     out[o] = 0;
     return o ? 0 : -1;
+}
+
+static int json_title(const char *path, char *out, size_t outsz) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return -1;
+    const size_t capacity = 64 * 1024;
+    char *buf = malloc(capacity);
+    if (!buf) { fclose(f); return -1; }
+    size_t n = fread(buf, 1, capacity - 1, f); buf[n] = 0;
+    fclose(f);
+    GAME_LIST_AFTER_JSON_READ();
+    int result = json_title_buffer(buf, out, outsz);
+    free(buf);
+    return result;
 }
 
 static int title_in_dir(const char *dir, const char *id, char *out, size_t outsz) {

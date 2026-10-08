@@ -25,6 +25,7 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 | ADR-013 | 2026-10-08 | ACCEPTED | Keep each haptic service invocation's extra-OUT endpoint count local to its report send; clamp it to `SC2_HAP_MAX_OUT`. Serialize shared report/service log-throttling state separately from the haptic queue lock. This removes cross-reader route-count contamination and races without holding the queue lock during USB I/O or logging. The process-wide pulse queue and rumble target remain unchanged and do not establish independent multi-controller haptic routing. Evidence: M1-69 expected-red behavior, M1-70 TSan race, M1-71–74 fixed regression/sanitizer/build results, F045; published in draft PR #1 commit `a902be57084fd90e70672c3fbf84db8a7a297f1c`. Reconsider queue scope only after producer APIs carry a verified session/slot owner and hardware requirements are known. |
 | ADR-014 | 2026-10-08 | ACCEPTED | Do not add an implicit global "active haptic session" pointer or retarget the queue based on whichever USB reader happens to run. Current manager code can host multiple lazy SC2 readers, while menu/game/portal producers have no session identity. Any routing fix must define the active-controller policy and carry an explicit generation-tagged session/slot owner to enqueue and service APIs, or explicitly gate the product to one SC2 session. Evidence: F046. Until selected, preserve P1-HAPTIC-26 as open and do not claim multi-session haptic correctness. |
 | ADR-015 | 2026-10-08 | ACCEPTED | Every concurrent `sc2_find_active_ep()` call owns its report buffers for the whole USB scan; do not use function-static storage for endpoint completion data. The manager may run wired and Puck discovery concurrently, and each call classifies mutable completion buffers after returning from ioctl. A deterministic host stub reproduced cross-call contamination with static storage; per-call stack buffers pass the regression. This changes only scanner scratch ownership, not the USB session/resource contract. Evidence: F047 and M1-78–84; scanner fix published in PR commit `b6f5bae3f6cb2c45be0e798c10b6cf2345ce2edf`. Reconsider only if the bounded stack footprint becomes unsafe on the PS5 worker stack; the current allocation is `SC2_MAX_EPS * 64` bytes. |
+| ADR-016 | 2026-10-08 | ACCEPTED | `json_title()` must own a bounded input buffer per call. The profile watcher can resolve the active title while the portal lists games; a 64 KiB function-static buffer made both calls parse whichever file was read last. Allocate one 64 KiB buffer, parse through a pure helper, and free it on return. This adds a small bounded allocation per metadata lookup. Evidence: F048 and M1-86–90. Reconsider if target memory pressure is measured; do not replace it with process-global mutable scratch. |
 
 ## ADR-015 — Per-invocation SC2 endpoint scan buffers
 
@@ -35,3 +36,13 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: each scan reserves `SC2_MAX_EPS * 64` bytes on its thread stack.
 - Verification gate: normal test, ASan/UBSan suite, targeted TSan and SDK cross-build pass; live USB ioctl and stack-budget behavior on PS5 need target hardware.
 - Reconsider if target stack measurements show the bounded scratch allocation is unsafe; then use explicit per-session heap/resource ownership, never shared static scratch.
+
+## ADR-016 — Per-call installed-title JSON input
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: `json_title()` used one mutable static 64 KiB buffer; profile watching and portal game listing can call it from different threads.
+- Evidence: host regression `tests/test_game_list_concurrency.c` synchronizes two calls after reading different fixture files. The expected-red result gave both IDs the `Wired Title` string.
+- Decision: allocate a bounded 64 KiB buffer per invocation, pass it to a pure JSON-title parser, and free it after parsing.
+- Tradeoff: a temporary heap allocation is made per title read; read size remains capped at 65,535 bytes.
+- Verification gate: normal, ASan/UBSan and targeted TSan host tests, plus PS5 SDK cross-build. Actual appmeta filesystem access and memory behavior remain target-unverified.
+- Reconsider only if measured target memory pressure warrants a different per-call ownership strategy.
