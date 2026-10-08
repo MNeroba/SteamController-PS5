@@ -512,6 +512,13 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - `git diff --check`: PASS. Environment: macOS Darwin 27.0.0 arm64, Apple clang 21.0.0 for host tests; SDK v0.43 at commit `d9c9519116944a7f1c22d262012c53b80b3520b7`. The local branch remains `fix/p0-safety` at Puckbridge pin `78460113ef7c48502c765a1f83ba34d53c977134`; M1-194 is an uncommitted source-tree delta targeting GitHub main head `89a3703d385d2e4208d037f423613caac45cba18`, pending publication and post-publication tree verification.
 - Evidence is host tests plus compile/link only. No real PS5 ioctl scheduling, USB device, Puck hotplug, Steam Controller, DualSense, or firmware runtime was exercised; BLE/HCI/radio and firmware/system operations were not run. The earlier repository finding remains: `9235825` directly follows full-source `e2059116`; deleted-path/line counts are verified but the suspected Git tree-construction mechanism is unproven. No history rewrite or binary release.
 
+### M1-194 GitHub publication reconciliation — 2026-10-08 21:03 UTC
+
+- Published M1-194 source commit `6bda48be9c544898451e60573fb8fc363fd4505e` directly to GitHub `main`, parent `89a3703d385d2e4208d037f423613caac45cba18`, tree `1fce5b32bd377cb791ca42df0c2d7e29c97cd6d1`. The expected-head guard was used with `force=false`; GitHub acknowledged the branch update. The 20 uploaded blobs had already been checked against local Git blob hashes before the update.
+- Re-fetched the main branch and recursive tree after publication. The tree has 209 entries and 196 blobs, `truncated=false`; required payload files (`gc_main.c`, `controller_sc2.c`, `sc2_haptics.c`, `slot_registry.c`, and `steam_protocol.c`) plus `AGENTS.md` and `CODEX_TASK.md` are present. Exact local/remote manifest verification at publication confirmed every path, mode and blob SHA, with no missing, extra or mismatched entries.
+- GitHub Actions runs `37843842873` (Host tests) and `37843843107` (PS5 cross-build) are queued for this source head. Combined commit status is empty; no CI pass is claimed. Local normal, ASan/UBSan, TSan and SDK v0.43 compile/link results remain as recorded above.
+- The user's correction is now reflected in the repository memory: first destructive commit `9235825db8425e4bb335396fcc38e83daf3c3aa7` directly follows complete source commit `e2059116442e0d195b8aacb9b4baf4eb13737e3e`; compare evidence reports 189 paths, 183 removals and 43,543 deleted lines; the suspected tree-construction mechanism is still unproven. History was retained.
+
 
 ## M1-190 validation-memory publication — 2026-10-08 20:11 UTC
 

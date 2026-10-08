@@ -45,4 +45,6 @@ On 2026-10-08, the complete project was published to `main` at commit `0f122c64e
 
 ## M1-194 scanner operation-table rebuild
 
-On 2026-10-08, the scanner operation-table change built with the same pinned SDK v0.43 and LLVM 18.1.8 command. The ELF is 64-bit x86-64, with SHA-256 `1af60f12c8d5f34860beb82975db609d29dc1d8e1635d1b17cc7084f134e0e78`; `llvm-readobj` lists the expected PS5 SDK runtime libraries. This verifies compilation/linking only. No real USB FS ioctl, console, Steam Controller, Puck, or firmware behavior was tested. Exact environment and command are in M1-194 of `project-memory/TEST_LOG.md`; this record was written before its source delta was published to `main`.
+On 2026-10-08, the scanner operation-table change built with the same pinned SDK v0.43 and LLVM 18.1.8 command. The ELF is 64-bit x86-64, with SHA-256 `1af60f12c8d5f34860beb82975db609d29dc1d8e1635d1b17cc7084f134e0e78`; `llvm-readobj` lists the expected PS5 SDK runtime libraries. This verifies compilation/linking only. No real USB FS ioctl, console, Steam Controller, Puck, or firmware behavior was tested. Exact environment and command are in M1-194 of `project-memory/TEST_LOG.md`.
+
+The validated scanner source and this build record were published to `main` in commit `6bda48be9c544898451e60573fb8fc363fd4505e` (tree `1fce5b32bd377cb791ca42df0c2d7e29c97cd6d1`). GitHub's acknowledged recursive tree contained all 196 source blobs across 209 entries; this tree check does not add PS5 runtime evidence. Actions run IDs and their actual state are tracked in `project-memory/TEST_LOG.md`.
