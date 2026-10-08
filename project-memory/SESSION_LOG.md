@@ -64,4 +64,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Source finding: lazy SC2 slots retain `handle=-1` until the controller wakes and a virtual device is created. The manager's allocation-failure and `pthread_create`-failure cleanup paths previously passed that sentinel to `scePadVirtualDeviceDeleteDevice`.
 - Change: guarded both cleanup calls with `handle >= 0`; recorded as F028 / P1-SLOT-11. This is code review evidence, not a PS5 ABI/runtime verification.
 - Validation: `make -C tests clean sanitize` PASS, 344 ASan/UBSan checks; a Python source assertion confirmed both call sites are guarded; `git diff --check` and publishable-text whitespace scan PASS. The host suite does not compile `gc_main.c`. PS5 SDK is unavailable, and no thread-creation fault injection or hardware test was possible.
-- PR: this code fix and updated memory are ready to add to draft PR #1; do not promote the PR from draft.
+- PR: code fix and updated memory are published in follow-up commit `04cc833e99c4e1e53eaaa93ae01658daa2cc69c0` on draft PR #1; do not promote the PR from draft.
+
+## M1 profile numeric parsing audit — 2026-10-08 13:14 UTC
+
+- Finding: `sc2_profile_parse` processed authenticated portal and saved profile numeric values with `atoi`. A long value outside `int` range has undefined behavior in C; partial strings such as `20junk` were silently accepted as 20.
+- Change: replaced numeric `atoi` conversions with checked `strtol`, explicit `ERANGE`/`INT_MIN`/`INT_MAX`, full-input validation, and preservation of the prior/default setting when invalid. Valid in-range values still follow field-specific clamping. Added direct host tests with overflow, empty input, trailing junk, boundary and valid clamp cases.
+- Tests: `make -C tests clean sanitize` PASS, 370 ASan/UBSan checks (profile parser 26); test builds `sc2_profile.c` on host with only target game lookup stubs. This does not test portal-to-disk integration or PS5 selection/runtime.
+- Publication: profile parser and test changes are in the local working tree but are not yet in draft PR #1. Current remote PR code head is `04cc833e99c4e1e53eaaa93ae01658daa2cc69c0`; Host tests run `37782420592` was queued for that head.
+- Next: run diff/whitespace checks, publish the profile fix and current memory in a follow-up PR commit, then inspect the resulting CI. Keep PS5 SDK, actual console and controllers as explicit outstanding gates.

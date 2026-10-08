@@ -13,6 +13,8 @@
 #include <sys/stat.h>
 #include <stdarg.h>
 #include <ctype.h>
+#include <errno.h>
+#include <limits.h>
 
 #ifdef __PROSPERO__
 void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/ghostpad/gc_status.log */
@@ -100,6 +102,28 @@ static uint32_t parse_combo(const char *v) {
     return m;
 }
 
+/* Profile text comes from both disk and an authenticated network endpoint.
+ * strtol plus explicit range/consumption checks avoids atoi overflow and
+ * rejects partially numeric values instead of silently treating them as 0. */
+static int parse_profile_int(const char *text, int *out) {
+    char *end;
+    long value;
+    if (!text || !out) return 0;
+    errno = 0;
+    value = strtol(text, &end, 10);
+    if (end == text || errno == ERANGE || value < INT_MIN || value > INT_MAX)
+        return 0;
+    while (*end == ' ' || *end == '\t') end++;
+    if (*end != '\0') return 0;
+    *out = (int)value;
+    return 1;
+}
+
+static void parse_profile_flag(const char *text, uint8_t *out) {
+    int value;
+    if (parse_profile_int(text, &value)) *out = (uint8_t)(value != 0);
+}
+
 void sc2_profile_parse(const char *text, sc2_profile_t *p) {
     char line[200];
     const char *s = text;
@@ -129,8 +153,8 @@ void sc2_profile_parse(const char *text, sc2_profile_t *p) {
                 if      (!strcasecmp(act, "long"))   p->lng[i]    = parse_combo(v);
                 else if (!strcasecmp(act, "double")) p->dbl[i]    = parse_combo(v);
                 else if (!strcasecmp(act, "shift"))  p->shf[i]    = parse_combo(v);
-                else if (!strcasecmp(act, "turbo"))  p->turbo[i]  = (uint8_t)(atoi(v) != 0);
-                else if (!strcasecmp(act, "toggle")) p->toggle[i] = (uint8_t)(atoi(v) != 0);
+                else if (!strcasecmp(act, "turbo"))  parse_profile_flag(v, &p->turbo[i]);
+                else if (!strcasecmp(act, "toggle")) parse_profile_flag(v, &p->toggle[i]);
                 else if (!strcasecmp(act, "full") && (i == IN_LT || i == IN_RT))
                     p->full[i == IN_RT] = parse_combo(v);
             }
@@ -144,18 +168,18 @@ void sc2_profile_parse(const char *text, sc2_profile_t *p) {
             for (int i = 0; i < SC2_IN_COUNT; i++) if (!strcasecmp(v, sc2_in_keys[i])) p->shift_in = (int8_t)i;
             continue;
         }
-        if (!strcasecmp(k, "LONG_MS"))   { int x = atoi(v); p->long_ms   = (uint16_t)(x < 150 ? 150 : x > 2000 ? 2000 : x); continue; }
-        if (!strcasecmp(k, "DOUBLE_MS")) { int x = atoi(v); p->double_ms = (uint16_t)(x < 100 ? 100 : x > 800 ? 800 : x);   continue; }
-        if (!strcasecmp(k, "TURBO_MS"))  { int x = atoi(v); p->turbo_ms  = (uint16_t)(x < 20 ? 20 : x > 500 ? 500 : x);     continue; }
+        if (!strcasecmp(k, "LONG_MS"))   { int x; if (parse_profile_int(v, &x)) p->long_ms = (uint16_t)(x < 150 ? 150 : x > 2000 ? 2000 : x); continue; }
+        if (!strcasecmp(k, "DOUBLE_MS")) { int x; if (parse_profile_int(v, &x)) p->double_ms = (uint16_t)(x < 100 ? 100 : x > 800 ? 800 : x); continue; }
+        if (!strcasecmp(k, "TURBO_MS"))  { int x; if (parse_profile_int(v, &x)) p->turbo_ms = (uint16_t)(x < 20 ? 20 : x > 500 ? 500 : x); continue; }
         if (!strcasecmp(k, "LPAD") || !strcasecmp(k, "RPAD")) {
             for (int i = 0; i < 4; i++) if (!strcasecmp(v, k_pad[i])) {
                 if (k[0] == 'L' || k[0] == 'l') p->lpad = (uint8_t)i; else p->rpad = (uint8_t)i;
             }
-        } else if (!strcasecmp(k, "INVERT_LY"))  p->invert_ly   = (uint8_t)(atoi(v) != 0);
-        else if (!strcasecmp(k, "INVERT_RY"))    p->invert_ry   = (uint8_t)(atoi(v) != 0);
-        else if (!strcasecmp(k, "SWAP_STICKS"))  p->swap_sticks = (uint8_t)(atoi(v) != 0);
+        } else if (!strcasecmp(k, "INVERT_LY"))  parse_profile_flag(v, &p->invert_ly);
+        else if (!strcasecmp(k, "INVERT_RY"))    parse_profile_flag(v, &p->invert_ry);
+        else if (!strcasecmp(k, "SWAP_STICKS"))  parse_profile_flag(v, &p->swap_sticks);
         else if (!strcasecmp(k, "DEADZONE")) {
-            int d = atoi(v); if (d < 0) d = 0; if (d > 40) d = 40; p->deadzone = (uint8_t)d;
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 40) d = 40; p->deadzone = (uint8_t)d; }
         }
         else if (!strcasecmp(k, "GYRO")) {
             for (int i = 0; i < GYRO_MODES; i++) if (!strcasecmp(v, k_gyro[i])) p->gyro_mode = (uint8_t)i;
@@ -164,27 +188,29 @@ void sc2_profile_parse(const char *text, sc2_profile_t *p) {
             for (int i = 0; i < 2; i++) if (!strcasecmp(v, k_gyro_axis[i])) p->gyro_axis = (uint8_t)i;
         }
         else if (!strcasecmp(k, "GYRO_SENS_X") || !strcasecmp(k, "GYRO_SENS_Y")) {
-            int x = atoi(v); x = x < 1 ? 1 : x > 100 ? 100 : x;
-            if (k[10] == 'X' || k[10] == 'x') p->gyro_sens_x = (uint8_t)x; else p->gyro_sens_y = (uint8_t)x;
+            int x; if (parse_profile_int(v, &x)) {
+                x = x < 1 ? 1 : x > 100 ? 100 : x;
+                if (k[10] == 'X' || k[10] == 'x') p->gyro_sens_x = (uint8_t)x; else p->gyro_sens_y = (uint8_t)x;
+            }
         }
-        else if (!strcasecmp(k, "GYRO_INVERT_X")) p->gyro_invert_x = (uint8_t)(atoi(v) != 0);
-        else if (!strcasecmp(k, "GYRO_INVERT_Y")) p->gyro_invert_y = (uint8_t)(atoi(v) != 0);
+        else if (!strcasecmp(k, "GYRO_INVERT_X")) parse_profile_flag(v, &p->gyro_invert_x);
+        else if (!strcasecmp(k, "GYRO_INVERT_Y")) parse_profile_flag(v, &p->gyro_invert_y);
         else if (!strcasecmp(k, "GYRO_ANTI_DEADZONE")) {
-            int d = atoi(v); if (d < 0) d = 0; if (d > 40) d = 40; p->gyro_adz = (uint8_t)d;
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 40) d = 40; p->gyro_adz = (uint8_t)d; }
         }
         else if (!strcasecmp(k, "GYRO_CURVE")) {
-            int d = atoi(v); if (d < 10) d = 10; if (d > 30) d = 30; p->gyro_curve = (uint8_t)d;
+            int d; if (parse_profile_int(v, &d)) { if (d < 10) d = 10; if (d > 30) d = 30; p->gyro_curve = (uint8_t)d; }
         }
         else if (!strcasecmp(k, "RSTICK")) p->rstick = !strcasecmp(v, "FLICK") ? RSTICK_FLICK : RSTICK_NORMAL;
         else if (!strcasecmp(k, "TRIGGER_FX")) {
-            int d = atoi(v); if (d < 0) d = 0; if (d > 200) d = 200; p->trig_fx = (uint8_t)d;
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 200) d = 200; p->trig_fx = (uint8_t)d; }
         }
         else if (!strcasecmp(k, "FLICK_SPEED")) {
-            int d = atoi(v); if (d < 90) d = 90; if (d > 1440) d = 1440; p->flick_speed = (uint16_t)d;
+            int d; if (parse_profile_int(v, &d)) { if (d < 90) d = 90; if (d > 1440) d = 1440; p->flick_speed = (uint16_t)d; }
         }
-        else if (!strcasecmp(k, "MOTION")) p->motion = (uint8_t)(atoi(v) != 0);
+        else if (!strcasecmp(k, "MOTION")) parse_profile_flag(v, &p->motion);
         else if (!strcasecmp(k, "GYRO_STEADINESS")) {
-            int d = atoi(v); if (d < 0) d = 0; if (d > 30) d = 30; p->gyro_steady = (uint8_t)d;
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 30) d = 30; p->gyro_steady = (uint8_t)d; }
         }
     }
     /* … is reserved for pause/resume: drop anything older profiles bound to it */

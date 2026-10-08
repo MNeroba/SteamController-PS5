@@ -25,13 +25,13 @@ export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
 make -C payload
 ```
 
-Portable protocol, descriptor, portal security/JSON, mapping, motion-math, and feedback-encoding tests run without the PS5 SDK:
+Portable protocol, descriptor, portal security/JSON, profile parsing, mapping, motion-math, and feedback-encoding tests run without the PS5 SDK:
 
 ```sh
 make -C tests sanitize
 ```
 
-The latest ASan/UBSan run passes 344 assertions. These host tests do not build or exercise the PS5 adapter and do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility. The current environment has no configured PS5 SDK or physical console. A missing hardware test is reported as blocked, not as a compatibility failure or pass.
+The latest ASan/UBSan run passes 370 assertions. These host tests do not build or exercise most PS5 adapter code and do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility. The current environment has no configured PS5 SDK or physical console. A missing hardware test is reported as blocked, not as a compatibility failure or pass.
 
 ## Source pins and attribution
 

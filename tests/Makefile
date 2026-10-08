@@ -1,7 +1,7 @@
 CC := clang
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 BUILD := build
-TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback
+TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile
 
 .PHONY: all test sanitize clean
 
@@ -15,6 +15,7 @@ test: $(TESTS)
 	./$(BUILD)/test_steam_mapping
 	./$(BUILD)/test_steam_motion
 	./$(BUILD)/test_steam_feedback
+	./$(BUILD)/test_sc2_profile
 
 sanitize:
 	$(MAKE) clean
@@ -43,6 +44,9 @@ $(BUILD)/test_steam_motion: test_steam_motion.c ../payload/steam_motion.c ../pay
 
 $(BUILD)/test_steam_feedback: test_steam_feedback.c ../payload/steam_feedback.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $^ -o $@
+
+$(BUILD)/test_sc2_profile: test_sc2_profile.c ../payload/sc2_profile.c | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload $^ -pthread -o $@
 
 clean:
 	rm -rf $(BUILD)

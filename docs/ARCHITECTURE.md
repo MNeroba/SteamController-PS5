@@ -42,6 +42,8 @@ The first pure decoder, `payload/steam_protocol.c`, now returns typed SC input, 
 
 Small platform-independent operations are factored into `steam_mapping.c` (axis/trigger, d-pad and trackpad transforms), `steam_motion.c` (unit conversion, bias handling and quaternion integration), and `steam_feedback.c` (bounded pulse/rumble report serialization). `webui_json.c` supplies bounded JSON string/number output to the authenticated portal. These pure modules have host tests; the current PS5 adapter still owns inherited profile and `ScePadData` mapping state, so a complete canonical transport/session/slot architecture is not yet implemented. Do not infer PS5 behavior or hardware support from helper tests.
 
+Numeric profile fields now use checked `strtol` parsing with full-input and `int`-range validation; malformed or overflowing values leave the prior/default field intact. Host tests exercise parser bounds. This protects the parser used by both saved profile files and authenticated profile writes, without claiming profile-transition or browser integration tests.
+
 `SteamSession`: controlled state machine `DISCOVERED → INITIALIZING → READY → STANDBY → RECONNECTING → CLOSED` plus failure transitions; lizard suppression, heartbeat, mode, battery, capability flags, cleanup. A session lease binds transport and physical identity without owning the PS5 virtual slot directly.
 
 `ControllerState`: monotonic time, independent raw and normalized axes/buttons, independent rear controls, per-trackpad contacts+click and calibration, gyro[3], accel[3] with units and reference frames, battery, charging, optional flags. Keep unknown/missing fields marked absent; avoid overwriting good state with malformed input.
