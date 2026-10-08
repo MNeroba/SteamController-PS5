@@ -474,6 +474,14 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - `git diff --check` passes. No real PS5 ioctl, Steam Controller, official Puck, or hotplug path was exercised; scanner ioctls remain direct and target semantics are unverified. This result is `VERIFIED_HOST_TEST` plus `VERIFIED_PS5_BUILD`, not hardware evidence.
 
 
+## M1-192 source and evidence published directly to main — 2026-10-08 20:22 UTC
+
+- Published M1-191 code, regression, architecture/test-plan docs, and issue/finding/decision/test/session memory directly to `main` in fast-forward commit `283dda3a7b0c115dbe6587e6eb1c355f37504956`, parent `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84`, tree `a87604674d7a651610300707ce2d184857acee5c`.
+- All 14 changed GitHub blob SHAs equal local `git hash-object` results. Recursive-tree validation passed with 208 entries/195 blobs; all unchanged blobs, modes and paths match the prior verified tree. No paths were added or removed in this code commit.
+- GitHub confirms PR #1 is closed and unmerged; legacy branch/history was retained. No force update, history rewrite or binary release.
+- Push workflows for this source commit are queued: run `37838885358` PS5 cross-build and run `37838885367` Host tests. Older `c87ff0e` runs remain queued too; no GitHub CI pass is claimed.
+
+
 ## M1-190 validation-memory publication — 2026-10-08 20:11 UTC
 
 - Published the clean-tree build record and final recovery/memory synchronization directly to `main` as commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84`, parent `0f122c64eff0b196ba023c75af9a61ba1cc9514a`, tree `e03ee1fab971b0f1dd3430923925f485fb81e385`. Six changed file blobs matched their local Git object IDs; GitHub recursive tree still contains exactly the 195 local paths/modes/blobs.

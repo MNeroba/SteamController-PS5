@@ -586,3 +586,11 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Updated `docs/ARCHITECTURE.md`, `docs/TEST_PLAN.md`, `P0-USB-LIFE-19`, `P1-SC2-SCAN-27`, F064, ADR-030, and T-P40. No third-party code was copied.
 - Normal host suite, full ASan/UBSan suite, targeted scanner TSan, SDK v0.43 compile/link, and `git diff --check` pass; details and exact commands are in `TEST_LOG.md` M1-191. Latest ELF SHA-256: `683f8581d4582827b7ca4c144d17f99919fb5c8f166c0185f2125f5579b45bb6`.
 - Verification limits: no PS5/Puck/controller runtime, device removal, USB FS error behavior, BLE/HCI/radio, or firmware operation was tested. Push runs for pre-change main commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84` were queued when last checked; recheck after the code+memory commit.
+
+
+## M1-192 source and evidence publication — 2026-10-08 20:22 UTC
+
+- Owner's correction confirmed the exact first destructive commit: `9235825db8425e4bb335396fcc38e83daf3c3aa7` (`fix(game-hooks): validate persisted settings`), directly after complete-source commit `e2059116442e0d195b8aacb9b4baf4eb13737e3e`; 189 changed paths, 183 removals, and 43,543 deleted lines. The suspected incomplete-tree construction mechanism remains unproven.
+- Published M1-191 source/test/docs/project records directly to `main` in fast-forward commit `283dda3a7b0c115dbe6587e6eb1c355f37504956` (parent `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84`, tree `a87604674d7a651610300707ce2d184857acee5c`). The 14 changed blob IDs all match local Git object hashes; recursive tree remains 195 files/208 entries with unchanged paths and no unintended blob or mode changes.
+- GitHub Actions runs `37838885358` (PS5 cross-build) and `37838885367` (Host tests) were queued at 20:22 UTC. The prior c87 runs were still queued. No CI result is claimed. PR #1 is closed unmerged; no history was rewritten.
+- Updated P0-REPO-12 and the memory snapshot; next safe source audit is remaining direct USB transfer/cleanup code in `payload/usb_helpers.c` and `payload/sc2_haptics.c`. PS5/Puck/controller runtime and all BLE/radio/firmware operations remain untested or blocked.
