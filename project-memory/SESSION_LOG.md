@@ -71,5 +71,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Finding: `sc2_profile_parse` processed authenticated portal and saved profile numeric values with `atoi`. A long value outside `int` range has undefined behavior in C; partial strings such as `20junk` were silently accepted as 20.
 - Change: replaced numeric `atoi` conversions with checked `strtol`, explicit `ERANGE`/`INT_MIN`/`INT_MAX`, full-input validation, and preservation of the prior/default setting when invalid. Valid in-range values still follow field-specific clamping. Added direct host tests with overflow, empty input, trailing junk, boundary and valid clamp cases.
 - Tests: `make -C tests clean sanitize` PASS, 370 ASan/UBSan checks (profile parser 26); test builds `sc2_profile.c` on host with only target game lookup stubs. This does not test portal-to-disk integration or PS5 selection/runtime.
-- Publication: profile parser and test changes are in the local working tree but are not yet in draft PR #1. Current remote PR code head is `04cc833e99c4e1e53eaaa93ae01658daa2cc69c0`; Host tests run `37782420592` was queued for that head.
-- Next: run diff/whitespace checks, publish the profile fix and current memory in a follow-up PR commit, then inspect the resulting CI. Keep PS5 SDK, actual console and controllers as explicit outstanding gates.
+- Publication: profile parser and its test were published on draft PR #1 in commit `cf225f48f0f38e86101f4f6d2993edbe47347c58`; the PR body was updated to report 370 host checks. Host tests run `37782987424` was queued for that head.
+- Next: inspect the queued PR workflow. Keep PS5 SDK, actual console and controllers as explicit outstanding gates.
+
+## M1 profile parser publication — 2026-10-08 13:16 UTC
+
+- Published strict profile integer parsing and `tests/test_sc2_profile.c` to draft PR #1 in commit `cf225f48f0f38e86101f4f6d2993edbe47347c58`; PR body now reports 370 ASan/UBSan checks and remaining target gates.
+- Current PR head is mergeable and draft. GitHub Actions Host tests run `37782987424` is queued; no workflow conclusion is available yet.
+- Test record M1-06: `make -C tests clean sanitize` PASS, 370 checks. The profile parser is host-compiled with stubs for target game lookup; the PS5 adapter, saved-profile integration, and hardware remain unverified.
+- Next: inspect CI result. Keep the PR draft until PS5 SDK and physical USB/Puck/controller tests can be performed; BLE remains gated and untouched.

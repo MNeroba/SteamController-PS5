@@ -31,8 +31,10 @@
 |---|---|---|---|---|---|---|
 | PUB-01 | 2026-10-08 13:05 UTC | GitHub snapshot `4596c7fc4a9876e56cb8194961f15de0fd1e7066`; base README commit `61780b03bcef6859935cac1ef288cf3eef12d3ba` | Private repository initialization and draft PR | GitHub app connector; `MNeroba/SteamController-PS5`, `main` → `fix/p0-safety` | CREATED (DRAFT) | [PR #1](https://github.com/MNeroba/SteamController-PS5/pull/1), 145 changed files; PR metadata reported mergeable. `gh` CLI token remained invalid; connector permission was admin. |
 | PUB-02 | 2026-10-08 13:11 UTC | `04cc833e99c4e1e53eaaa93ae01658daa2cc69c0` (parent `7721f18cde11498c92fe9f6c91aa2a3f7dfbd269`) | Follow-up lazy-slot rollback guard and imported-text cleanup | GitHub app connector; fast-forward update to `fix/p0-safety` | PUBLISHED TO DRAFT PR | PR #1 head advanced; includes guarded invalid-handle cleanup and memory records. PR remains draft. |
+| PUB-03 | 2026-10-08 13:15 UTC | `cf225f48f0f38e86101f4f6d2993edbe47347c58` (parent `04cc833e99c4e1e53eaaa93ae01658daa2cc69c0`) | Checked profile integer parsing and 26 host checks | GitHub app connector; fast-forward update to `fix/p0-safety`; PR body updated | PUBLISHED TO DRAFT PR | PR #1 head advanced; description now reports 370 host checks and profile parsing limits. |
 | CI-01 | 2026-10-08 13:06 UTC | `4596c7fc4a9876e56cb8194961f15de0fd1e7066` | GitHub Actions Host tests | Workflow run `37781721767` | QUEUED | No CI conclusion available yet; inspect the run before changing the PR status. |
 | CI-02 | 2026-10-08 13:11 UTC | `04cc833e99c4e1e53eaaa93ae01658daa2cc69c0` | GitHub Actions Host tests | Workflow run `37782420592` (`pull_request` event) | QUEUED | Job `host-tests` was queued with no logs; no conclusion available at check time. |
+| CI-03 | 2026-10-08 13:15 UTC | `cf225f48f0f38e86101f4f6d2993edbe47347c58` | GitHub Actions Host tests | Workflow run `37782987424` (`pull_request` event) | QUEUED | Job `host-tests` was queued with no logs; no conclusion available at check time. |
 
 ### New entry template
 
