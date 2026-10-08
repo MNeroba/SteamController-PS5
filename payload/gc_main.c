@@ -58,6 +58,7 @@
 #include "bridge/wireless_ds4.h"
 #include "slot_registry.h"
 #include "slot_lifecycle.h"
+#include "usb_session.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -608,6 +609,78 @@ typedef struct {
     int bind_ok;
 } usb_thread_arg_t;
 
+static int usb_platform_open(const char *path, int flags, void *context) {
+    (void)context;
+    return open(path, flags);
+}
+
+static int usb_platform_init_fs(int fd, void *configuration, void *context) {
+    (void)context;
+    return ioctl(fd, USB_FS_INIT, configuration);
+}
+
+static int usb_platform_open_endpoint(int fd, void *configuration,
+                                      void *context) {
+    (void)context;
+    return ioctl(fd, USB_FS_OPEN, configuration);
+}
+
+static int usb_platform_start_transfer(int fd, void *configuration,
+                                       void *context) {
+    (void)context;
+    return ioctl(fd, USB_FS_START, configuration);
+}
+
+static int usb_platform_complete_transfer(int fd, void *configuration,
+                                          void *context) {
+    (void)context;
+    return ioctl(fd, USB_FS_COMPLETE, configuration);
+}
+
+static int usb_platform_stop_transfer(int fd, uint8_t endpoint_index,
+                                      void *context) {
+    (void)context;
+    struct usb_fs_stop stop;
+    memset(&stop, 0, sizeof(stop));
+    stop.ep_index = endpoint_index;
+    return ioctl(fd, USB_FS_STOP, &stop);
+}
+
+static int usb_platform_close_endpoint(int fd, uint8_t endpoint_index,
+                                       void *context) {
+    (void)context;
+    struct usb_fs_close close_endpoint;
+    memset(&close_endpoint, 0, sizeof(close_endpoint));
+    close_endpoint.ep_index = endpoint_index;
+    return ioctl(fd, USB_FS_CLOSE, &close_endpoint);
+}
+
+static int usb_platform_uninit_fs(int fd, void *context) {
+    (void)context;
+    struct usb_fs_uninit uninit;
+    memset(&uninit, 0, sizeof(uninit));
+    return ioctl(fd, USB_FS_UNINIT, &uninit);
+}
+
+static int usb_platform_close_fd(int fd, void *context) {
+    (void)context;
+    return close(fd);
+}
+
+static const usb_session_ops_t g_usb_session_ops = {
+    .open_device = usb_platform_open,
+    .init_fs = usb_platform_init_fs,
+    .open_endpoint = usb_platform_open_endpoint,
+    .start_transfer = usb_platform_start_transfer,
+    .complete_transfer = usb_platform_complete_transfer,
+    .resources = {
+        .stop_transfer = usb_platform_stop_transfer,
+        .close_endpoint = usb_platform_close_endpoint,
+        .uninit_fs = usb_platform_uninit_fs,
+        .close_fd = usb_platform_close_fd
+    }
+};
+
 static void *usb_hid_thread(void *arg) {
     usb_thread_arg_t *targ = (usb_thread_arg_t *)arg;
     slot_registry_token_t slot_token = targ->slot_token;
@@ -637,12 +710,11 @@ static void *usb_hid_thread(void *arg) {
     struct usb_fs_open     fs_open;
     struct usb_fs_start    start;
     struct usb_fs_complete complete;
-    struct usb_fs_stop     stop;
-    struct usb_fs_close    fs_close;
-    struct usb_fs_uninit   uninit;
     uint8_t  buf[64];
     void    *buffers[1]; uint32_t lengths[1];
     int fd = -1, out_opened = 0, sc2_iface = 0;
+    usb_resources_t usb_resources;
+    usb_resources_init(&usb_resources);
     int usb_ready_notified = 0;
 
     gp_log("slot[%d] USB thread: %s VID=0x%04x PID=0x%04x\n",
@@ -650,22 +722,28 @@ static void *usb_hid_thread(void *arg) {
 
     /* ── Xbox One: single-pass ─────────────────────────────────────────── */
     if (pid == PID_XBOX) {
-        fd = open(dev_path, O_RDWR);
-        if (fd < 0) { gp_log("slot[%d] Xbox open fail errno=%d\n", slot, errno); goto exit_slot; }
+        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
+                             O_RDWR, NULL) != 0) {
+            gp_log("slot[%d] Xbox open fail errno=%d\n", slot, errno);
+            goto exit_slot;
+        }
+        fd = usb_resources.fd;
 
         { int ii; for(ii=0;ii<4;ii++){int i2=ii; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2);} }
         usleep(120000); /* hub settle: give USB hub time to propagate detach */
         memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=eps; init.ep_index_max=4;
-        if (ioctl(fd,USB_FS_INIT,&init)!=0){
+        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
+                                &init, NULL)!=0){
             gp_log("slot[%d] Xbox FS_INIT fail errno=%d\n",slot,errno);
-            close(fd); goto exit_slot;
+            goto exit_slot;
         }
 
         memset(&fs_open,0,sizeof(fs_open));
         fs_open.ep_index=0; fs_open.ep_no=XBOX_EP_IN;
         fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (ioctl(fd,USB_FS_OPEN,&fs_open)!=0){
+        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
+                                      0, &fs_open, NULL)!=0){
             gp_log("slot[%d] Xbox IN fail errno=%d\n",slot,errno);
             goto uninit_exit;
         }
@@ -679,7 +757,8 @@ static void *usb_hid_thread(void *arg) {
         memset(&fs_open,0,sizeof(fs_open));
         fs_open.ep_index=1; fs_open.ep_no=XBOX_EP_OUT;
         fs_open.max_bufsize=64; fs_open.max_frames=1;
-        out_opened = (ioctl(fd,USB_FS_OPEN,&fs_open)==0) ? 1 : 0;
+        out_opened = (usb_session_open_endpoint(&usb_resources,
+            &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
         gp_log("slot[%d] Xbox OUT ep=0x%02x opened=%d\n", slot, XBOX_EP_OUT, out_opened);
 
         xbox_gip_handshake(fd, eps);
@@ -689,8 +768,12 @@ static void *usb_hid_thread(void *arg) {
     /* ── Steam Controller 2026 (Puck / cable) ──────────────────────────── */
     if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
         int is_puck = (pid == PID_SC2_PUCK);
-        fd = open(dev_path, O_RDWR);
-        if (fd < 0) { gp_log("slot[%d] SC2 open fail errno=%d\n", slot, errno); goto exit_slot; }
+        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
+                             O_RDWR, NULL) != 0) {
+            gp_log("slot[%d] SC2 open fail errno=%d\n", slot, errno);
+            goto exit_slot;
+        }
+        fd = usb_resources.fd;
 
         sc2_ep_map(fd, &sc2_map);            /* logs every interface's IN/OUT */
         uint8_t addrs[SC2_MAX_EPS];
@@ -709,9 +792,10 @@ static void *usb_hid_thread(void *arg) {
         struct usb_fs_endpoint sc2_eps[SC2_MAX_EPS];
         memset(sc2_eps,0,sizeof(sc2_eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=sc2_eps; init.ep_index_max=SC2_MAX_EPS;
-        if (ioctl(fd,USB_FS_INIT,&init)!=0){
+        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
+                                &init, NULL)!=0){
             gp_log("slot[%d] SC2 FS_INIT fail errno=%d\n",slot,errno);
-            close(fd); goto exit_slot;
+            goto exit_slot;
         }
 
         /* Wait for the controller to wake / pick the puck slot it's paired to */
@@ -719,19 +803,25 @@ static void *usb_hid_thread(void *arg) {
         while ((active = sc2_find_active_ep(fd, sc2_eps, addrs, n_eps, 2000)) == 0) {
             if (!told) { gp_log("slot[%d] Puck idle — waiting for the controller to turn on\n", slot); told = 1; }
         }
-        memset(&uninit,0,sizeof(uninit)); ioctl(fd,USB_FS_UNINIT,&uninit);
-        if (active < 0) { gp_log("slot[%d] SC2 puck removed\n",slot); close(fd); goto exit_slot; }
+        if (usb_session_uninit_fs(&usb_resources, &g_usb_session_ops,
+                                  NULL)!=0) {
+            gp_log("slot[%d] SC2 scan FS_UNINIT fail errno=%d\n",slot,errno);
+            goto exit_slot;
+        }
+        if (active < 0) { gp_log("slot[%d] SC2 puck removed\n",slot); goto exit_slot; }
         if (!sc2_pause_is_active()) sc2_vda_attach(slot_token, slot, &session);
         ds_handoff_sc2_session(!sc2_pause_is_active());
 
         /* Re-init with the single active endpoint at index 0 for the main loop */
         memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=eps; init.ep_index_max=2 + SC2_HAP_MAX_OUT;
-        if (ioctl(fd,USB_FS_INIT,&init)!=0){ close(fd); goto exit_slot; }
+        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
+                                &init, NULL)!=0) goto exit_slot;
         memset(&fs_open,0,sizeof(fs_open));
         fs_open.ep_index=0; fs_open.ep_no=(uint8_t)active;
         fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (ioctl(fd,USB_FS_OPEN,&fs_open)!=0){
+        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
+                                      0, &fs_open, NULL)!=0){
             gp_log("slot[%d] SC2 IN 0x%02x fail errno=%d\n",slot,active,errno);
             goto uninit_exit;
         }
@@ -753,7 +843,8 @@ static void *usb_hid_thread(void *arg) {
                 memset(&fs_open,0,sizeof(fs_open));
                 fs_open.ep_index=1; fs_open.ep_no=own_out;
                 fs_open.max_bufsize=64; fs_open.max_frames=1;
-                out_opened = (ioctl(fd,USB_FS_OPEN,&fs_open)==0) ? 1 : 0;
+                out_opened = (usb_session_open_endpoint(&usb_resources,
+                    &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
             }
             gp_log("slot[%d] SC2 haptics: active IN 0x%02x → iface %d, own OUT 0x%02x\n",
                    slot, active, sc2_iface, own_out);
@@ -767,7 +858,9 @@ static void *usb_hid_thread(void *arg) {
                 memset(&fs_open,0,sizeof(fs_open));
                 fs_open.ep_index=(uint8_t)(2 + sc2_n_out); fs_open.ep_no=o;
                 fs_open.max_bufsize=64; fs_open.max_frames=1;
-                if (ioctl(fd,USB_FS_OPEN,&fs_open)==0) {
+                if (usb_session_open_endpoint(&usb_resources,
+                    &g_usb_session_ops, (uint8_t)(2 + sc2_n_out),
+                    &fs_open, NULL)==0) {
                     sc2_n_out++;
                     gp_log("slot[%d] SC2 haptics: extra OUT 0x%02x (iface %d) for broadcast test\n",
                            slot, o, sc2_map.it[j].iface);
@@ -781,8 +874,12 @@ static void *usb_hid_thread(void *arg) {
 
     /* ── Steam Controller: single-pass ─────────────────────────────────── */
     if (pid == PID_STEAM_WIRED) {
-        fd = open(dev_path, O_RDWR);
-        if (fd < 0) { gp_log("slot[%d] Steam open fail errno=%d\n", slot, errno); goto exit_slot; }
+        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
+                             O_RDWR, NULL) != 0) {
+            gp_log("slot[%d] Steam open fail errno=%d\n", slot, errno);
+            goto exit_slot;
+        }
+        fd = usb_resources.fd;
 
         /* Detach PS5 HID from keyboard(0) / mouse(1) / gamepad(2) interfaces */
         { int ii; for(ii=0;ii<3;ii++){int i2=ii; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2);} }
@@ -794,14 +891,16 @@ static void *usb_hid_thread(void *arg) {
 
         memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=eps; init.ep_index_max=1;
-        if (ioctl(fd,USB_FS_INIT,&init)!=0){
+        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
+                                &init, NULL)!=0){
             gp_log("slot[%d] Steam FS_INIT fail errno=%d\n",slot,errno);
-            close(fd); goto exit_slot;
+            goto exit_slot;
         }
         memset(&fs_open,0,sizeof(fs_open));
         fs_open.ep_index=0; fs_open.ep_no=STEAM_EP_IN;
         fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (ioctl(fd,USB_FS_OPEN,&fs_open)!=0){
+        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
+                                      0, &fs_open, NULL)!=0){
             gp_log("slot[%d] Steam IN ep=0x%02x fail errno=%d\n",slot,STEAM_EP_IN,errno);
             goto uninit_exit;
         }
@@ -816,44 +915,69 @@ static void *usb_hid_thread(void *arg) {
     }
 
     /* ── Nintendo: two-pass ────────────────────────────────────────────── */
-    fd = open(dev_path, O_RDWR);
-    if (fd < 0) { gp_log("slot[%d] open fail errno=%d\n", slot, errno); goto exit_slot; }
+    if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
+                         O_RDWR, NULL) != 0) {
+        gp_log("slot[%d] open fail errno=%d\n", slot, errno);
+        goto exit_slot;
+    }
+    fd = usb_resources.fd;
 
     memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
     init.pEndpoints=eps; init.ep_index_max=1;
-    if (ioctl(fd,USB_FS_INIT,&init)!=0){
-        gp_log("slot[%d] Nintendo FS_INIT p1 fail\n",slot); close(fd); goto exit_slot;
+    if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
+                            &init, NULL)!=0){
+        gp_log("slot[%d] Nintendo FS_INIT p1 fail\n",slot); goto exit_slot;
     }
     { int i0=0,i1=1; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i0); ioctl(fd,USB_IFACE_DRIVER_DETACH,&i1); }
     memset(&fs_open,0,sizeof(fs_open));
     fs_open.ep_index=0; fs_open.ep_no=0x81; fs_open.max_bufsize=64; fs_open.max_frames=1;
-    if (ioctl(fd,USB_FS_OPEN,&fs_open)!=0){
+    if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
+                                  0, &fs_open, NULL)!=0){
         gp_log("slot[%d] Nintendo IN p1 fail errno=%d\n",slot,errno); goto uninit_exit;
     }
     gp_log("slot[%d] Nintendo p1 IN ok maxpkt=%u\n",slot,(unsigned)fs_open.max_packet_length);
-    memset(&uninit,0,sizeof(uninit)); ioctl(fd,USB_FS_UNINIT,&uninit);
-    close(fd); fd=-1;
+    {
+        int cleanup_result = usb_session_cleanup(&usb_resources,
+            &g_usb_session_ops, NULL);
+        fd = -1;
+        if (cleanup_result != 0) {
+            gp_log("slot[%d] Nintendo p1 cleanup reported an error\n", slot);
+            goto exit_slot;
+        }
+    }
 
     /* Pass 2: retry DETACH+OPEN up to 5 times to beat usb_hid0 re-attach
      * (real Switch Pro is claimed by PS5 native HID driver after probe releases it) */
     { int detach_try;
       for (detach_try = 0; detach_try < 5; detach_try++) {
-        fd = open(dev_path, O_RDWR);
-        if (fd < 0) { gp_log("slot[%d] reopen fail attempt %d\n",slot,detach_try); goto exit_slot; }
+        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
+                             O_RDWR, NULL) != 0) {
+            gp_log("slot[%d] reopen fail attempt %d\n",slot,detach_try);
+            goto exit_slot;
+        }
+        fd = usb_resources.fd;
         { int i0=0,i1=1,i2=2;
           ioctl(fd,USB_IFACE_DRIVER_DETACH,&i0);
           ioctl(fd,USB_IFACE_DRIVER_DETACH,&i1);
           ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2); }
         memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=eps; init.ep_index_max=2;
-        if (ioctl(fd,USB_FS_INIT,&init)!=0){
-            close(fd); fd=-1; usleep(50000); continue;
+        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
+                                &init, NULL)!=0){
+            int cleanup_result = usb_session_cleanup(&usb_resources,
+                &g_usb_session_ops, NULL);
+            fd = -1;
+            if (cleanup_result != 0) goto exit_slot;
+            usleep(50000); continue;
         }
         memset(&fs_open,0,sizeof(fs_open));
         fs_open.ep_index=0; fs_open.ep_no=0x81; fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (ioctl(fd,USB_FS_OPEN,&fs_open)==0) break; /* claimed it */
-        memset(&uninit,0,sizeof(uninit)); ioctl(fd,USB_FS_UNINIT,&uninit);
-        close(fd); fd=-1;
+        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
+                                      0, &fs_open, NULL)==0) break; /* claimed it */
+        int cleanup_result = usb_session_cleanup(&usb_resources,
+            &g_usb_session_ops, NULL);
+        fd = -1;
+        if (cleanup_result != 0) goto exit_slot;
         gp_log("slot[%d] Nintendo p2 OPEN retry %d errno=%d\n",slot,detach_try,errno);
         usleep(50000);
       }
@@ -869,11 +993,13 @@ static void *usb_hid_thread(void *arg) {
     /* 8BitDo uses ep=0x02; real Nintendo Switch Pro Controller uses ep=0x01 */
     memset(&fs_open,0,sizeof(fs_open));
     fs_open.ep_index=1; fs_open.ep_no=0x02; fs_open.max_bufsize=64; fs_open.max_frames=1;
-    out_opened = (ioctl(fd,USB_FS_OPEN,&fs_open)==0) ? 1 : 0;
+    out_opened = (usb_session_open_endpoint(&usb_resources,
+        &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
     if (!out_opened) {
         memset(&fs_open,0,sizeof(fs_open));
         fs_open.ep_index=1; fs_open.ep_no=0x01; fs_open.max_bufsize=64; fs_open.max_frames=1;
-        out_opened = (ioctl(fd,USB_FS_OPEN,&fs_open)==0) ? 1 : 0;
+        out_opened = (usb_session_open_endpoint(&usb_resources,
+            &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
         if (out_opened) gp_log("slot[%d] Nintendo OUT ep=0x01 (real Switch Pro)\n", slot);
     }
     gp_log("slot[%d] Nintendo OUT opened=%d\n", slot, out_opened);
@@ -901,9 +1027,11 @@ main_loop: ;
         eps[0].aFrames=0; eps[0].status=0;
 
         memset(&start,0,sizeof(start)); start.ep_index=0;
-        if (ioctl(fd,USB_FS_START,&start)!=0) {
+        if (usb_session_start_transfer(&usb_resources, &g_usb_session_ops,
+                                       0, &start, NULL)!=0) {
             if (errno==EBUSY){
-                memset(&stop,0,sizeof(stop)); stop.ep_index=0; ioctl(fd,USB_FS_STOP,&stop);
+                (void)usb_session_stop_transfer(&usb_resources,
+                    &g_usb_session_ops, 0, NULL);
                 usleep(5000);
             } else if (errno==ENXIO||errno==ENOTTY){
                 gp_log("slot[%d] START errno=%d — device gone\n",slot,errno); goto reinit;
@@ -916,14 +1044,16 @@ main_loop: ;
         int ok=0, cerr=0, cw=0;
         for(cw=0;cw<60;cw++){
             memset(&complete,0,sizeof(complete)); complete.ep_index=0;
-            if(ioctl(fd,USB_FS_COMPLETE,&complete)==0){ok=1;break;}
+            if(usb_session_complete_transfer(&usb_resources,
+                &g_usb_session_ops, 0, &complete, NULL)==0){ok=1;break;}
             cerr=errno;
             if(cerr==ENXIO||cerr==ENOTTY){gp_log("slot[%d] COMPLETE errno=%d — gone\n",slot,cerr);goto reinit;}
             if(cerr!=EBUSY) break;
             usleep(500);
         }
         if(!ok){
-            memset(&stop,0,sizeof(stop)); stop.ep_index=0; ioctl(fd,USB_FS_STOP,&stop);
+            (void)usb_session_stop_transfer(&usb_resources,
+                &g_usb_session_ops, 0, NULL);
             continue;
         }
         if(lengths[0]<1) continue;
@@ -1043,17 +1173,26 @@ main_loop: ;
 reinit:
     if (usb_ready_notified) { notify("Puckbridge: slot[%d] controller disconnected", slot); usb_ready_notified=0; }
     if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) { sc2_haptic_available = 0; sc2_menu_request_close(); sc2_gyro_reset(); sc2_battery_reset(); ds_handoff_sc2_session(0); }
-    memset(&stop,0,sizeof(stop)); stop.ep_index=0; ioctl(fd,USB_FS_STOP,&stop);
-    if (out_opened) {
-        memset(&fs_close,0,sizeof(fs_close)); fs_close.ep_index=1; ioctl(fd,USB_FS_CLOSE,&fs_close);
-        out_opened=0;
-    }
-    memset(&fs_close,0,sizeof(fs_close)); fs_close.ep_index=0; ioctl(fd,USB_FS_CLOSE,&fs_close);
+    goto cleanup_usb;
 uninit_exit:
-    memset(&uninit,0,sizeof(uninit)); ioctl(fd,USB_FS_UNINIT,&uninit);
-    close(fd); fd=-1;
+cleanup_usb:
+    if (usb_resources.fd >= 0) {
+        int cleanup_result = usb_session_cleanup(&usb_resources,
+            &g_usb_session_ops, NULL);
+        if (cleanup_result != 0)
+            gp_log("slot[%d] USB resource cleanup reported %d\n",
+                   slot, cleanup_result);
+    }
+    fd = -1;
 
 exit_slot:
+    if (usb_resources.fd >= 0) {
+        int cleanup_result = usb_session_cleanup(&usb_resources,
+            &g_usb_session_ops, NULL);
+        if (cleanup_result != 0)
+            gp_log("slot[%d] USB resource cleanup reported %d\n",
+                   slot, cleanup_result);
+    }
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
     sc2_assignment_release(assignment_token);
     sc2_bind_reset(&session.binding_state);

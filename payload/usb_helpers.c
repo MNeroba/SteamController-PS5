@@ -39,12 +39,21 @@ int usb_send_out(int fd, struct usb_fs_endpoint *ep,
         if (ioctl(fd, USB_FS_COMPLETE, &complete) == 0)
             return 0;
         if (errno != EBUSY) {
-            LOG("OUT %s COMPLETE fail errno=%d\n", tag, errno);
-            return -errno;
+            int saved_errno = errno;
+            LOG("OUT %s COMPLETE fail errno=%d\n", tag, saved_errno);
+            struct usb_fs_stop stop;
+            memset(&stop, 0, sizeof(stop));
+            stop.ep_index = 1;
+            ioctl(fd, USB_FS_STOP, &stop);
+            return -saved_errno;
         }
         usleep(50000);
     }
     LOG("OUT %s timeout\n", tag);
+    struct usb_fs_stop stop;
+    memset(&stop, 0, sizeof(stop));
+    stop.ep_index = 1;
+    ioctl(fd, USB_FS_STOP, &stop);
     return -EBUSY;
 }
 

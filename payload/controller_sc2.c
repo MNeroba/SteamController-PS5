@@ -102,7 +102,10 @@ int sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
         struct usb_fs_open o; memset(&o, 0, sizeof(o));
         o.ep_index = i; o.ep_no = addrs[i]; o.max_bufsize = 64; o.max_frames = 1;
         if (ioctl(fd, USB_FS_OPEN, &o) != 0) {
-            if (errno == ENXIO) return -ENXIO;
+            if (errno == ENXIO) {
+                found = -ENXIO;
+                break;
+            }
             continue;
         }
         opened[i] = 1;

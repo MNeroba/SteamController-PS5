@@ -97,7 +97,13 @@ static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx, const uint
     for (int w = 0; w < 20; w++) {
         struct usb_fs_complete c; memset(&c, 0, sizeof(c));
         if (ioctl(fd, USB_FS_COMPLETE, &c) == 0) return ep->status ? -1000 - ep->status : 0;
-        if (errno != EBUSY) return -errno;
+        if (errno != EBUSY) {
+            int saved_errno = errno;
+            struct usb_fs_stop sp; memset(&sp, 0, sizeof(sp));
+            sp.ep_index = (uint8_t)idx;
+            ioctl(fd, USB_FS_STOP, &sp);
+            return -saved_errno;
+        }
         usleep(10000);
     }
     struct usb_fs_stop sp; memset(&sp, 0, sizeof(sp)); sp.ep_index = (uint8_t)idx;
