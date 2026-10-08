@@ -6,6 +6,6 @@
 - Exact command or manual steps:
 - Expected behavior:
 - Actual output (link to immutable/redacted log):
-- Exit code: 
+- Exit code:
 - Result: PASS | FAIL | BLOCKED | NOT_RUN
 - Regression issue and remediation:

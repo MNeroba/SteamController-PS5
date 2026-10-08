@@ -1,6 +1,6 @@
 # Nintendo Switch Pro Controller USB Protocol Research
 
-This document captures the complete research into making the 8BitDo Ultimate 2 (Nintendo Switch Pro Controller mode) work on PS5 via raw USB FS access. 
+This document captures the complete research into making the 8BitDo Ultimate 2 (Nintendo Switch Pro Controller mode) work on PS5 via raw USB FS access.
 
 ---
 

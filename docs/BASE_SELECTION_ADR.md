@@ -1,6 +1,7 @@
 # ADR-001 — Foundation selection for SteamController-PS5
 
-Status: **ACCEPTED — 2026-10-08**  
+Status: **ACCEPTED — 2026-10-08**
+
 Date: 2026-10-08
 
 ## Context

@@ -1,6 +1,6 @@
 # Ghostcontrol — by StonedModder
 
-If you enjoy my work - please consider donating to my BTC address: 
+If you enjoy my work - please consider donating to my BTC address:
 
 `bc1qa9zfgnccajsw8vg7k287qz5a7apf8pefj5jjx5`
 

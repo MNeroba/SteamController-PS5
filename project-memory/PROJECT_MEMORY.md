@@ -35,10 +35,10 @@ ADR-001 accepts PuckbridgePS5 at `78460113ef7c48502c765a1f83ba34d53c977134` as t
 
 ## Exact next tasks
 
-1. Monitor Host tests workflow run `37781721767` for PR #1; fix any failure and keep the PR in draft until the available verification is complete.
+1. Monitor Host tests workflow run `37781980759` for PR #1; fix any failure and keep the PR in draft until the available verification is complete. The lazy-slot `-1` deletion guard is in the local working tree and is not yet on the remote PR branch.
 2. Install/configure a compatible PS5 payload SDK; current environment has no `prospero.mk` under `/Users/mneroba/GitHub`, and `make -C payload` stops because `PS5_PAYLOAD_SDK` is unset.
 3. Add host tests for session lifecycle, profile transitions, and slot generations; test the PS5 adapter's neutral-publication branch. The pure mapping, motion, and feedback helpers now have host coverage, but hardware behavior remains unverified.
-4. Complete game-hook rollback for process exit/payload stop and continue auditing the inherited slot/handoff lifecycle.
+4. Complete game-hook rollback for process exit/payload stop and continue auditing the inherited slot/handoff lifecycle. Allocation and USB-thread creation rollback now avoid deleting invalid `-1` handles; target verification remains open as P1-SLOT-11.
 5. Obtain a physical PS5, DualSense, Steam Controller, and official Puck for USB/Puck/reconnect/motion/touch/haptics/security hardware gates.
 6. Continue BLE only under passive/evidence gates in `docs/BLE_FEASIBILITY.md`; no stock DualSense risk.
 

@@ -1,6 +1,7 @@
 # FINAL CODEX TASK — SteamController-PS5
 
-**Revision:** 1.0 · **Research cutoff:** 2026-10-08 · **Primary target:** jailbroken PS5 with ProsperoOS firmware 13.60 · **Implementation language:** portable C99 for the payload/engine, other languages only where justified for host tools and UI.  
+**Revision:** 1.0 · **Research cutoff:** 2026-10-08 · **Primary target:** jailbroken PS5 with ProsperoOS firmware 13.60 · **Implementation language:** portable C99 for the payload/engine, other languages only where justified for host tools and UI.
+
 **Read first:** [`AGENTS.md`](AGENTS.md), [`docs/SOURCES_AND_EVIDENCE.md`](docs/SOURCES_AND_EVIDENCE.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`project-memory/PROJECT_MEMORY.md`](project-memory/PROJECT_MEMORY.md).
 
 > This is an **execution specification**, not a request for another high-level proposal. Work through the milestones, implement and test all feasible deliverables, and preserve exact evidence for things requiring a physical PS5. Never invent results, code, SDK support, commits or PR URLs. Never leave TODO/mock behavior in a deliverable described as working.

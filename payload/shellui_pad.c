@@ -3810,9 +3810,9 @@ static void safe_mdbg_restore(pid_t target, void *orig_bytes, intptr_t addr, siz
     if (page2 != page1) {
         protect2_ok = (kernel_set_vmem_protection(target, page2, 0x1000, PROT_READ | PROT_WRITE | PROT_EXEC) == 0);
     }
-    
+
     mdbg_copyin(target, orig_bytes, addr, len);
-    
+
     if (protect1_ok) {
         kernel_set_vmem_protection(target, page1, 0x1000, PROT_READ | PROT_EXEC);
     }

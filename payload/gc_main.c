@@ -1079,7 +1079,7 @@ static void *controller_manager_thread(void *arg) {
             usb_thread_arg_t *targ = malloc(sizeof(*targ));
             if (!targ) {
                 gp_log("manager: malloc fail for slot[%d]\n", slot);
-                scePadVirtualDeviceDeleteDevice(handle);
+                if (handle >= 0) scePadVirtualDeviceDeleteDevice(handle);
                 pthread_mutex_lock(&g_slot_lock);
                 g_slots[slot].handle=-1; g_slots[slot].vdi_ready=0;
                 g_slots[slot].usb_active=0; g_slots[slot].dev_path[0]='\0';
@@ -1095,7 +1095,7 @@ static void *controller_manager_thread(void *arg) {
             if (pthread_create(&tid, NULL, usb_hid_thread, targ) != 0) {
                 gp_log("manager: pthread_create fail slot[%d]\n", slot);
                 free(targ);
-                scePadVirtualDeviceDeleteDevice(handle);
+                if (handle >= 0) scePadVirtualDeviceDeleteDevice(handle);
                 pthread_mutex_lock(&g_slot_lock);
                 g_slots[slot].handle=-1; g_slots[slot].vdi_ready=0;
                 g_slots[slot].usb_active=0; g_slots[slot].dev_path[0]='\0';

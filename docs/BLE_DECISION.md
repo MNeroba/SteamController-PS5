@@ -1,6 +1,7 @@
 # Native PS5 Bluetooth LE evidence decision
 
-**Status:** Research only; no active native-radio operation performed.  
+**Status:** Research only; no active native-radio operation performed.
+
 **Decision date:** 2026-10-08
 
 ## Target and hardware
