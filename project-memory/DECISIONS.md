@@ -234,3 +234,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: malformed or unusual descriptors now fail discovery. The count checks do not validate a device's HID report-descriptor contents, PS5 ioctl semantics, or physical hardware compatibility.
 - Verification gate: 24 production parser checks, the full normal and ASan/UBSan suites, and the pinned SDK v0.43 cross-build pass. No PS5, Steam Controller, Puck, live descriptor, or USB ioctl was tested. See T-P45.
 - Reconsider only if a captured, standards-conforming target descriptor demonstrates a legitimate topology that this bounded map cannot represent; preserve strict count validation.
+
+
+## ADR-035 — Require fixed sizes for standard USB descriptors
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: `steam_usb_parse_config()` checked only minimum lengths for standard configuration, interface, and endpoint descriptor types. It therefore accepted extra bytes inside those records even though USB 2.0 defines fixed standard lengths: 9, 9, and 7 bytes respectively. A descriptor extension has its own descriptor type and must not be folded into a standard record.
+- Evidence: USB-IF USB 2.0 Specification §§9.6.2, 9.6.3 and 9.6.6 (S12); expected-red `test_fixed_standard_descriptor_lengths()` in `tests/test_steam_usb.c`; F070/T-P46/M1-198.
+- Decision: reject configuration descriptor headers unless bLength is exactly 9, interface descriptors unless bLength is exactly 9, and endpoint descriptors unless bLength is exactly 7. Keep unknown descriptor types length-bounded and skippable.
+- Tradeoff: malformed streams and nonstandard vendor encodings of these standard descriptor types are rejected. This does not validate HID report descriptors or actual PS5 ioctl/device behavior.
+- Verification gate: three expected-red regressions fail before and pass after the fix; 27 USB parser checks, full normal and ASan/UBSan suites, and SDK v0.43 compile/link pass. Physical USB/PS5 remains untested.
+- Reconsider only if a standards-backed target ABI explicitly defines a different descriptor type/length; do not relax standard descriptor sizes based on an undocumented capture.

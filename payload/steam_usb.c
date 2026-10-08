@@ -16,7 +16,8 @@ int steam_usb_parse_config(const uint8_t *data, unsigned length,
     int have_interface = 0;
     if (!data || !out) return -1;
     memset(out, 0, sizeof(*out));
-    if (length < 9 || data[0] < 9 || data[1] != USB_DESC_CONFIG || data[0] > length)
+    /* USB 2.0 configuration descriptors have a fixed nine-byte prefix. */
+    if (length < 9 || data[0] != 9 || data[1] != USB_DESC_CONFIG)
         return -1;
     total = (unsigned)data[2] | ((unsigned)data[3] << 8);
     if (total < data[0] || total > length) return -1;
@@ -32,7 +33,8 @@ int steam_usb_parse_config(const uint8_t *data, unsigned length,
 
         if (type == USB_DESC_INTERFACE) {
             uint8_t iface, alt;
-            if (descriptor_length < 9) return -1;
+            /* Standard interface descriptors are exactly nine bytes. */
+            if (descriptor_length != 9) return -1;
             if (have_interface &&
                 current_endpoint_count != current_expected_endpoints)
                 return -1;
@@ -56,7 +58,8 @@ int steam_usb_parse_config(const uint8_t *data, unsigned length,
             }
         } else if (type == USB_DESC_ENDPOINT) {
             uint8_t address, attributes;
-            if (descriptor_length < 7 || !have_interface) return -1;
+            /* Standard endpoint descriptors are exactly seven bytes. */
+            if (descriptor_length != 7 || !have_interface) return -1;
             current_endpoint_count++;
             if (current_endpoint_count > current_expected_endpoints)
                 return -1;

@@ -12,8 +12,9 @@ typedef struct {
 
 /* Parse one complete USB configuration descriptor. If puck_only is nonzero,
  * retain only Valve Puck controller interfaces 2 through 5. Returns interface
- * count or -1 for a truncated/malformed stream, descriptor-count mismatch, or
- * a configuration that exceeds the representable interface map. */
+ * count or -1 for a truncated/malformed stream, a nonstandard length for a
+ * fixed USB descriptor, descriptor-count mismatch, or a configuration that
+ * exceeds the representable interface map. */
 int steam_usb_parse_config(const uint8_t *data, unsigned length,
                            int puck_only, steam_usb_map_t *out);
 

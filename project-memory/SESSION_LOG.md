@@ -691,3 +691,14 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Host tests run 37847899123 and PS5 cross-build run 37847899130 are queued; combined status has no completed checks. No CI pass is claimed.
 - M1-197 local evidence: full normal and ASan/UBSan suites pass; parser test passes 24 checks; fixed-seed property test covers 100,000 Steam reports and 100,000 USB configurations. SDK v0.43/LLVM 18.1.8 compile/link passes with ELF SHA-256 5b4ab572d235b2a5e87f4e4f4d031d37ac9b0d3e84ce2a6b2d6103e89055f551. No physical PS5, controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio command, firmware write, or binary release was used.
 - P0-USB-DESC-09 is fixed at the parser/host-test level. Keep P0-USB-DESC-10 blocked until a safely identified Steam Controller/Puck descriptor and target ioctl behavior can be obtained. Next: recheck the two Actions runs and continue a separate host-only source audit.
+
+
+## M1-198 fixed standard USB descriptor lengths — 2026-10-08 21:40 UTC
+
+- Source evidence: USB-IF USB 2.0 sections 9.6.2/9.6.3/9.6.6 define standard configuration/interface/endpoint descriptor sizes. The parser previously enforced only minimum lengths.
+- Regression-first: three exact-size tests were added; all three initially failed against production code. A bad endpoint fixture total-length value was corrected before considering the expected-red result valid.
+- Code/docs: require exact 9/9/7 byte descriptor lengths in payload/steam_usb.c; update the API comment, Sources and Evidence (S12), Architecture, Test Plan (T-P46), ADR-035, F070, P1-USB-DESC-11, Building, and memory logs.
+- Verification: full normal test suite and full ASan/UBSan suite pass; parser is 27 checks and property tests run 100,000 report plus 100,000 USB configuration inputs. SDK v0.43 / LLVM 18.1.8 cross-build passes; ELF SHA-256 362d584f60d26a0206a983c55980ebe7083f4c05fc9bd7adf9b878839a49fa1c.
+- GitHub: current main is M1-197 memory-sync commit 2742b15fd0bac06db54f5fc50730c10d35063463. Host/PS5 Actions 37848117055/37848117173 are queued; no CI result is claimed. M1-198 is not published yet.
+- Hardware/safety: no PS5, controller, Puck, USB ioctl, BLE/HCI/radio, firmware/system write, or release action. Descriptor parser behavior remains host/build evidence only.
+- Next exact action: git diff --check, scan all nonignored files for trailing whitespace/secrets, compare the complete local manifest to main tree 70e1f0e4d321457fe37f1dc4698617d092544efe, and prepare a non-force guarded main update against 2742b15fd0bac06db54f5fc50730c10d35063463.

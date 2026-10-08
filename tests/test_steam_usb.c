@@ -121,12 +121,37 @@ static void test_interface_map_capacity(void) {
     CHECK(steam_usb_parse_config(config, sizeof(config), 0, &map) == -1);
 }
 
+static void test_fixed_standard_descriptor_lengths(void) {
+    static const uint8_t extended_config[] = {
+        10, 2, 19, 0, 1, 1, 0, 0x80, 50, 0,
+        9, 4, 2, 0, 0, 3, 0, 0, 0
+    };
+    static const uint8_t extended_interface[] = {
+        9, 2, 19, 0, 1, 1, 0, 0x80, 50,
+        10, 4, 2, 0, 0, 3, 0, 0, 0, 0
+    };
+    static const uint8_t extended_endpoint[] = {
+        9, 2, 26, 0, 1, 1, 0, 0x80, 50,
+        9, 4, 2, 0, 1, 3, 0, 0, 0,
+        8, 5, 0x84, 3, 64, 0, 10, 0
+    };
+    steam_usb_map_t map;
+
+    CHECK(steam_usb_parse_config(extended_config, sizeof(extended_config),
+                                 0, &map) == -1);
+    CHECK(steam_usb_parse_config(extended_interface, sizeof(extended_interface),
+                                 0, &map) == -1);
+    CHECK(steam_usb_parse_config(extended_endpoint, sizeof(extended_endpoint),
+                                 0, &map) == -1);
+}
+
 int main(void) {
     test_complete_configuration_map();
     test_puck_interface_filter();
     test_invalid_descriptors();
     test_declared_descriptor_counts();
     test_interface_map_capacity();
+    test_fixed_standard_descriptor_lengths();
     if (failures) {
         fprintf(stderr, "%d of %d Steam USB descriptor checks failed\n", failures, checks);
         return 1;
