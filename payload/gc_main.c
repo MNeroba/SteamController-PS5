@@ -57,6 +57,7 @@
 #include "game_hooks.h"
 #include "bridge/wireless_ds4.h"
 #include "slot_registry.h"
+#include "slot_lifecycle.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -580,11 +581,9 @@ static void sc2_vda_detach(slot_registry_token_t token, int slot,
 }
 
 static void slot_release(slot_registry_token_t token, const char *why) {
-    int result = slot_registry_request_release(&g_slots, token);
-    if (result == SLOT_REGISTRY_OK)
-        result = delete_slot_vda(token, (int)token.index, why);
-    if (result == SLOT_REGISTRY_OK)
-        result = slot_registry_release(&g_slots, token);
+    vda_delete_context_t context = { (int)token.index, why };
+    int result = slot_lifecycle_release(&g_slots, token, delete_vda_handle,
+                                        &context);
     if (result != SLOT_REGISTRY_OK && result != SLOT_REGISTRY_STALE)
         gp_log("slot[%u] release failed (%s), registry result=%d\n",
                token.index, why, result);
@@ -1062,6 +1061,49 @@ exit_slot:
     return NULL;
 }
 
+typedef struct {
+    vda_delete_context_t deletion;
+    sc2_assignment_token_t assignment_token;
+    int32_t virtual_handle;
+} manager_start_context_t;
+
+static int manager_create_virtual(uint32_t slot, int32_t *out_handle,
+                                  int *out_bind_ok, void *opaque) {
+    manager_start_context_t *context = (manager_start_context_t *)opaque;
+    int bind_ok = 0;
+    int32_t handle = create_vda_for_slot((int)slot, &bind_ok);
+    context->virtual_handle = handle;
+    *out_handle = handle;
+    *out_bind_ok = bind_ok;
+    return handle < 0 ? -1 : 0;
+}
+
+static int manager_start_usb_worker(slot_registry_token_t token,
+                                    int32_t virtual_handle, int bind_ok,
+                                    void *opaque) {
+    manager_start_context_t *context = (manager_start_context_t *)opaque;
+    usb_thread_arg_t *arg = malloc(sizeof(*arg));
+    if (!arg) {
+        gp_log("manager: malloc fail for slot[%u]\n", token.index);
+        return -1;
+    }
+    arg->slot_token = token;
+    arg->assignment_token = context->assignment_token;
+    arg->bind_ok = bind_ok;
+
+    pthread_t tid;
+    if (pthread_create(&tid, NULL, usb_hid_thread, arg) != 0) {
+        gp_log("manager: pthread_create fail slot[%u]\n", token.index);
+        free(arg);
+        return -1;
+    }
+    pthread_detach(tid);
+    gp_log("manager: slot[%u] USB thread started handle=0x%x\n",
+           token.index, (uint32_t)virtual_handle);
+    notify("Puckbridge: slot[%u] ready — press a button to assign", token.index);
+    return 0;
+}
+
 /* ── Controller manager thread ────────────────────────────────────────── */
 static void *controller_manager_thread(void *arg) {
     (void)arg;
@@ -1116,8 +1158,6 @@ static void *controller_manager_thread(void *arg) {
             /* The assignment lease serializes the PS5 dialog. Slot ownership
              * remains generation-tagged even if that dialog times out. */
             sc2_assignment_token_t assignment_token = 0;
-            int32_t handle = -1;
-            int bind_ok = 0;
             if (!lazy) {
                 assignment_token = sc2_assignment_claim(slot);
                 if (assignment_token == 0) {
@@ -1125,52 +1165,34 @@ static void *controller_manager_thread(void *arg) {
                     slot_release(slot_token, "assignment lease unavailable");
                     continue;
                 }
+            }
 
-                /* Create VDA and force_bind (shows PS5 assignment dialog). */
-                handle = create_vda_for_slot(slot, &bind_ok);
-                int attach_result = handle < 0 ? SLOT_REGISTRY_ERROR :
-                    slot_registry_set_virtual(&g_slots, slot_token, handle);
-                if (attach_result != SLOT_REGISTRY_OK) {
-                    gp_log("manager: slot[%d] VDA registration failed (handle=0x%x, result=%d); not deleting an unowned/ambiguous handle\n",
-                           slot, (uint32_t)handle, attach_result);
+            manager_start_context_t start_context = {
+                { slot, "manager startup rollback" }, assignment_token, -1
+            };
+            slot_lifecycle_ops_t start_ops = {
+                manager_create_virtual,
+                manager_start_usb_worker,
+                delete_vda_handle
+            };
+            int cleanup_result = SLOT_REGISTRY_OK;
+            int start_result = slot_lifecycle_start(
+                &g_slots, slot_token, !lazy, &start_ops, &start_context,
+                &cleanup_result);
+            if (start_result != SLOT_LIFECYCLE_OK) {
+                if (assignment_token)
                     sc2_assignment_release(assignment_token);
-                    /* Do not delete a handle whose registry ownership was not
-                     * established; a duplicate value may belong to another slot. */
-                    slot_release(slot_token, "VDA setup failed");
-                    continue;
+                if (start_result == SLOT_LIFECYCLE_VDA_ATTACH_FAILED) {
+                    gp_log("manager: slot[%d] VDA registration failed (handle=0x%x); not deleting an unowned/ambiguous handle\n",
+                           slot, (uint32_t)start_context.virtual_handle);
+                } else {
+                    gp_log("manager: slot[%d] startup transaction failed (stage=%d, cleanup=%d)\n",
+                           slot, start_result, cleanup_result);
                 }
-            }
-
-            /* SC2's virtual pad is created later when the controller wakes. */
-            if (slot_registry_activate(&g_slots, slot_token) != SLOT_REGISTRY_OK) {
-                sc2_assignment_release(assignment_token);
-                slot_release(slot_token, "slot activation failed");
-                continue;
-            }
-
-            /* Launch USB reader thread */
-            usb_thread_arg_t *targ = malloc(sizeof(*targ));
-            if (!targ) {
-                gp_log("manager: malloc fail for slot[%d]\n", slot);
-                sc2_assignment_release(assignment_token);
-                slot_release(slot_token, "USB thread allocation failed");
-                continue;
-            }
-            targ->slot_token = slot_token;
-            targ->assignment_token = assignment_token;
-            targ->bind_ok = bind_ok;
-
-            pthread_t tid;
-            if (pthread_create(&tid, NULL, usb_hid_thread, targ) != 0) {
-                gp_log("manager: pthread_create fail slot[%d]\n", slot);
-                free(targ);
-                sc2_assignment_release(assignment_token);
-                slot_release(slot_token, "USB thread creation failed");
-            } else {
-                pthread_detach(tid);
-                gp_log("manager: slot[%d] USB thread started handle=0x%x\n",
-                       slot, (uint32_t)handle);
-                notify("Puckbridge: slot[%d] ready — press a button to assign", slot);
+                if (cleanup_result != SLOT_REGISTRY_OK &&
+                    cleanup_result != SLOT_REGISTRY_STALE)
+                    gp_log("manager: slot[%d] startup cleanup deferred (registry result=%d)\n",
+                           slot, cleanup_result);
             }
             /* One controller per scan pass — assignment gate blocks the rest
              * until the user confirms this one with a button press. */
