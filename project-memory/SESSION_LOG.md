@@ -254,3 +254,10 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Final review tightened `usb_send_out()` to preserve the USB completion errno across its best-effort STOP ioctl; M1-44 recompiles this exact source state successfully.
 - Final SDK v0.43/LLVM 18.1.8 build is warning-free; the final ELF is ELF64 x86-64 PIE with the six expected SDK runtime libraries and SHA-256 `273bf561ececaa0093c40827ffac9cabb087252fdd028afca32ec5d623dbe545`. `git diff --check` passes; the bounded private-key/token scan returned no matches. Test evidence remains 821 regular and 821 ASan/UBSan checks (M1-40/41).
 - This source/memory increment is still local; PR #1 expected remote head for publication remains `13c64c5439d82e81c31ec78dd030dbcf8d30bfe7`. Next exact action: publish the validated changes with an expected-head fast-forward, update the PR description and inspect the new CI status once.
+
+## M1 USB lifecycle source publication — 2026-10-08 15:28 UTC
+
+- Published the USB reader/resource increment as commit `28acb8a8b0d4c979ecfc23a81e36e53c3e236e59`, parent `13c64c5439d82e81c31ec78dd030dbcf8d30bfe7`. All 21 uploaded file blob SHAs matched locally computed Git blob IDs. The branch update used the expected-head guard with `force=false`; no merge or release occurred.
+- PR #1 remains open, draft and mergeable. Its body now reports 821 host and ASan/UBSan checks, the final ELF SHA-256 `273bf561ececaa0093c40827ffac9cabb087252fdd028afca32ec5d623dbe545`, and exact physical/runtime limitations.
+- Current-head Host run `37801053888` and PS5 cross-build run `37801053913` were queued at 15:28 UTC. Combined status was empty; no CI pass is claimed. The earlier empty/no-run result for parent `13c64c5` is retained in CI-27.
+- The next exact action is to publish this post-publication memory/provenance/CI synchronization as a guarded fast-forward from `28acb8a8b0d4c979ecfc23a81e36e53c3e236e59`. After that, audit game-hook cleanup for process exit and payload stop; physical PS5/Steam Controller/Puck tests remain blocked on hardware.
