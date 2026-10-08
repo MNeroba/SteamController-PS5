@@ -32,4 +32,4 @@ The SDK repository describes most of its files as GPL-3.0-or-later and identifie
 
 ## Latest rebuild
 
-On 2026-10-08, after the portal request-deadline change, the same SDK v0.43 / LLVM 18.1.8 command succeeded on Darwin arm64. Output: ELF64 x86-64 PIE, SHA-256 `95d58142bbbd71c1019f742c0a0dcf0c3a15b209903623302ef1c95ed5990d1f`. This confirms compilation and linking only; it is not evidence of console loading or firmware compatibility. See M1-144 in `project-memory/TEST_LOG.md`.
+On 2026-10-08, after the portal request-deadline and strict game-hook settings parsing changes, the same SDK v0.43 / LLVM 18.1.8 command succeeded on Darwin arm64. Output: ELF64 x86-64 PIE, SHA-256 `0f9e78bc4be21a60b2dfde0ab76da6b74e04fb1ae10edd3aa4df6c741a45aab2`. This confirms compilation and linking only; it is not evidence of console loading or firmware compatibility. See M1-153 in `project-memory/TEST_LOG.md`.

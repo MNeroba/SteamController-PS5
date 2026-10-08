@@ -62,6 +62,17 @@ static void pause_ms(long ms) {
     while (nanosleep(&req, &req) != 0) {}
 }
 
+static int write_malformed_settings(void) {
+    FILE *file = fopen("/tmp/steamcontroller-game-hooks-test.ini", "w");
+    int write_failed, close_result;
+    if (!file) return -1;
+    write_failed = fputs("GAME_INPUT=2\nGAME_VIBRATION=-1\nGAME_PRIORITY=1junk\n"
+                         "GAME_PRIORITY=999999999999999999999999999999999999\n"
+                         "GAME_AUDIO_HAPTICS=0\n", file) == EOF;
+    close_result = fclose(file);
+    return write_failed || close_result != 0 ? -1 : 0;
+}
+
 static void *settings_worker(void *arg) {
     intptr_t id = (intptr_t)arg;
     for (int i = 0; i < 250; i++) {
@@ -107,11 +118,23 @@ int main(void) {
     void *result = NULL;
     char too_small[3];
 
-    (void)unlink("/tmp/steamcontroller-game-hooks-test.ini");
+    if (write_malformed_settings() != 0) return 1;
     if (game_hooks_json(NULL, sizeof(too_small)) != -1 ||
         game_hooks_json(too_small, sizeof(too_small)) != -1)
         return 1;
     game_hooks_start();
+    char initial_json[512];
+    if (game_hooks_json(initial_json, sizeof(initial_json)) <= 0 ||
+        !strstr(initial_json, "\"audio\":0") ||
+        !strstr(initial_json, "\"mode\":2") ||
+        !strstr(initial_json, "\"input\":0") ||
+        !strstr(initial_json, "\"vibration\":0")) {
+        fprintf(stderr, "FAIL malformed persisted game-hook settings were accepted: %s\n",
+                initial_json);
+        game_hooks_test_stop();
+        return 1;
+    }
+    atomic_fetch_add_explicit(&checks, 4, memory_order_relaxed);
     if (pthread_create(&settings[0], NULL, settings_worker, (void *)(intptr_t)0) != 0 ||
         pthread_create(&settings[1], NULL, settings_worker, (void *)(intptr_t)1) != 0 ||
         pthread_create(&pad, NULL, pad_worker, NULL) != 0 ||

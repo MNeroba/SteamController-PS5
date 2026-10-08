@@ -64,15 +64,39 @@ static void active_set(int active) {
     pthread_mutex_unlock(&g_lock);
 }
 
+static int parse_settings_integer(const char *text, long *value) {
+    char *end;
+    long parsed;
+    if (!text || !value) return 0;
+    errno = 0;
+    parsed = strtol(text, &end, 10);
+    if (end == text || errno == ERANGE) return 0;
+    while (*end == ' ' || *end == '\t') end++;
+    if (*end == '\r') end++;
+    if (*end == '\n') end++;
+    if (*end != '\0') return 0;
+    *value = parsed;
+    return 1;
+}
+
 static void load_settings(void) {
     FILE *f = fopen(GAME_HOOKS_SETTINGS_PATH, "r"); if (!f) return;
     GameHookSettings settings = { 0, 0, 2, 1 };
     char l[128];
+    long value;
     while (fgets(l, sizeof(l), f)) {
-        if (!strncmp(l, "GAME_INPUT=", 11))     settings.input_on = atoi(l + 11) != 0;
-        if (!strncmp(l, "GAME_VIBRATION=", 15)) settings.vibe_on  = atoi(l + 15) != 0;
-        if (!strncmp(l, "GAME_AUDIO_HAPTICS=", 19)) settings.audio_on = atoi(l + 19) != 0;
-        if (!strncmp(l, "GAME_PRIORITY=", 14))  { int m = atoi(l + 14); settings.mode = (m >= 0 && m <= 2) ? m : 1; }
+        if (!strncmp(l, "GAME_INPUT=", 11) &&
+            parse_settings_integer(l + 11, &value) && (value == 0 || value == 1))
+            settings.input_on = (int)value;
+        if (!strncmp(l, "GAME_VIBRATION=", 15) &&
+            parse_settings_integer(l + 15, &value) && (value == 0 || value == 1))
+            settings.vibe_on = (int)value;
+        if (!strncmp(l, "GAME_AUDIO_HAPTICS=", 19) &&
+            parse_settings_integer(l + 19, &value) && (value == 0 || value == 1))
+            settings.audio_on = (int)value;
+        if (!strncmp(l, "GAME_PRIORITY=", 14) &&
+            parse_settings_integer(l + 14, &value))
+            settings.mode = value >= 0 && value <= 2 ? (int)value : 1;
     }
     fclose(f);
     pthread_mutex_lock(&g_lock);
