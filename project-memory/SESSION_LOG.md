@@ -702,3 +702,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - GitHub: current main is M1-197 memory-sync commit 2742b15fd0bac06db54f5fc50730c10d35063463. Host/PS5 Actions 37848117055/37848117173 are queued; no CI result is claimed. M1-198 is not published yet.
 - Hardware/safety: no PS5, controller, Puck, USB ioctl, BLE/HCI/radio, firmware/system write, or release action. Descriptor parser behavior remains host/build evidence only.
 - Next exact action: git diff --check, scan all nonignored files for trailing whitespace/secrets, compare the complete local manifest to main tree 70e1f0e4d321457fe37f1dc4698617d092544efe, and prepare a non-force guarded main update against 2742b15fd0bac06db54f5fc50730c10d35063463.
+
+
+### M1-198 direct-main publication reconciliation — 2026-10-08 21:43 UTC
+
+- Published fixed USB standard descriptor lengths, parser regressions, source evidence, architecture/test/build docs, and project memory directly to main as commit e84f792fb37c47a332f4b914b25fbd74640b7cf0, parent 2742b15fd0bac06db54f5fc50730c10d35063463, tree dfb72ab1b4dad7f3aac9d8bdbd672f9deaa0385a. The ref update used expected-head 2742b15fd0bac06db54f5fc50730c10d35063463 with force=false; no PR or history rewrite was used.
+- All 13 changed blobs matched local Git object hashes before tree creation. Re-fetched main/tree: 209 entries/196 blobs, truncated=false, exact path/mode/blob match to the complete local manifest with no missing/extra files.
+- Actions 37848691432 (Host tests) and 37848691412 (PS5 cross-build) are queued; combined status has no completed checks. No CI pass is claimed.
+- M1-198 local evidence: regression-first exact-length checks, full normal and ASan/UBSan suites, 27 USB parser checks and 100,000 report + 100,000 configuration parser inputs pass. SDK v0.43/LLVM 18.1.8 cross-build passes; ELF SHA-256 362d584f60d26a0206a983c55980ebe7083f4c05fc9bd7adf9b878839a49fa1c.
+- No physical PS5, Steam Controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio, firmware/system write, or binary release was used. P0-USB-DESC-10 remains blocked pending safe identified hardware evidence.
