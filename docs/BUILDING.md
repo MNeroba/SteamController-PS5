@@ -52,3 +52,5 @@ The validated scanner source and this build record were published to `main` in c
 ## M1-195 descriptor fallback classification
 
 On 2026-10-08, the SC2 descriptor-status/fallback change built with the same pinned SDK v0.43 and LLVM 18.1.8 command. The ELF is 64-bit x86-64, with SHA-256 `87fa9f441430dd1235654e308988bf28144b2fe5a241f692ea9456f1b9d6d73b`; `llvm-readobj` lists the expected PS5 SDK runtime libraries. This verifies compilation/linking only. It does not exercise `USB_GET_FULL_DESC`, `ENXIO` handling, device removal, console runtime or real Steam Controller/Puck behavior. Exact command and host test results are in M1-195 of `project-memory/TEST_LOG.md`.
+
+The M1-195 source/docs snapshot was published to `main` as commit `72048849da463b1e18a9c91e07d2f64926f6e6af` (tree `ac4e13add70bcf641b6c83114aa1e8d743401f8b`). GitHub's recursive-tree acknowledgement contained all 196 blobs across 209 entries; this confirms source publication, not target runtime behavior.
