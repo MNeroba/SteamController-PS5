@@ -805,15 +805,30 @@ static void *usb_hid_thread(void *arg) {
 
         /* Wait for the controller to wake / pick the puck slot it's paired to */
         int active = 0, told = 0;
-        while ((active = sc2_find_active_ep(fd, sc2_eps, addrs, n_eps, 2000)) == 0) {
+        while ((active = sc2_find_active_ep(fd, &usb_resources, sc2_eps,
+                                             addrs, n_eps, 2000)) == 0) {
             if (!told) { gp_log("slot[%d] Puck idle — waiting for the controller to turn on\n", slot); told = 1; }
+        }
+        if (usb_resources.opened_endpoints != 0 ||
+            usb_resources.active_transfers != 0) {
+            gp_log("slot[%d] SC2 scan cleanup incomplete (opened=0x%x active=0x%x); retrying through session cleanup\n",
+                   slot, usb_resources.opened_endpoints,
+                   usb_resources.active_transfers);
+            goto exit_slot;
         }
         if (usb_session_uninit_fs(&usb_resources, &g_usb_session_ops,
                                   NULL)!=0) {
             gp_log("slot[%d] SC2 scan FS_UNINIT fail errno=%d\n",slot,errno);
             goto exit_slot;
         }
-        if (active < 0) { gp_log("slot[%d] SC2 puck removed\n",slot); goto exit_slot; }
+        if (active < 0) {
+            if (active == -ENXIO)
+                gp_log("slot[%d] SC2 puck removed\n", slot);
+            else
+                gp_log("slot[%d] SC2 endpoint scan failed (%d)\n", slot,
+                       active);
+            goto exit_slot;
+        }
         if (!sc2_pause_is_active()) sc2_vda_attach(slot_token, slot, &session);
         ds_handoff_sc2_session(!sc2_pause_is_active());
 

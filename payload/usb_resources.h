@@ -34,6 +34,8 @@ int usb_resources_note_fs_init_result(usb_resources_t *resources, int success);
 int usb_resources_note_fs_uninit_result(usb_resources_t *resources, int success);
 int usb_resources_note_endpoint_open(usb_resources_t *resources,
                                      uint8_t endpoint_index);
+int usb_resources_note_endpoint_close(usb_resources_t *resources,
+                                      uint8_t endpoint_index);
 int usb_resources_note_transfer_start(usb_resources_t *resources,
                                       uint8_t endpoint_index);
 int usb_resources_note_transfer_complete(usb_resources_t *resources,

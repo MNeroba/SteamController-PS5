@@ -179,3 +179,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Decision: after verifying the current `main` head and full source tree, publish complete working snapshots as direct, fast-forward commits to `main`; close the obsolete draft PR after its content is restored to `main`. Do not rewrite or delete history. Keep the hardware, firmware, and BLE gates explicitly blocked/unverified and do not release an unverified binary.
 - Tradeoff: direct commits remove the PR review/checkpoint flow; compensate with exact tree/blob verification, clean-checkout builds, and append-only project memory.
 - Reconsider after the first successful release or when the owner asks for a review workflow.
+
+
+## ADR-030 — Track SC2 endpoint discovery in the USB session
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: `sc2_find_active_ep()` opened and started temporary candidate endpoints with direct ioctls, but the session resource state did not know those operations occurred. STOP/CLOSE return values were ignored before `gc_main.c` uninitialized or reinitialized the USB FS session.
+- Evidence: pinned Puckbridge source `78460113ef7c48502c765a1f83ba34d53c977134`; derivative `payload/controller_sc2.c:109-225`, `payload/usb_resources.c`, `payload/gc_main.c:808-839`; fail-once CLOSE regression in `tests/test_sc2_usb_scan.c`; F064/T-P40/M1-191.
+- Decision: have the scanner record opened endpoint, possible transfer, completion, stop, and close transitions in the reader's existing `usb_resources_t`. Successful CLOSE clears the endpoint and transfer bits. Failed STOP/CLOSE retains its ownership state and returns the first error; `gc_main.c` routes retained resources through `usb_session_cleanup` instead of proceeding with ordinary scan reinitialization. This keeps one authoritative resource registry and reuses the existing cleanup path.
+- Tradeoff: scanner ioctl operations are still direct and cannot yet inject each platform operation through the `usb_session_ops_t` table. Host tests verify state transitions and retries but not Prospero kernel semantics.
+- Verification gate: concurrent scanner test plus fail-once CLOSE/retry under normal, ASan/UBSan, and TSan; full SDK v0.43 compile/link. PS5 USB ioctl and physical Puck tests remain required.
+- Reconsider if the target's documented USB FS behavior requires scanner-specific operation callbacks or different partial-close semantics.

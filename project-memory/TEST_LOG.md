@@ -460,3 +460,22 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - `make clean all PS5_PAYLOAD_SDK="/Users/mneroba/GitHub/SteamController-PS5/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk" LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config` from `/private/tmp/SteamController-PS5-main-clean-export/payload`: PASS (exit 0), ELF64 x86-64 PIE, SHA-256 `26dce830d274755fc0bd6a83cafc8e3e6f660e756544d699a2b346ef445afbf0`. Compile/link only; no PS5 execution or firmware claim.
 - Actual `git clone --depth 1 --branch main https://github.com/MNeroba/SteamController-PS5.git /private/tmp/SteamController-PS5-main-clean` was NOT_RUN to completion: command failed with `Could not resolve host: github.com`. Tests/build were run from a clean export with the exact published tree SHA, not a network clone.
 - GitHub push workflows are queued for this commit: `37836992181` PS5 cross-build, `37836992223` Host tests; combined status was empty. PR #1 was closed unmerged; no history was rewritten or deleted. The stale `fix/p0-safety` branch is retained and must not be treated as the full release source. No physical hardware/BLE/HCI/radio/firmware action or binary release.
+
+
+## M1-191 SC2 endpoint-scan ownership and cleanup — 2026-10-08 20:19 UTC
+
+- Test-first: extended `tests/test_sc2_usb_scan.c` with a fail-once `USB_FS_CLOSE` error. The first build failed against the old five-argument `sc2_find_active_ep()` contract because the regression requires the session resource owner; implementation then added that explicit ownership contract. The final injection verifies the scanner returns `-EIO`, keeps the endpoint bit set, and lets the shared `usb_resources_cleanup()` path retry CLOSE exactly once.
+- Fix: `usb_resources_note_endpoint_close()` clears endpoint/transfer bits only after successful close. `sc2_find_active_ep()` now records each candidate endpoint open, possible transfer start, completion, stop and close; it returns the first cleanup error. `gc_main.c` checks retained ownership after scan and routes incomplete cleanup through the existing session cleanup path before reinitializing.
+- M1-191a targeted normal scan/resource tests: `make -C tests clean build/test_sc2_usb_scan build/test_usb_resources && ./tests/build/test_sc2_usb_scan && ./tests/build/test_usb_resources`; PASS (exit 0). Concurrent Puck/wired report buffers remain isolated; resource module reports 66 checks.
+- M1-191b full normal suite: `make -C tests clean test`; PASS (exit 0), 1048 counted assertions, 340,000 concurrent operations/snapshots, and 100,000 Steam-report plus 100,000 USB-descriptor deterministic inputs. The SC2 scanner regression also passes, including failed-close tracking/retry.
+- M1-191c full AddressSanitizer/UndefinedBehaviorSanitizer suite: `make -C tests clean sanitize`; PASS (exit 0), same counts and no sanitizer report.
+- M1-191d targeted ThreadSanitizer: from `tests/`, `make clean && make CFLAGS='-std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=thread -fno-omit-frame-pointer' build/test_sc2_usb_scan && ./build/test_sc2_usb_scan`; PASS (exit 0), concurrent scanner has no TSan report.
+- M1-191e PS5 SDK v0.43/LLVM 18.1.8 cross-build: `make -C payload clean all PS5_PAYLOAD_SDK=/Users/mneroba/GitHub/SteamController-PS5/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config`; PASS (exit 0), Darwin 27.0.0 arm64, ELF64 x86-64 PIE; SHA-256 `683f8581d4582827b7ca4c144d17f99919fb5c8f166c0185f2125f5579b45bb6`. Compile/link only.
+- `git diff --check` passes. No real PS5 ioctl, Steam Controller, official Puck, or hotplug path was exercised; scanner ioctls remain direct and target semantics are unverified. This result is `VERIFIED_HOST_TEST` plus `VERIFIED_PS5_BUILD`, not hardware evidence.
+
+
+## M1-190 validation-memory publication — 2026-10-08 20:11 UTC
+
+- Published the clean-tree build record and final recovery/memory synchronization directly to `main` as commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84`, parent `0f122c64eff0b196ba023c75af9a61ba1cc9514a`, tree `e03ee1fab971b0f1dd3430923925f485fb81e385`. Six changed file blobs matched their local Git object IDs; GitHub recursive tree still contains exactly the 195 local paths/modes/blobs.
+- `git diff --check` passes. Code did not change after the M1-189 clean-export host/sanitizer/build runs.
+- GitHub push workflows for this current head are queued: run `37837501810` (PS5 cross-build) and run `37837501974` (Host tests); no CI pass is claimed. PR #1 remains closed unmerged.

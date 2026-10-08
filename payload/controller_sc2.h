@@ -8,6 +8,7 @@
 #include "sc2_trigfx.h"
 #include "sc2_control.h"
 #include "steam_usb.h"
+#include "usb_resources.h"
 
 /*
  * Steam Controller (2026) — "Ibex"
@@ -47,9 +48,11 @@ int  sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep);
 
 /* With FS already initialised (ep_index_max >= n), open all candidate
  * endpoints, wait up to timeout_ms for a 0x42/0x45 report and return the
- * endpoint address that produced it (0 = none yet, <0 = device gone).
- * All endpoints are closed again before returning. */
-int  sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
+ * endpoint address that produced it (0 = none yet, <0 = gone/error). The
+ * resource tracker records each open/transfer. Failed stop/close operations
+ * remain owned by the caller's session cleanup path. */
+int  sc2_find_active_ep(int fd, usb_resources_t *resources,
+                        struct usb_fs_endpoint *eps,
                         const uint8_t *addrs, int n, int timeout_ms);
 
 /* Per-controller input state. No packet history is shared between USB/Puck

@@ -569,3 +569,20 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - True `git clone` failed because the environment could not resolve `github.com`; the clean source export has the exact Git tree hash verified through GitHub's API. GitHub push Actions are queued as run `37836992181` (PS5 cross-build) and `37836992223` (Host tests); no CI pass yet.
 - Closed PR #1 unmerged and removed its task attachment; owner requested direct `main` commits until first successful release. The incomplete legacy `fix/p0-safety` branch is retained for history and must not be treated as complete.
 - No PS5/controller/Puck, BLE/HCI/radio or firmware operation; no unverified binary release. Next: inspect the two push workflows, then continue safe USB/Puck lifecycle source audit in `controller_sc2.c` and `gc_main.c`.
+
+
+## M1-190 validation record published to main — 2026-10-08 20:11 UTC
+
+- Published the complete-tree validation record, current P0-REPO-12 resolution, and build guidance directly to `main` in commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84` (parent `0f122c64eff0b196ba023c75af9a61ba1cc9514a`, tree `e03ee1fab971b0f1dd3430923925f485fb81e385`). Every changed blob SHA matched locally, and GitHub confirms 195 files still match the local tree exactly.
+- `git diff --check` passed; no source code changed, so the M1-189 clean-export test/build results still apply to the exact payload tree.
+- Current push workflow runs are queued: `37837501810` PS5 cross-build and `37837501974` Host tests. No CI pass is claimed. PR #1 is closed unmerged.
+
+
+## M1-191 SC2 endpoint-scan cleanup hardening — 2026-10-08 20:19 UTC
+
+- Continued the owner-directed USB/Puck lifecycle audit in `payload/controller_sc2.c` and `payload/gc_main.c`. The active-endpoint scan performed raw OPEN/START/COMPLETE/STOP/CLOSE ioctls, while the owning `usb_resources_t` remained empty and STOP/CLOSE failures were ignored. A failed CLOSE could therefore be followed by normal FS_UNINIT/reinitialization without the session cleanup path knowing an endpoint might still be open. This is a source-backed failure path; no hardware failure was observed.
+- Added the fail-once CLOSE regression before implementation. The initial target build failed on the old scanner function signature; after adding the owning `usb_resources_t` contract, the test injects CLOSE `EIO` and verifies the scanner returns the error, retains the endpoint bit, and session cleanup retries.
+- Added `usb_resources_note_endpoint_close()`; successful CLOSE clears the endpoint/transfer bits, while failure leaves them owned. `sc2_find_active_ep()` records scanner endpoint/transfer transitions and returns its first cleanup error. `gc_main.c` diverts retained scan resources through `usb_session_cleanup` instead of normal FS_UNINIT/reinit. The scanner still uses direct ioctls; operation-table injection is future work.
+- Updated `docs/ARCHITECTURE.md`, `docs/TEST_PLAN.md`, `P0-USB-LIFE-19`, `P1-SC2-SCAN-27`, F064, ADR-030, and T-P40. No third-party code was copied.
+- Normal host suite, full ASan/UBSan suite, targeted scanner TSan, SDK v0.43 compile/link, and `git diff --check` pass; details and exact commands are in `TEST_LOG.md` M1-191. Latest ELF SHA-256: `683f8581d4582827b7ca4c144d17f99919fb5c8f166c0185f2125f5579b45bb6`.
+- Verification limits: no PS5/Puck/controller runtime, device removal, USB FS error behavior, BLE/HCI/radio, or firmware operation was tested. Push runs for pre-change main commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84` were queued when last checked; recheck after the code+memory commit.

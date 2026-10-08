@@ -65,6 +65,19 @@ int usb_resources_note_endpoint_open(usb_resources_t *resources,
     return USB_RESOURCES_OK;
 }
 
+int usb_resources_note_endpoint_close(usb_resources_t *resources,
+                                      uint8_t endpoint_index) {
+    uint32_t bit;
+    int result = endpoint_bit(endpoint_index, &bit);
+    if (result != USB_RESOURCES_OK) return result;
+    if (!resources || resources->fd < 0 || !resources->fs_initialized ||
+        !(resources->opened_endpoints & bit))
+        return USB_RESOURCES_BAD_STATE;
+    resources->opened_endpoints &= ~bit;
+    resources->active_transfers &= ~bit;
+    return USB_RESOURCES_OK;
+}
+
 int usb_resources_note_transfer_start(usb_resources_t *resources,
                                       uint8_t endpoint_index) {
     uint32_t bit;
