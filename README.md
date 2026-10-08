@@ -21,13 +21,13 @@ SteamController-PS5 is a focused payload project for carrying Steam Controller i
 | Area | Progress | What the evidence says |
 |---|---|---|
 | **M0 · foundation and licensing** | Complete | PuckbridgePS5 was selected after a pinned source comparison with OmniPad-PS5. See [ADR-001](docs/BASE_SELECTION_ADR.md) and [provenance](docs/PROVENANCE.md). |
-| **P0 · safety and architecture** | In progress | Host-tested parser, portal, session, slot-lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
+| **P0 · safety and architecture** | In progress | Host-tested parser, bounded portal requests, session, slot-lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
 | **M1 · USB-C and official Puck** | Partial | Steam report and USB descriptor code cross-builds and has portable tests. Live USB/Puck enumeration and reconnect behavior are unverified. |
 | **M2 · Steam controls and motion** | Partial | Input, mapping, motion, touch, profiles, and extra-control paths exist in source; end-to-end behavior on a console and controller is unverified. |
 | **M3 · haptics and feedback** | Partial | A generation-tagged lease admits one active SC2 USB/Puck reader, rejects a second SC2 reader, and gates queue service and teardown by owner token. Host tests cover the policy; `gc_main.c`, USB output and physical haptics remain target-unverified. Multi-SC2 use is not supported. |
 | **M4 · native PS5 Bluetooth LE** | Research only | No native PS5 GAP/GATT path is proven. No HCI or radio operation has been run. See [BLE decision](docs/BLE_DECISION.md). |
 | **M5 · Edge identity and ShellUI** | Research backlog | Separate experiments; not part of the verified DualSense path. |
-| **M6 · portal and diagnostics** | Partial | Authentication and request handling have host tests. The portal uses plain HTTP and has not been validated on-console. |
+| **M6 · portal and diagnostics** | Partial | Token authentication, bounded request framing, absolute request deadlines, and diagnostics have host tests. The portal uses plain HTTP and has not been validated on-console. |
 
 Evidence labels used in the project: `VERIFIED_CODE`, `VERIFIED_HOST_TEST`, `VERIFIED_PS5_BUILD`, `VERIFIED_HARDWARE`, `UPSTREAM_CLAIM`, `EXTERNAL_HARDWARE`, `HYPOTHESIS`, and `BLOCKED`. A cross-build is not a runtime or hardware test. See the [test plan](docs/TEST_PLAN.md) and [hardware matrix](project-memory/HARDWARE_MATRIX.md) for detail.
 
@@ -70,7 +70,7 @@ make -C tests clean test
 make -C tests clean sanitize
 ```
 
-The latest recorded run passes 930 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer, including concurrent profile save/delete coverage, on-console menu save-error handling, fixed-seed parser samples, and other concurrency regressions. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
+The latest recorded run passes 938 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer, including concurrent profile save/delete coverage, on-console menu save-error handling, an absolute HTTP request deadline, fixed-seed parser samples, and other concurrency regressions. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
 ### PS5 payload cross-build
 

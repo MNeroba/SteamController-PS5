@@ -2,6 +2,8 @@
 #define WEBUI_HTTP_H
 
 #include <stddef.h>
+#include <stdint.h>
+#include <sys/types.h>
 
 #define WEBUI_HTTP_METHOD_MAX 8
 #define WEBUI_HTTP_TARGET_MAX 256
@@ -19,9 +21,31 @@ typedef struct {
     int has_content_length;
 } webui_http_request_t;
 
+typedef int (*webui_http_clock_fn)(void *context, uint64_t *now_ms);
+typedef ssize_t (*webui_http_recv_fn)(void *context, char *buffer,
+                                      size_t capacity, unsigned wait_ms);
+
+enum {
+    WEBUI_HTTP_READ_OK = 0,
+    WEBUI_HTTP_READ_MALFORMED = -1,
+    WEBUI_HTTP_READ_TOO_LARGE = -2,
+    WEBUI_HTTP_READ_TIMEOUT = -3,
+    WEBUI_HTTP_READ_IO_ERROR = -4
+};
+
 /* Returns 1 when a complete valid header block is available, 0 when more
  * bytes are needed, and -1 for malformed or unsupported input. */
 int webui_http_parse_headers(const char *data, size_t length,
                             webui_http_request_t *request);
+
+/* Read and parse one bounded request. timeout_ms is an absolute deadline from
+ * the initial monotonic-clock sample, not an inactivity timeout. The clock
+ * callback must report monotonic milliseconds; receive must honor wait_ms.
+ * Callbacks let host tests exercise production framing without the PS5 socket
+ * ABI. */
+int webui_http_read_request(void *context, webui_http_recv_fn receive,
+                            webui_http_clock_fn clock, unsigned timeout_ms,
+                            char *buffer, size_t capacity,
+                            webui_http_request_t *request, char **body);
 
 #endif

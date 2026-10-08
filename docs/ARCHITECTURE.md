@@ -82,6 +82,8 @@ The assignment dialog gate remains a separate atomic lease token containing a sl
 
 `WebControl`: nonblocking, authenticated mutations through application layer; documented schema with version, error codes, limits, profile data migrations. No raw input socket enabled in release. Avoid conflicting web ports if selected base already has them.
 
+`webui_http.c` owns bounded request framing independently of the PS5 socket ABI. The sequential portal server measures a 5-second absolute request deadline with a monotonic clock and caps each socket receive wait at 2 seconds; client activity does not restart the deadline. It returns distinct timeout, malformed, oversized, and I/O outcomes. Deterministic host tests exercise both a client that drips bytes and a receive that completes after the deadline. This addresses request-thread starvation at the framing layer; actual PS5 socket timeout behavior and portal runtime still need target validation.
+
 `HAL`: dependency injection or light function-table wrappers only where a real test/platform seam exists (clock, USB, BLE transport, socket, storage, OS virtual pad). Avoid pointless generic factories or unused backend interfaces.
 
 ## Invariants to test

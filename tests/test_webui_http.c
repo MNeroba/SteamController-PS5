@@ -28,6 +28,101 @@ static int parse(const char *wire, webui_http_request_t *request) {
     return webui_http_parse_headers(wire, strlen(wire), request);
 }
 
+typedef struct {
+    const char *wire;
+    size_t length;
+    size_t offset;
+    uint64_t now_ms;
+    unsigned max_wait_ms;
+    unsigned first_wait_ms;
+    unsigned last_wait_ms;
+} slow_request_t;
+
+static int slow_request_clock(void *context, uint64_t *now_ms) {
+    slow_request_t *source = context;
+    *now_ms = source->now_ms;
+    return 0;
+}
+
+static ssize_t slow_request_receive(void *context, char *buffer,
+                                   size_t capacity, unsigned wait_ms) {
+    slow_request_t *source = context;
+    if (wait_ms > source->max_wait_ms) source->max_wait_ms = wait_ms;
+    if (!source->first_wait_ms) source->first_wait_ms = wait_ms;
+    source->last_wait_ms = wait_ms;
+    if (!capacity || source->offset >= source->length) return 0;
+    buffer[0] = source->wire[source->offset++];
+    source->now_ms += 100;
+    return 1;
+}
+
+static ssize_t delayed_complete_request_receive(void *context, char *buffer,
+                                                size_t capacity, unsigned wait_ms) {
+    slow_request_t *source = context;
+    size_t remaining = source->length - source->offset;
+    (void)wait_ms;
+    if (remaining > capacity) return -1;
+    memcpy(buffer, source->wire + source->offset, remaining);
+    source->offset += remaining;
+    source->now_ms += 300;
+    return (ssize_t)remaining;
+}
+
+static ssize_t slow_request_body_receive(void *context, char *buffer,
+                                         size_t capacity, unsigned wait_ms) {
+    slow_request_t *source = context;
+    const char *header_end = strstr(source->wire, "\r\n\r\n");
+    size_t header_length = (size_t)(header_end - source->wire) + 4;
+    size_t remaining = source->length - source->offset;
+    size_t count = source->offset < header_length ? header_length - source->offset : 1;
+    (void)wait_ms;
+    if (count > remaining) count = remaining;
+    if (count > capacity) return -1;
+    memcpy(buffer, source->wire + source->offset, count);
+    source->offset += count;
+    source->now_ms += count == 1 ? 100 : 10;
+    return (ssize_t)count;
+}
+
+static void test_request_uses_absolute_deadline(void) {
+    static const char wire[] = "GET / HTTP/1.1\r\nHost: test\r\n\r\n";
+    slow_request_t source = {wire, sizeof(wire) - 1, 0, 0, 0, 0, 0};
+    webui_http_request_t request;
+    char buffer[128], *body = NULL;
+    int result = webui_http_read_request(&source, slow_request_receive,
+                                         slow_request_clock, 250,
+                                         buffer, sizeof(buffer), &request, &body);
+    CHECK(result == WEBUI_HTTP_READ_TIMEOUT);
+    CHECK(source.offset < source.length);
+    CHECK(source.max_wait_ms <= 250);
+    CHECK(source.last_wait_ms < source.first_wait_ms);
+}
+
+static void test_request_rejects_data_after_deadline(void) {
+    static const char wire[] = "GET / HTTP/1.1\r\nHost: test\r\n\r\n";
+    slow_request_t source = {wire, sizeof(wire) - 1, 0, 0, 0, 0, 0};
+    webui_http_request_t request;
+    char buffer[128], *body = NULL;
+    int result = webui_http_read_request(&source, delayed_complete_request_receive,
+                                         slow_request_clock, 250,
+                                         buffer, sizeof(buffer), &request, &body);
+    CHECK(result == WEBUI_HTTP_READ_TIMEOUT);
+    CHECK(source.now_ms > 250);
+}
+
+static void test_body_uses_same_absolute_deadline(void) {
+    static const char wire[] = "POST /api/profile HTTP/1.1\r\n"
+                               "Content-Length: 4\r\n\r\ntest";
+    slow_request_t source = {wire, sizeof(wire) - 1, 0, 0, 0, 0, 0};
+    webui_http_request_t request;
+    char buffer[128], *body = NULL;
+    int result = webui_http_read_request(&source, slow_request_body_receive,
+                                         slow_request_clock, 250,
+                                         buffer, sizeof(buffer), &request, &body);
+    CHECK(result == WEBUI_HTTP_READ_TIMEOUT);
+    CHECK(source.offset < source.length);
+}
+
 static void test_valid_get(void) {
     const char wire[] = "GET /api/status HTTP/1.1\r\n"
                         "Host: console.local\r\n"
@@ -158,6 +253,9 @@ static void test_token_file_lifecycle(void) {
 }
 
 int main(void) {
+    test_request_uses_absolute_deadline();
+    test_request_rejects_data_after_deadline();
+    test_body_uses_same_absolute_deadline();
     test_valid_get();
     test_valid_post_and_spacing();
     test_incomplete_headers();

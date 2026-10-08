@@ -1,5 +1,6 @@
 #include "webui_http.h"
 
+#include <errno.h>
 #include <stdint.h>
 #include <string.h>
 
@@ -156,4 +157,86 @@ int webui_http_parse_headers(const char *data, size_t length,
     if (strcmp(request->method, "GET") == 0 && request->content_length != 0) return -1;
     request->header_length = header_end;
     return 1;
+}
+
+static int remaining_timeout_ms(webui_http_clock_fn clock, void *context,
+                                uint64_t request_started_ms, unsigned timeout_ms,
+                                unsigned *remaining_ms) {
+    uint64_t now;
+    if (!clock || clock(context, &now) != 0 || now < request_started_ms)
+        return WEBUI_HTTP_READ_IO_ERROR;
+    if (now - request_started_ms >= timeout_ms) return WEBUI_HTTP_READ_TIMEOUT;
+    *remaining_ms = timeout_ms - (unsigned)(now - request_started_ms);
+    return WEBUI_HTTP_READ_OK;
+}
+
+int webui_http_read_request(void *context, webui_http_recv_fn receive,
+                            webui_http_clock_fn clock, unsigned timeout_ms,
+                            char *buffer, size_t capacity,
+                            webui_http_request_t *request, char **body) {
+    size_t got = 0, total;
+    uint64_t request_started_ms;
+    int parsed = 0, result;
+
+    if (!receive || !clock || !buffer || capacity < 2 || !request || !body ||
+        timeout_ms == 0 || clock(context, &request_started_ms) != 0)
+        return WEBUI_HTTP_READ_IO_ERROR;
+
+    while (!parsed) {
+        ssize_t n;
+        unsigned remaining;
+        if (got >= capacity - 1) return WEBUI_HTTP_READ_TOO_LARGE;
+        result = remaining_timeout_ms(clock, context, request_started_ms,
+                                      timeout_ms, &remaining);
+        if (result != WEBUI_HTTP_READ_OK) return result;
+        n = receive(context, buffer + got, capacity - 1 - got, remaining);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return WEBUI_HTTP_READ_TIMEOUT;
+            return WEBUI_HTTP_READ_IO_ERROR;
+        }
+        if (n == 0) return WEBUI_HTTP_READ_IO_ERROR;
+        if ((size_t)n > capacity - 1 - got) return WEBUI_HTTP_READ_IO_ERROR;
+        result = remaining_timeout_ms(clock, context, request_started_ms,
+                                      timeout_ms, &remaining);
+        if (result != WEBUI_HTTP_READ_OK) return result;
+        got += (size_t)n;
+        buffer[got] = '\0';
+        parsed = webui_http_parse_headers(buffer, got, request);
+        if (parsed < 0) return WEBUI_HTTP_READ_MALFORMED;
+    }
+
+    if (request->header_length > capacity - 1 ||
+        request->content_length > capacity - 1 - request->header_length)
+        return WEBUI_HTTP_READ_TOO_LARGE;
+    total = request->header_length + request->content_length;
+    if (got > total) return WEBUI_HTTP_READ_MALFORMED;
+    while (got < total) {
+        ssize_t n;
+        unsigned remaining;
+        result = remaining_timeout_ms(clock, context, request_started_ms,
+                                      timeout_ms, &remaining);
+        if (result != WEBUI_HTTP_READ_OK) return result;
+        n = receive(context, buffer + got, total - got, remaining);
+        if (n < 0) {
+            if (errno == EINTR) continue;
+            if (errno == EAGAIN || errno == EWOULDBLOCK)
+                return WEBUI_HTTP_READ_TIMEOUT;
+            return WEBUI_HTTP_READ_IO_ERROR;
+        }
+        if (n == 0) return WEBUI_HTTP_READ_IO_ERROR;
+        if ((size_t)n > total - got) return WEBUI_HTTP_READ_IO_ERROR;
+        result = remaining_timeout_ms(clock, context, request_started_ms,
+                                      timeout_ms, &remaining);
+        if (result != WEBUI_HTTP_READ_OK) return result;
+        got += (size_t)n;
+        buffer[got] = '\0';
+    }
+
+    if (memchr(buffer + request->header_length, '\0', request->content_length))
+        return WEBUI_HTTP_READ_MALFORMED;
+    *body = buffer + request->header_length;
+    (*body)[request->content_length] = '\0';
+    return WEBUI_HTTP_READ_OK;
 }

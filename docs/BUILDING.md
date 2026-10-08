@@ -29,3 +29,7 @@ The release workflow uses the same SDK version and SHA-256 check before building
 On 2026-10-08, the payload built successfully on Darwin 27.0.0 arm64 with Homebrew LLVM 18.1.8 and SDK v0.43. The output was a 64-bit x86-64 PS5 shared-object ELF; its SHA-256 is recorded in `project-memory/TEST_LOG.md` (test M1-15). The build checked compilation and SDK linker stubs only. It did not run on a PS5, verify a specific firmware, or validate USB/Puck hardware behavior.
 
 The SDK repository describes most of its files as GPL-3.0-or-later and identifies exceptions such as BSD-licensed FreeBSD headers. The SDK distribution is not included in this repository. Check the applicable source notices and corresponding-source obligations before distributing a built payload.
+
+## Latest rebuild
+
+On 2026-10-08, after the portal request-deadline change, the same SDK v0.43 / LLVM 18.1.8 command succeeded on Darwin arm64. Output: ELF64 x86-64 PIE, SHA-256 `95d58142bbbd71c1019f742c0a0dcf0c3a15b209903623302ef1c95ed5990d1f`. This confirms compilation and linking only; it is not evidence of console loading or firmware compatibility. See M1-144 in `project-memory/TEST_LOG.md`.
