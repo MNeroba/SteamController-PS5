@@ -191,3 +191,19 @@ Regression or next action:
 ```
 
 Always retain failed results and add a separate rerun record. If artifact is not physically present, never link to a guessed ELF/path.
+
+
+## M1 concurrent SC2 endpoint scanner buffers — 2026-10-08 17:10 UTC
+
+- M1-78 | Host scanner regression build | Initial `make -C tests build/test_sc2_usb_scan` failed because the host USB stubs omitted the descriptor and ioctl declarations used by `controller_sc2.c` (`usb_gen_descriptor`, `USB_GET_FULL_DESC`, and related USB flags). Added only test-host declarations; production behavior was unchanged by this harness correction.
+- M1-79 | Host scanner harness | The first fake `USB_FS_COMPLETE` callback returned success indefinitely, so the production scan loop did not terminate. Interrupted the faulty harness with Ctrl-C (exit 130), then made the fake return `EBUSY` after one completion per thread. This was a test-harness defect, not a production test result.
+- M1-80 | Expected-red regression | Ran the two-thread ioctl-stubbed endpoint scan against inherited function-static buffers. FAIL as expected (exit 1): `per-session scan buffers were contaminated: Puck=0x0 (wanted 0x81), wired=0x0`. This is a deterministic host reproduction of report overwrite, not real USB evidence.
+- M1-81 | Normal host suite | `make -C tests clean test`; Darwin 27.0 arm64, Apple clang 21.0.0, strict `-Wall -Wextra -Werror -pedantic`; PASS (exit 0). Scanner prints `SC2 concurrent USB endpoint scan buffers are isolated`; existing 873 counted assertions, 340,000 concurrent operations/snapshots and 200,000 deterministic Steam/USB parser inputs pass.
+- M1-82 | ASan/UBSan suite | `make -C tests clean sanitize`; Darwin 27.0 arm64, Apple clang 21.0.0, AddressSanitizer and UndefinedBehaviorSanitizer; PASS (exit 0) with the same 873 counted assertions, 340,000 concurrent operations/snapshots and 200,000 parser inputs. The scanner fake runs both concurrent sessions.
+- M1-83 | Scanner ThreadSanitizer | `make -C tests clean`; `make -C tests CFLAGS='-std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=thread -fno-omit-frame-pointer' build/test_sc2_usb_scan`; `./build/test_sc2_usb_scan` from `tests/`; PASS (exit 0), both reports classified independently with no TSan warning.
+- M1-84 | PS5 SDK cross-build | `make -C payload clean all PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk" LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config`; SDK v0.43, LLVM 18.1.8; PASS (exit 0), warning-free ELF64 x86-64 PIE. `shasum -a 256 payload/ghost-control-ps5.elf` = `215f2f1b73c4b08be42392421f859469d6e03a17714e8bc63505e81344f19492`; `llvm-readelf -d` lists six expected SDK libraries. This proves compile/link only, not PS5 runtime or USB behavior.
+- M1-85 | Local hygiene | `git diff --check` plus bounded Python trailing-whitespace and private-key/GitHub/AWS/bearer-token pattern scan across publishable text; PASS. No borrowed source was added.
+- CI-48 | 2026-10-08 17:10 UTC | `e77e440f11e5e91d3bf5d26a9dfdbe4ff1df5d4b` | GitHub Actions Host tests | Workflow run `37813669678`, pull_request, run 56 | QUEUED | Recheck still queued; combined status empty. No GitHub CI pass is claimed.
+- CI-49 | 2026-10-08 17:10 UTC | `e77e440f11e5e91d3bf5d26a9dfdbe4ff1df5d4b` | GitHub Actions PS5 cross-build | Workflow run `37813669565`, pull_request, run 42 | QUEUED | Recheck still queued; combined status empty. No GitHub CI pass is claimed.
+
+Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `tests/test_sc2_usb_scan.c`; baseline pinned source is Puckbridge commit `78460113ef7c48502c765a1f83ba34d53c977134`. No physical PS5, Steam Controller, DualSense or Puck was used.

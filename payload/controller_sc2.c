@@ -100,7 +100,7 @@ void sc2_input_state_reset(sc2_input_state_t *state) {
 
 int sc2_find_active_ep(int fd, struct usb_fs_endpoint *eps,
                        const uint8_t *addrs, int n, int timeout_ms) {
-    static uint8_t bufs[SC2_MAX_EPS][64];
+    uint8_t bufs[SC2_MAX_EPS][64];
     void    *bp[SC2_MAX_EPS][1];
     uint32_t bl[SC2_MAX_EPS][1];
     int opened[SC2_MAX_EPS] = {0}, started[SC2_MAX_EPS] = {0};
