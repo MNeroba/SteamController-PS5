@@ -35,6 +35,8 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 | ADR-023 | 2026-10-08 | ACCEPTED | The sequential portal request reader uses one absolute monotonic deadline per request, checks it before and after every receive, and bounds each socket wait. An idle timeout alone can be reset indefinitely by a slow client. Evidence: F055/T-P34/M1-139–147; eight deterministic host checks and full ASan/UBSan suite. |
 | ADR-024 | 2026-10-08 | ACCEPTED | Parse persisted game-hook settings with checked `strtol`, require full-value conversion, accept booleans only as 0/1 and hook mode only in range. Malformed fields retain safe defaults; numeric out-of-range mode preserves its prior fallback to 1. Evidence: F056/T-P35/M1-148–154; four production-code settings checks and the existing concurrency test. |
 | ADR-025 | 2026-10-08 | ACCEPTED | Bound portal response writes with one five-second absolute monotonic deadline spanning all header/body chunks; cap each blocking socket send wait at two seconds. A per-call send timeout does not bound the loop when each partial write makes progress. Evidence: F057/T-P36/M1-156–161; seven production framing checks plus full ASan/UBSan suite. |
+| ADR-026 | 2026-10-08 | ACCEPTED | Match complete portal routes and query keys exactly, with allowlists, bounded copies, explicit methods and strict action values. Evidence: F058/T-P37/M1-163–168; 54 route checks. |
+| ADR-027 | 2026-10-08 | ACCEPTED | Treat a supplied Origin as defense in depth: require it to match the unique HTTP Host while keeping it optional for non-browser clients and preserving bearer authorization as the `/api/` gate. Require profile POST to include a nonzero Content-Length, nonblank body and declared `text/plain;charset=UTF-8`; other no-body POST actions are unchanged. Evidence: F059/T-P38/M1-172–176; 27 new HTTP checks, 1030 full checks and SDK cross-build. |
 
 ## ADR-015 — Per-invocation SC2 endpoint scan buffers
 
@@ -156,3 +158,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: adding API routes or parameter values now requires updating the route schema and tests. Percent-encoded or future arbitrary-text query values are rejected until their decoding and validation rules are deliberately specified.
 - Verification gate: 54 route assertions and full 1003-check normal and ASan/UBSan suites pass; SDK v0.43 compile/link succeeds. The host tests exercise the production route module, not the live socket-to-handler path. Browser behavior, PS5 socket integration and hardware remain unverified.
 - Reconsider only when introducing a route that needs a documented encoding/value schema, and retain exact path/key matching.
+
+
+## ADR-027 — Validate portal Origin and profile request bodies
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: the pinned HTTP parser treated a POST without Content-Length as a zero-byte body and ignored Content-Type and Origin. The profile route then parsed an empty string into the existing or default profile, saved it and returned success. The derivative already requires a private bearer token for `/api/`, so this was request-contract correctness and defense-in-depth work, not an authentication bypass.
+- Evidence: Puckbridge pin `78460113ef7c48502c765a1f83ba34d53c977134`, `payload/webui.c:194-202`; derivative `payload/webui_http.c:157-243`, `payload/webui.c:161-187,284-297`; `tests/test_webui_http.c`; F059/T-P38/M1-172–176.
+- Decision: parse bounded unique Host, Origin and Content-Type fields. If Origin is present, require `http://` plus the request Host, comparing ASCII case-insensitively; allow no Origin for non-browser clients and keep bearer authorization as the primary API gate. Require `/api/profile` POST to include explicit nonzero Content-Length, nonblank content and declared `text/plain;charset=UTF-8`.
+- Tradeoff: clients behind a host-rewriting proxy or using another profile media type will be rejected. The portal remains plain HTTP; this change does not encrypt the bearer token or provide browser/console runtime evidence.
+- Verification gate: 27 new request-policy checks pass in normal and ASan/UBSan suites; full suite passes 1030 checks; SDK v0.43/LLVM 18.1.8 compile/link passes. Live browser/socket-to-handler and physical PS5 validation remain required.
+- Reconsider if the portal gains a documented HTTPS/reverse-proxy mode or needs a different profile upload media type.
