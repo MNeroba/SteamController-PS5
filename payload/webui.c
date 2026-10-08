@@ -15,6 +15,7 @@
 #include "webui_auth.h"
 #include "webui_http.h"
 #include "webui_route.h"
+#include "webui_peer_policy.h"
 #include "webui_json.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -429,8 +430,16 @@ static void *server_thread(void *arg) {
     }
     LOG("webui: listening on :%d\n", WEBUI_PORT);
     for (;;) {
-        int c = accept(s, NULL, NULL);
+        struct sockaddr_in peer;
+        socklen_t peer_length = sizeof(peer);
+        int c = accept(s, (struct sockaddr *)&peer, &peer_length);
         if (c < 0) { usleep(100000); continue; }
+        if (peer_length < sizeof(peer) || peer.sin_family != AF_INET ||
+            !webui_peer_ipv4_is_lan(peer.sin_addr.s_addr)) {
+            LOG("webui: rejected peer outside local IPv4 ranges\n");
+            close(c);
+            continue;
+        }
 #ifdef SO_NOSIGPIPE
         int no_sigpipe = 1;
         setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
