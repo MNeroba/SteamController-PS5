@@ -1,43 +1,149 @@
 # SteamController-PS5
 
-A Steam Controller 2026 focused PS5 payload project. This repository uses the pinned [PuckbridgePS5](https://github.com/ThisIsAkill/PuckbridgePS5) source tree as its implementation foundation because it contains the Steam USB/Puck report path and PS5 virtual-controller integration. The selection rationale and limits are in [ADR-001](docs/BASE_SELECTION_ADR.md).
+<p align="center">
+  <strong>Use the Steam Controller 2026 as a virtual DualSense on PS5.</strong><br>
+  USB-C and the official Valve Puck are the primary targets.
+</p>
 
-## Development status
+<p align="center">
+  <a href="LICENSE"><img alt="License: GPL-3.0-or-later" src="https://img.shields.io/badge/license-GPL--3.0--or--later-blue.svg"></a>
+  <img alt="Project status: in development" src="https://img.shields.io/badge/status-in%20development-orange.svg">
+  <img alt="PS5 hardware: not verified" src="https://img.shields.io/badge/PS5%20hardware-not%20verified-lightgrey.svg">
+  <img alt="BLE: research only" src="https://img.shields.io/badge/native%20BLE-research%20only-lightgrey.svg">
+</p>
 
-The imported code contains Steam Controller report handling, profiles, motion, touchpad mapping, haptics, a virtual DualSense path, and optional game integration. These are source capabilities inherited from PuckbridgePS5; they have not yet been independently validated on PS5 hardware in this project. See [the test plan](docs/TEST_PLAN.md), [project memory](project-memory/PROJECT_MEMORY.md), and the hardware matrix.
+> **Development project — not a verified release.** The source has passed portable host tests and a PS5 SDK cross-build. No physical PS5, Steam Controller, DualSense, or Puck was available for runtime testing. Firmware compatibility and gameplay support are therefore **not claimed**.
 
-USB-C and the official Puck are the first target. Native PS5 Bluetooth LE is research-only and has no compatibility claim. Its evidence gates are recorded in [BLE decision](docs/BLE_DECISION.md).
+SteamController-PS5 is a focused payload project for carrying Steam Controller input into the PS5 controller stack. It builds on the Steam USB/Puck and virtual-controller work in PuckbridgePS5, while extracting reusable protocol, mapping, motion, session, and lifecycle code for independent host testing.
 
-## Portal security
+## Project status
 
-The portal listens on TCP port 8090. On first startup it generates a random token in `/data/ghostpad/webui.token` with file mode `0600` and secures `/data/ghostpad` to mode `0700`. The browser asks for this token before making API requests and keeps it in tab-scoped session storage. Retrieve the file through local console file access and do not post the token in logs or public issue reports. To rotate it, stop the payload, delete the token file, and restart.
+| Area | Progress | What the evidence says |
+|---|---|---|
+| **M0 · foundation and licensing** | Complete | PuckbridgePS5 was selected after a pinned source comparison with OmniPad-PS5. See [ADR-001](docs/BASE_SELECTION_ADR.md) and [provenance](docs/PROVENANCE.md). |
+| **P0 · safety and architecture** | In progress | Host-tested input parsing, exact authenticated portal routes, bounded requests, local IPv4 peer filtering, session/slot lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
+| **M1 · USB-C and official Puck** | Partial | Steam report and USB descriptor code cross-builds and has portable tests. Live USB/Puck enumeration and reconnect behavior are unverified. |
+| **M2 · Steam controls and motion** | Partial | Input, mapping, motion, touch, profiles, and extra-control paths exist in source; end-to-end behavior on a console and controller is unverified. |
+| **M3 · haptics and feedback** | Partial | A generation-tagged lease admits one active SC2 USB/Puck reader, rejects a second SC2 reader, and gates queue service and teardown by owner token. Host tests cover the policy; `gc_main.c`, USB output and physical haptics remain target-unverified. Multi-SC2 use is not supported. |
+| **M4 · native PS5 Bluetooth LE** | Research only | No native PS5 GAP/GATT path is proven. No HCI or radio operation has been run. See [BLE decision](docs/BLE_DECISION.md). |
+| **M5 · Edge identity and ShellUI** | Research backlog | Separate experiments; not part of the verified DualSense path. |
+| **M6 · portal and diagnostics** | Partial | Token authentication, strict route/query parsing, bounded request framing, absolute request/response deadlines, and diagnostics have host tests. The portal uses plain HTTP and has not been validated on-console. |
 
-The portal currently uses plain HTTP. Use it only on a trusted local network; bearer tokens can be observed by an active network intermediary. Do not expose port 8090 to the public internet.
+Evidence labels used in the project: `VERIFIED_CODE`, `VERIFIED_HOST_TEST`, `VERIFIED_PS5_BUILD`, `VERIFIED_HARDWARE`, `UPSTREAM_CLAIM`, `EXTERNAL_HARDWARE`, `HYPOTHESIS`, and `BLOCKED`. A cross-build is not a runtime or hardware test. See the [test plan](docs/TEST_PLAN.md) and [hardware matrix](project-memory/HARDWARE_MATRIX.md) for detail.
 
-Game-process input merging and game-driven vibration hooks are disabled by default. Enable them explicitly in the portal; the regular virtual DualSense path remains available without game hooks. The selected title change now requests removal of the prior game's hooks, but process-exit rollback and PS5 runtime behavior still require platform validation.
+## What it is designed to do
 
-## Build and host tests
+- Focus on **Steam Controller 2026**, rather than being a generic controller hub.
+- Start with direct USB-C and the official Valve Puck.
+- Preserve Steam-specific motion, touch, rear controls, and feedback in the input model, even where the PS5 output path cannot expose every capability.
+- Use a shared controller/session architecture and the normal virtual DualSense path as the default output.
+- Keep transport, Steam report decoding, mapping, and PS5-specific integration in separate, testable layers.
 
-PS5 payload build requires a compatible `ps5-payload-sdk` checkout configured through `PS5_PAYLOAD_SDK`:
+Native Bluetooth LE is a gated research track, not a supported connection method. Do not reset, claim, or take over the PS5's internal Bluetooth radio. Do not risk the stock DualSense to test speculative APIs.
 
-```sh
-export PS5_PAYLOAD_SDK=/path/to/ps5-payload-sdk
-make -C payload
+## Architecture
+
+```mermaid
+flowchart LR
+    SC[Steam Controller 2026] --> USB[USB-C / official Puck adapter]
+    USB --> PROTO[Steam protocol decoder]
+    PROTO --> SESSION[Session and extended input state]
+    SESSION --> MAP[Mapping · motion · touch]
+    MAP --> SLOT[Slot and user lifecycle]
+    SLOT --> PAD[Virtual DualSense backend]
+    GAME[Game feedback] --> FEEDBACK[Feedback encoder]
+    FEEDBACK --> USB
+    WEB[Portal] --> API[Authenticated control API]
+    API --> SESSION
 ```
 
-Portable protocol, descriptor, portal security/JSON, mapping, motion-math, and feedback-encoding tests run without the PS5 SDK:
+The boundaries and ownership rules are documented in [Architecture](docs/ARCHITECTURE.md). The active code is still a staged derivative; this diagram describes the target architecture and is not a claim that every connection is complete.
+
+## Build and test
+
+### Portable host tests
+
+The host test suite does not need the PS5 SDK:
 
 ```sh
-make -C tests sanitize
+make -C tests clean test
+make -C tests clean sanitize
 ```
 
-The latest ASan/UBSan run passes 344 assertions. These host tests do not build or exercise the PS5 adapter and do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility. The current environment has no configured PS5 SDK or physical console. A missing hardware test is reported as blocked, not as a compatibility failure or pass.
+The latest recorded run passes 1048 numbered checks under AddressSanitizer and UndefinedBehaviorSanitizer. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, rejection of empty or incorrectly declared profile bodies, and an IPv4 peer-scope policy. Targeted ThreadSanitizer runs also pass for the recorded concurrency tests. These tests use host code and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
-## Source pins and attribution
+### PS5 payload cross-build
 
-- PuckbridgePS5 foundation: `78460113ef7c48502c765a1f83ba34d53c977134`.
-- OmniPad-PS5 comparison reference: `b7682efce18ee0a8d7c80bbc90afbce72151ef96`; no OmniPad source is imported.
-- The project retains PuckbridgePS5's GPL license, source notices, and PoorDS4 attribution. See [provenance](docs/PROVENANCE.md).
-- The upstream README credits its inline portal controller drawing to Akhil Moola and declares the project GPL-3.0-or-later; it has no separate artwork notice. The handoff image `steam-controller.jpg` is not used by the payload and is excluded from Git.
+The build uses the community [ps5-payload-dev SDK](https://github.com/ps5-payload-dev/sdk) v0.43 and LLVM 18. The SDK archive is checked against SHA-256 `a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb`. The commands below are the recorded macOS/Homebrew setup; `.build-cache/` is ignored by Git.
 
-This repository is distributed under GPL-3.0-or-later; see [LICENSE](LICENSE). The original upstream README is retained at [README.upstream.puckbridge.md](README.upstream.puckbridge.md), and the project starter README is retained at [docs/PROJECT_STARTER_README.md](docs/PROJECT_STARTER_README.md).
+```sh
+brew install llvm@18
+export LLVM_CONFIG="$(brew --prefix llvm@18)/bin/llvm-config"
+
+mkdir -p .build-cache/ps5-payload-sdk-v0.43
+curl -fL -o .build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk.zip \
+  https://github.com/ps5-payload-dev/sdk/releases/download/v0.43/ps5-payload-sdk.zip
+printf '%s  %s\n' \
+  a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb \
+  .build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk.zip | shasum -a 256 -c
+unzip -q -o .build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk.zip \
+  -d .build-cache/ps5-payload-sdk-v0.43
+
+export PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk"
+make -C payload clean all
+file payload/ghost-control-ps5.elf
+shasum -a 256 payload/ghost-control-ps5.elf
+```
+
+The latest local build used Darwin arm64, Homebrew LLVM 18.1.8, and SDK v0.43. It produced an ELF64 x86-64 payload and linked against the expected SDK libraries. This verifies compilation and linking only. It does **not** verify firmware compatibility, loading, or operation on a PS5. More detail is in [the build record](docs/BUILDING.md).
+
+## Load on a development console
+
+There is no persistent installer or supported release package yet. The payload Makefile has a `deploy` target that streams the built ELF to a TCP listener; it does not install system files:
+
+```sh
+make -C payload deploy PS5_HOST=192.168.1.50 PORT=9021
+```
+
+Use this only when you have independently confirmed that your **development** console, firmware, and payload loader support this ELF and the loader is listening on the selected port. Port `9021` is the inherited Makefile default, not a compatibility guarantee. This project's deploy path has not been tested on a physical PS5. Do not use this as an installation recipe for a stock console or infer support for firmware 13.60 from upstream claims.
+
+If the payload starts and its portal is available, it listens at `http://<PS5-IP>:8090`. The server accepts loopback, RFC1918 private, and IPv4 link-local peers only; public IPv4 peers and IPv6 are rejected. The portal token is stored at `/data/ghostpad/webui.token`; retrieve it through trusted local console access. Portal traffic is plain HTTP, so use it only on a trusted local network and never expose the port to the public internet. API requests still require the bearer token. See the P0 web-security requirements in [CODEX_TASK.md](CODEX_TASK.md) and the repository's [security issue list](project-memory/ISSUES.md).
+
+## Repository map
+
+| Path | Purpose |
+|---|---|
+| [`payload/`](payload/) | Payload, PS5 adapter, Steam protocol/mapping modules, portal and web assets |
+| [`tests/`](tests/) | Portable tests, host SDK stubs, and sanitizer targets |
+| [`docs/`](docs/) | Architecture, source evidence, build, licensing, BLE gates, and test plan |
+| [`project-memory/`](project-memory/) | Append-only findings, decisions, issues, test/session logs, and hardware matrix |
+| [`CODEX_TASK.md`](CODEX_TASK.md) | Full development specification and milestones |
+| [`AGENTS.md`](AGENTS.md) | Repository workflow, safety, provenance, and evidence requirements |
+| [`CONTRIBUTING.md`](CONTRIBUTING.md) | External contribution and pull request requirements |
+| [`.github/pull_request_template.md`](.github/pull_request_template.md) | Pull request checklist |
+
+## Contributing
+
+Small, reviewable contributions are welcome. Before a significant feature or architecture change, open an issue to discuss scope and evidence. Read [CONTRIBUTING.md](CONTRIBUTING.md), keep each PR focused, include the exact checks you ran, and mark unavailable hardware checks `NOT_RUN` with the reason. Preserve upstream notices and add a provenance entry before importing third-party code.
+
+Do not submit secrets, console identifiers, Bluetooth addresses/bonding material, firmware files, confidential Sony SDK content, or unlicensed assets. Do not perform active native-radio experiments, firmware/system writes, or other irreversible console operations as part of a PR.
+
+## Upstream work and thanks
+
+This repository is a derivative of [PuckbridgePS5](https://github.com/ThisIsAkill/PuckbridgePS5), pinned for the foundation audit at [`78460113ef7c48502c765a1f83ba34d53c977134`](https://github.com/ThisIsAkill/PuckbridgePS5/commit/78460113ef7c48502c765a1f83ba34d53c977134). Its Steam Controller and virtual DualSense implementation made this project possible; inherited copyright and license notices are retained.
+
+Thanks to:
+
+- [ThisIsAkill and PuckbridgePS5 contributors](https://github.com/ThisIsAkill/PuckbridgePS5) for the Steam Controller PS5 foundation.
+- [StonedModder and Ghostcontrol](https://github.com/srbraboo/Ghostcontrol-PS5-USB-Controller-Patcher) for the virtual-controller groundwork used upstream.
+- [ItsBlurf and PoorDS4](https://github.com/ItsBlurf/PoorDS4); the imported bridge files carry their detailed attribution in [`payload/bridge/NOTICE.md`](payload/bridge/NOTICE.md).
+- [OmniPad-PS5](https://github.com/diegobarbosaa/OmniPad-PS5) for a comparison point on slots and lifecycle design. **No OmniPad code is imported.**
+- The maintainers of [SteamlessController](https://github.com/ddeverill/SteamlessController), [SDL](https://github.com/libsdl-org/SDL), Linux [`hid-steam`](https://github.com/torvalds/linux/tree/master/drivers/hid), [OpenPuck](https://github.com/safijari/openpuck), and [SteamlessLink](https://github.com/reo101/SteamlessLink) for public protocol research and references. These are references; their code is not represented as imported here.
+- [ps5-payload-dev](https://github.com/ps5-payload-dev/sdk) for the community build SDK.
+- Akhil Moola for the upstream portal controller illustration, and the creators of [Xelu's Free Controller Prompts](https://thoseawesomeguys.com/prompts/) for button prompt icons. See [provenance](docs/PROVENANCE.md) for asset and license notes.
+
+The comparison and attribution register is in [`docs/PROVENANCE.md`](docs/PROVENANCE.md). OmniPad is a read-only comparison reference; no OmniPad code was imported. The project is distributed under **GPL-3.0-or-later**; see [`LICENSE`](LICENSE).
+
+---
+
+<p align="center"><sub>Built carefully, with evidence. Hardware compatibility will be claimed only after hardware tests.</sub></p>

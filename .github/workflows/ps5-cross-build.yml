@@ -1,0 +1,47 @@
+name: PS5 cross-build
+
+on:
+  pull_request:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    env:
+      SDK_VERSION: v0.43
+      SDK_SHA256: a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install LLVM 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 llvm-18 unzip
+
+      - name: Install ps5-payload-sdk
+        run: |
+          curl -fsSL -o sdk.zip \
+            "https://github.com/ps5-payload-dev/sdk/releases/download/${SDK_VERSION}/ps5-payload-sdk.zip"
+          printf '%s  %s\n' "$SDK_SHA256" sdk.zip | sha256sum --check
+          unzip -q sdk.zip -d "$RUNNER_TEMP"
+          echo "PS5_PAYLOAD_SDK=$RUNNER_TEMP/ps5-payload-sdk" >> "$GITHUB_ENV"
+
+      - name: Build PS5 payload
+        working-directory: payload
+        run: |
+          python3 gen_html.py
+          make clean
+          make
+          sha256sum ghost-control-ps5.elf | tee ghost-control-ps5.elf.sha256
+
+      - name: Upload cross-build artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: ghost-control-ps5-cross-build
+          path: |
+            payload/ghost-control-ps5.elf
+            payload/ghost-control-ps5.elf.sha256

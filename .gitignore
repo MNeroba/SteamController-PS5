@@ -1,0 +1,6 @@
+*.elf
+*.o
+.DS_Store
+tests/build/
+/.build-cache/
+steam-controller.jpg
