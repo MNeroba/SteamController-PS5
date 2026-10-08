@@ -59,6 +59,10 @@
 | CI-12 | 2026-10-08 14:06 UTC | `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c` | GitHub Actions PS5 cross-build | Workflow run `37789382717` (`pull_request`) | QUEUED | Job remained queued at recheck; no logs or conclusion available. |
 | CI-13 | 2026-10-08 14:06 UTC | `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c` | GitHub Actions Host tests | Workflow run `37789373824` (`push`) | QUEUED | Job remained queued at recheck; no logs or conclusion available. |
 | CI-14 | 2026-10-08 14:06 UTC | `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c` | GitHub Actions PS5 cross-build | Workflow run `37789374156` (`push`) | QUEUED | Job remained queued at recheck; no logs or conclusion available. |
+| CI-15 | 2026-10-08 14:08 UTC | `014f418ade3c7d09655ed302b09cf9a4d0e508fc` | GitHub Actions Host tests | Workflow run `37789861487` (`push`) | QUEUED | Job remained queued at check; no logs or conclusion available. |
+| CI-16 | 2026-10-08 14:08 UTC | `014f418ade3c7d09655ed302b09cf9a4d0e508fc` | GitHub Actions PS5 cross-build | Workflow run `37789861783` (`push`) | QUEUED | Job remained queued at check; no logs or conclusion available. |
+| CI-17 | 2026-10-08 14:08 UTC | `014f418ade3c7d09655ed302b09cf9a4d0e508fc` | GitHub Actions Host tests | Workflow run `37789868606` (`pull_request`) | QUEUED | Job remained queued at check; no logs or conclusion available. |
+| CI-18 | 2026-10-08 14:08 UTC | `014f418ade3c7d09655ed302b09cf9a4d0e508fc` | GitHub Actions PS5 cross-build | Workflow run `37789868667` (`pull_request`) | QUEUED | Job remained queued at check; no logs or conclusion available. |
 
 ### New entry template
 

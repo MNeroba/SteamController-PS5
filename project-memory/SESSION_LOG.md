@@ -156,3 +156,9 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Published memory/provenance sync commit `78bcf3d840dd53b7f5c2c92e0c0b40612d3a6d6c` on top of `65cd4f918f56fb2c547217e008f6b81c17853c04`; the PR remained open, draft and mergeable.
 - Rechecked GitHub Actions for head `78bcf3d`: Host PR `37789382680`, PS5 cross-build PR `37789382717`, Host push `37789373824`, and cross-build push `37789374156` all remained queued with unchanged timestamps and no logs. Treat this as CI queue delay, not a pass or a code failure; do not repeatedly poll without new evidence.
 - Next: resume source review or wait for a meaningful workflow status change; physical PS5/Steam Controller/Puck gates remain blocked by hardware availability.
+
+## M1 latest CI queue snapshot — 2026-10-08 14:08 UTC
+
+- Memory-only CI snapshot commit `014f418ade3c7d09655ed302b09cf9a4d0e508fc` was the PR head at check time; GitHub reported PR #1 open, draft, and mergeable.
+- Four latest runs were created and remained queued: Host push `37789861487`, PS5 cross-build push `37789861783`, Host PR `37789868606`, and PS5 cross-build PR `37789868667`. No job logs or conclusions were available. Older queued runs for prior heads remain historical and are not treated as current pass/fail evidence.
+- Next: wait for an actual workflow status change before polling again; the same local 446-check ASan/UBSan suite and SDK v0.43 cross-build pass, while GitHub execution is still pending and hardware remains unavailable.
