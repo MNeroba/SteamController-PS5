@@ -493,6 +493,15 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - No physical PS5, Puck, Steam Controller or DualSense was available. No BLE/HCI/radio or firmware operation was run. USB kernel behavior remains unverified and no binary was released.
 
 
+## M1-193f source publication and exact-tree verification — 2026-10-08 20:38 UTC
+
+- Published the M1-193 USB COMPLETE endpoint-accounting and tracked OUT-lifecycle implementation directly to `main` as `1082dad728d6d769b9e5ada1dcdf88df0357e8b1` (parent `3320e8d757f78c9056b8b5c6dd6812107a809e81`, tree `dfb41cd6c13c520cc79cbaa24ded1ee288b24e8c`). The update used the expected prior head with `force=false`; GitHub acknowledged the new commit and the `main` ref now points to it.
+- GitHub recursive-tree verification returned 209 entries/196 blobs, `truncated=false`; all 196 local paths and blob hashes match exactly, with no missing or extra files. `payload/gc_main.c`, `payload/controller_sc2.c`, `payload/sc2_haptics.c`, `payload/slot_registry.c`, and `payload/steam_protocol.c` are present in the published tree. All 25 uploaded/changed blob IDs matched local Git object hashes.
+- M1-193 normal host tests and ASan/UBSan each pass 1123 checks; pinned SDK v0.43 compile/link passes with ELF SHA-256 `52f43e080aa171e9290441b10fe503f4a39bc8b8aac36f17bd61655145edcb22`; `git diff --check` passed before publication. These do not verify PS5 runtime or hardware behavior.
+- GitHub Actions push runs `37840779701` (PS5 cross-build) and `37840779559` (Host tests) are queued; combined status is empty. No CI pass is claimed. PR #1 is closed unmerged; no history rewrite or binary release.
+- The owner restated the first destructive commit as `9235825db8425e4bb335396fcc38e83daf3c3aa7`, directly after `e2059116442e0d195b8aacb9b4baf4eb13737e3e`, with 189 changed paths, 183 removals, and 43,543 deleted lines. Existing F063 and M1-192/M1-193 already retain those details; the proposed faulty tree-construction mechanism remains unproven.
+
+
 ## M1-190 validation-memory publication — 2026-10-08 20:11 UTC
 
 - Published the clean-tree build record and final recovery/memory synchronization directly to `main` as commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84`, parent `0f122c64eff0b196ba023c75af9a61ba1cc9514a`, tree `e03ee1fab971b0f1dd3430923925f485fb81e385`. Six changed file blobs matched their local Git object IDs; GitHub recursive tree still contains exactly the 195 local paths/modes/blobs.

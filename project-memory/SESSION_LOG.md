@@ -605,3 +605,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - M1-193 normal and ASan/UBSan suites both pass 1123 counted checks; SDK v0.43 cross-build passes (ELF SHA-256 `52f43e080aa171e9290441b10fe503f4a39bc8b8aac36f17bd61655145edcb22`); `git diff --check` passes. Exact commands and limits are in `TEST_LOG.md`.
 - Before source publication, GitHub `main` is `3320e8d757f78c9056b8b5c6dd6812107a809e81`; local Git HEAD is pinned upstream Puckbridge `78460113ef7c48502c765a1f83ba34d53c977134`, not a descendant of main. Publish with guarded Git Data API update after verifying the full tree, and record the GitHub-acknowledged SHA.
 - No PS5/Puck/controller hardware, BLE/HCI/radio or firmware operations were used. Next safe audit after publication: route the remaining direct but state-tracked multiplexed scan operations in `payload/controller_sc2.c::sc2_find_active_ep()` through an injectable platform seam without changing its multi-endpoint COMPLETE semantics. Hardware runtime remains a separate gate.
+
+
+## M1-193 publication reconciliation — 2026-10-08 20:38 UTC
+
+- Published the M1-193 source directly to GitHub `main` as `1082dad728d6d769b9e5ada1dcdf88df0357e8b1` (parent `3320e8d757f78c9056b8b5c6dd6812107a809e81`, tree `dfb41cd6c13c520cc79cbaa24ded1ee288b24e8c`) using the prior head as an expected-head guard and `force=false`.
+- Re-fetched GitHub `main` and the recursive tree after the update. The ref acknowledges the published SHA; the tree contains 196 blobs/209 entries and exactly matches the complete local manifest, including the five core payload files previously called out. All 25 uploaded/changed blobs match local Git object IDs.
+- Actions push runs `37840779701` (PS5 cross-build) and `37840779559` (Host tests) are queued. Combined status is empty, so no CI pass is claimed. Local host/sanitizer and cross-build evidence remains as recorded in M1-193; PS5/controller/Puck hardware, BLE, radio, and firmware runtime were not exercised.
+- The owner's correction is retained in F063 and M1-192/M1-193: `9235825` is the first destructive commit after `e2059116`, and its incomplete-tree mechanism remains unproven. No history was rewritten; direct-to-main remains the owner-requested workflow until the first successful release.
+- Next safe work: audit and introduce test injection for `payload/controller_sc2.c::sc2_find_active_ep()` while retaining multiplexed endpoint completion and tracked cleanup semantics. Physical-hardware validation remains blocked on access to the PS5, SC 2026, DualSense, and official Puck.
