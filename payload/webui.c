@@ -24,6 +24,7 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <time.h>
 #include <netinet/in.h>
 
 #ifdef __PROSPERO__
@@ -52,6 +53,7 @@ static void reply(int fd, int code, const char *type, const char *body, size_t n
     const char *reason = code == 200 ? "OK" : code == 401 ? "Unauthorized" :
                          code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" :
                          code == 413 ? "Payload Too Large" :
+                         code == 408 ? "Request Timeout" :
                          code == 500 ? "Internal Server Error" : "Bad Request";
     int hl = snprintf(h, sizeof(h),
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n"
@@ -109,55 +111,27 @@ static void list_cb(const char *id, const char *name, void *u) {
     sb_put(s, ",\"name\":"); json_str(s, name); sb_put(s, "}");
 }
 
-static int read_http_request(int fd, char *req, webui_http_request_t *request,
-                             char **body) {
-    size_t got = 0, total;
-    int parsed = 0;
-    while (!parsed) {
-        ssize_t r;
-        if (got >= REQ_MAX) {
-            REPLY_TXT(fd, 400, "request headers too large");
-            return -1;
-        }
-        r = recv(fd, req + got, REQ_MAX - got, 0);
-        if (r <= 0) {
-            if (got) REPLY_TXT(fd, 400, "incomplete request");
-            return -1;
-        }
-        got += (size_t)r;
-        req[got] = '\0';
-        parsed = webui_http_parse_headers(req, got, request);
-        if (parsed < 0) {
-            REPLY_TXT(fd, 400, "malformed request");
-            return -1;
-        }
-    }
+#define WEBUI_REQUEST_TIMEOUT_MS 5000u
+#define WEBUI_IDLE_TIMEOUT_MS 2000u
 
-    total = request->header_length + request->content_length;
-    if (total > REQ_MAX) {
-        REPLY_TXT(fd, 413, "request too large");
+static ssize_t webui_socket_receive(void *context, char *buffer, size_t capacity,
+                                    unsigned wait_ms) {
+    int fd = *(int *)context;
+    struct timeval timeout;
+    if (wait_ms == 0) { errno = EAGAIN; return -1; }
+    if (wait_ms > WEBUI_IDLE_TIMEOUT_MS) wait_ms = WEBUI_IDLE_TIMEOUT_MS;
+    timeout.tv_sec = (time_t)(wait_ms / 1000u);
+    timeout.tv_usec = (suseconds_t)(wait_ms % 1000u) * 1000;
+    if (setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, &timeout, sizeof(timeout)) != 0)
         return -1;
-    }
-    if (got > total) {
-        REPLY_TXT(fd, 400, "unexpected bytes after request body");
-        return -1;
-    }
-    while (got < total) {
-        ssize_t r = recv(fd, req + got, total - got, 0);
-        if (r < 0 && errno == EINTR) continue;
-        if (r <= 0) {
-            REPLY_TXT(fd, 400, "incomplete request body");
-            return -1;
-        }
-        got += (size_t)r;
-    }
-    req[got] = '\0';
-    *body = req + request->header_length;
-    if (memchr(*body, '\0', request->content_length) != NULL) {
-        REPLY_TXT(fd, 400, "binary request body is not supported");
-        return -1;
-    }
-    (*body)[request->content_length] = '\0';
+    return recv(fd, buffer, capacity, 0);
+}
+
+static int webui_monotonic_ms(void *context, uint64_t *now_ms) {
+    struct timespec now;
+    (void)context;
+    if (!now_ms || clock_gettime(CLOCK_MONOTONIC, &now) != 0) return -1;
+    *now_ms = (uint64_t)now.tv_sec * 1000u + (uint64_t)now.tv_nsec / 1000000u;
     return 0;
 }
 
@@ -168,8 +142,23 @@ static void handle(int fd) {
     char *path;
     char id[SC2_ID_MAX + 1];
     int is_post;
+    int read_result;
 
-    if (read_http_request(fd, req, &request, &body) != 0) return;
+    read_result = webui_http_read_request(&fd, webui_socket_receive,
+                                         webui_monotonic_ms,
+                                         WEBUI_REQUEST_TIMEOUT_MS,
+                                         req, sizeof(req), &request, &body);
+    if (read_result != WEBUI_HTTP_READ_OK) {
+        if (read_result == WEBUI_HTTP_READ_TIMEOUT)
+            REPLY_TXT(fd, 408, "request timed out");
+        else if (read_result == WEBUI_HTTP_READ_TOO_LARGE)
+            REPLY_TXT(fd, 413, "request too large");
+        else if (read_result == WEBUI_HTTP_READ_MALFORMED)
+            REPLY_TXT(fd, 400, "malformed request");
+        else
+            REPLY_TXT(fd, 400, "incomplete request");
+        return;
+    }
     path = request.target;
     is_post = strcmp(request.method, "POST") == 0;
     if (!webui_auth_path_allows(path, request.authorization, g_webui_token)) {
