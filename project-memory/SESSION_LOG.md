@@ -80,3 +80,25 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Current PR head is mergeable and draft. GitHub Actions Host tests run `37782987424` is queued; no workflow conclusion is available yet.
 - Test record M1-06: `make -C tests clean sanitize` PASS, 370 checks. The profile parser is host-compiled with stubs for target game lookup; the PS5 adapter, saved-profile integration, and hardware remain unverified.
 - Next: inspect CI result. Keep the PR draft until PS5 SDK and physical USB/Puck/controller tests can be performed; BLE remains gated and untouched.
+
+## M1 memory/provenance branch synchronization — 2026-10-08 13:17 UTC
+
+- Updated the GitHub draft branch with current profile-parser publication, test records, and provenance in docs-only commit `afeb258a6ddb5c607b78dc9a481edccf1b3ff254` (parent `cf225f48f0f38e86101f4f6d2993edbe47347c58`). PR #1 remains open, mergeable, and draft.
+- The docs commit triggered Host tests run `37783171488`; its job is queued and has no logs or conclusion. Earlier queued runs also had no result at inspection.
+- The local project memory now records this branch head and latest queue state. Continue monitoring for a real CI conclusion; do not describe queued CI as passing.
+
+## M1 profile parser concurrency audit — 2026-10-08 13:21 UTC
+
+- Source finding: `sc2_profile_parse` can run from the profile watcher and authenticated portal on separate threads. Its `parse_combo` helper used process-global `strtok` state, which could interleave tokens across concurrent profile parses.
+- Change: replaced `strtok` with a bounded tokenizer whose cursor and buffer are local to each call; added a four-thread regression stress test using four distinct profile mappings, 5,000 parses per thread.
+- Test authoring note: the first draft used the wrong expected constant for the persisted `CREATE` alias; corrected the fixture to match parser/serializer output before recording the passing run.
+- Validation: `make -C tests clean sanitize` PASS, 374 checks (profile parser 30) under ASan/UBSan on Darwin 27.0.0 arm64, Apple clang 21.0.0. This is not ThreadSanitizer and does not build/test the PS5 profile watcher or portal integration.
+- Current publication state: the source/test fix is not yet published; PR #1 remains at `afeb258a6ddb5c607b78dc9a481edccf1b3ff254`, and Host tests run `37783171488` is queued with no conclusion.
+- Next: publish the parser/test and count/memory updates to the existing draft PR; inspect the resulting Actions status without promoting the PR or claiming target verification.
+
+## M1 profile parser concurrency publication — 2026-10-08 13:24 UTC
+
+- Published `payload/sc2_profile.c`, its concurrent regression test, architecture/test-plan updates, and public README count to PR #1 in commit `ade3a334d4af408102c7b149e01dd3cc087fbc1a` (parent `afeb258a6ddb5c607b78dc9a481edccf1b3ff254`).
+- Updated PR #1 body; GitHub reports it open, draft, and mergeable at the new head.
+- Local `make -C tests clean sanitize` passes 374 checks. The PR's Host tests run `37784104792` is queued with no conclusion; earlier queued runs also remain unresolved.
+- Next: monitor run `37784104792`; target SDK and hardware gates remain as listed in this memory.
