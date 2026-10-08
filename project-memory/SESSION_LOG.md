@@ -180,3 +180,9 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - PR-triggered Host tests run `37793500940` and PS5 cross-build run `37793500959` are queued; combined commit status has no completed checks. This is pending, not a CI pass.
 - The assignment-dialog lease issue P1-ASGN-16 is fixed in the published branch. The full slot/session manager and physical target behavior remain open.
 - Next exact action: publish the updated memory/provenance snapshot on top of `7ded26db0465992d9ce4c3f03163470727ec5ae6`; then continue auditing slot ownership and teardown in `payload/gc_main.c`.
+
+## M1 project-memory publication — 2026-10-08 14:35 UTC
+
+- Published the follow-up project-memory/provenance snapshot to PR #1 as commit `0a3ef29edcce29ea78efd6f1e80c67a68b38c426`, parent `7ded26db0465992d9ce4c3f03163470727ec5ae6`. Six uploaded blob SHAs matched local `git hash-object` values; branch update succeeded with expected-head validation.
+- PR head is now `0a3ef29edcce29ea78efd6f1e80c67a68b38c426`, open, draft, and mergeable. The source commit's Host run `37793500940` and PS5 cross-build `37793500959` were queued at 14:35 UTC; no new PR workflow run was returned for the documentation-only sync.
+- Next exact action: audit reservation, USB-thread exit, and VDA teardown ownership in `payload/gc_main.c`; add host fault-injection around the existing lifecycle path before building a full slot abstraction.
