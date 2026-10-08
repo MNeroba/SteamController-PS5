@@ -9,6 +9,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <unistd.h>
 #include <time.h>
 #include <pthread.h>
@@ -90,13 +91,30 @@ static void to_frame(const ScePadData *p, PbPublishFrame *f) {
     }
 }
 
-static void unhook(const char *why) {
-    if (g.state == 2 && g.pid > 0 && kill(g.pid, 0) == 0) {
-        int r = pb_hooks_remove(g.pid, g.args);
-        LOG("game hooks: removed from %s (%d, %s)\n", g.title, r, why);
+static int unhook(const char *why) {
+    if (g.state == 2 && g.pid > 0) {
+        if (kill(g.pid, 0) != 0) {
+            if (errno != ESRCH) {
+                LOG("game hooks: cannot verify process %d (%s, errno=%d)\n",
+                    g.pid, why, errno);
+                g_active = 0;
+                return -1;
+            }
+        } else {
+            int r = pb_hooks_remove(g.pid, g.args);
+            LOG("game hooks: removal from %s returned %d (%s)\n",
+                g.title, r, why);
+            if (r != 0 && r != PB_HOOKS_REMOVE_CONFLICT) {
+                g_active = 0;
+                return -1;
+            }
+            if (r == PB_HOOKS_REMOVE_CONFLICT)
+                LOG("game hooks: left a later owner’s import slot unchanged\n");
+        }
     }
     g_active = 0;
     g.pid = -1; g.args = 0;
+    return 0;
 }
 
 static void *hooks_thread(void *arg) {
@@ -106,7 +124,7 @@ static void *hooks_thread(void *arg) {
     int tries = 0, rumbling = 0;
     uint32_t last_vseq = 0, last_pad_seq = 0, last_native_act = 0, last_aseq = 0, last_tseq = 0;
     int64_t last_hap_ms = 0;
-    int last_in = -1, last_vib = -1;
+    int last_in = -1, last_vib = -1, rollback_pending = 0;
 
     for (;;) {
         char t[SC2_ID_MAX + 1], a[SC2_ID_MAX + 1], o[SC2_ID_MAX + 1];
@@ -116,8 +134,8 @@ static void *hooks_thread(void *arg) {
 
         if (strcmp(t, cur) || want_in != last_in || want_vib != last_vib) {   /* game or settings changed */
             if (rumbling) { sc2_haptic_rumble_set(0, 0); rumbling = 0; }
-            if (g.state == 2)
-                unhook(!strcmp(t, cur) ? "settings changed" : "game changed");
+            if (g.state == 2 && unhook(!strcmp(t, cur) ? "settings changed" : "game changed") != 0)
+                rollback_pending = 1;
             else { g_active = 0; g.pid = -1; g.args = 0; }
             snprintf(cur, sizeof(cur), "%s", t);
             last_in = want_in; last_vib = want_vib;
@@ -128,6 +146,19 @@ static void *hooks_thread(void *arg) {
             snprintf(g.title, sizeof(g.title), "%s", t);
             memset(&g.st, 0, sizeof(g.st));
             pthread_mutex_unlock(&g_lock);
+            if (rollback_pending)
+                set_state(2, "hook removal pending; retaining target ownership");
+            else
+                set_state(0, "");
+        }
+
+        if (rollback_pending) {
+            if (unhook("retrying incomplete rollback") != 0) {
+                set_state(2, "hook removal pending; retrying safely");
+                usleep(100000);
+                continue;
+            }
+            rollback_pending = 0;
             set_state(0, "");
         }
 
@@ -161,8 +192,9 @@ static void *hooks_thread(void *arg) {
         }
 
         if (kill(g.pid, 0) != 0) {                  /* game process gone */
+            if (errno != ESRCH) { usleep(100000); continue; }
             if (rumbling) { sc2_haptic_rumble_set(0, 0); rumbling = 0; }
-            g_active = 0; g.pid = -1; title_since = now; tries = 0;
+            g_active = 0; g.pid = -1; g.args = 0; title_since = now; tries = 0;
             last_tseq = 0; sc2_trigfx_clear(); sc2_trigfx_enable(0);
             set_state(1, "game restarted, hooking again");
             continue;

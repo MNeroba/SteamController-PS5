@@ -229,4 +229,9 @@ int pb_hooks_publish(pid_t pid, intptr_t args_addr, const PbPublishFrame *f, int
                      int mode, int owner, int silence);   /* mode: 0 both, 1 last used, 2 Steam Controller only */
 int pb_hooks_read(pid_t pid, intptr_t args_addr, PbStatus *st);
 int pb_hooks_set_silence(pid_t pid, intptr_t args_addr, int on);
+/* REMOVE_RETRY means one or more slots still point to our gateway and the
+ * caller should retain ownership and retry. CONFLICT means the slot now
+ * belongs to another hook; it was left untouched. */
+#define PB_HOOKS_REMOVE_RETRY    (-2)
+#define PB_HOOKS_REMOVE_CONFLICT (-3)
 int pb_hooks_remove(pid_t pid, intptr_t args_addr);

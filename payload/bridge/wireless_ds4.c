@@ -34,6 +34,7 @@
 #include <ps5/nid.h>
 
 #include "wireless_ds4.h"
+#include "../game_hook_safety.h"
 
 #ifndef POORDS4_RC_VERSION
 #define POORDS4_RC_VERSION 0
@@ -6708,15 +6709,18 @@ game_cache_find_table(
  *       and buzzes on the Steam Controller), then call Sony's original.
  *
  * Every stub calls the original first and only touches the result when the
- * shared page is valid and fresh. If the payload stops publishing, frames
- * age out after ~0.5 s of reads and the game sees only the DualSense again.
+ * shared page is valid and fresh. If the payload stops publishing, input
+ * frames age out after ~0.5 s of reads and audio silence expires after a
+ * bounded number of output callbacks. Hook code remains inside game memory;
+ * process exit releases it, while a live game's hooks are reused on restart.
  * ═══════════════════════════════════════════════════════════════════════ */
 
 #define PB_MAGIC       0x42505550u   /* "PUPB" */
 #define PB_MAX_HOOKS   16u
-#define PB_LAYOUT_VERSION 5u         /* bump whenever PbArgs OR the stub code changes */
+#define PB_LAYOUT_VERSION 6u         /* bump whenever PbArgs OR the stub code changes */
 #define PB_MAX_PORTS   24u
 #define PB_ZERO_BYTES  32768u
+#define PB_AUDIO_STALE_CALLS 120u
 _Static_assert(GB_KINDS <= 16u, "PbArgs.orig too small");
 #define PB_PAD_SIZE    120u
 #define PB_STALE_READS 60u           /* reads without a new frame before merge stops */
@@ -6756,6 +6760,9 @@ typedef struct {
     volatile uint64_t in_calls, in_merged;
     /* audio (PS5 pad speaker + haptics ports) */
     volatile uint32_t a_silence;      /* 1: send the DualSense silence on its pad ports */
+    volatile uint32_t a_heartbeat;
+    volatile uint32_t a_heartbeat_seen;
+    volatile uint32_t a_heartbeat_age;
     volatile uint32_t aseq;           /* bumped per haptics block */
     volatile uint8_t  hap_l, hap_r, spk_level, r2;
     volatile uint32_t a_ports;
@@ -6769,6 +6776,7 @@ typedef struct {
     uint32_t hook_count, r1;
     uint64_t hook_slot[PB_MAX_HOOKS];
     uint64_t hook_orig[PB_MAX_HOOKS];
+    uint64_t hook_gateway[PB_MAX_HOOKS];
     uint32_t hook_prot[PB_MAX_HOOKS];
     uint8_t  zero[PB_ZERO_BYTES];     /* silence handed to Sony instead of the game's buffer */
 } PbArgs;
@@ -6831,6 +6839,29 @@ pb_ok(PbArgs *a, int32_t handle)
     return a && a->magic == PB_MAGIC && (a->in_handle == -1 || a->in_handle == handle);
 }
 
+/* The payload updates this sequence while the hook manager is alive. Count
+ * output callbacks with no sequence change and stop silencing once the owner
+ * disappears. Saturation prevents wraparound from reviving a stale lease. */
+static __attribute__((always_inline)) inline uint32_t
+pb_audio_heartbeat_age(PbArgs *a)
+{
+    return game_hook_heartbeat_age(&a->a_heartbeat,
+                                   &a->a_heartbeat_seen,
+                                   &a->a_heartbeat_age,
+                                   PB_AUDIO_STALE_CALLS);
+}
+
+static __attribute__((always_inline)) inline int
+pb_audio_silence_active(PbArgs *a)
+{
+    uint32_t requested = __atomic_load_n(&a->a_silence, __ATOMIC_ACQUIRE);
+    if (!requested)
+        return 0;
+    return game_hook_audio_lease_active(requested,
+                                        pb_audio_heartbeat_age(a),
+                                        PB_AUDIO_STALE_CALLS);
+}
+
 /* scePadReadState(handle, data) and scePadReadStateExt(handle, data): args in rdx */
 __attribute__((noinline, used, section(".text.pbhooks")))
 int32_t pb_read_state_stub(int32_t handle, uint8_t *data, PbArgs *a)
@@ -6884,7 +6915,7 @@ int32_t pb_set_vibration_stub(int32_t handle, const uint8_t *param, PbArgs *a)
         a->vhandle = handle; a->vlarge = param[0]; a->vsmall = param[1];
         __atomic_add_fetch(&a->vseq, 1u, __ATOMIC_RELEASE);
         /* Steam Controller is the active pad: keep the DualSense motors still */
-        if (a->a_silence) pass = quiet;
+        if (pb_audio_silence_active(a)) pass = quiet;
     }
     __atomic_add_fetch(&a->vcalls, 1u, __ATOMIC_RELAXED);
     return ((fn)(uintptr_t)a->orig[7])(handle, pass);
@@ -6996,7 +7027,7 @@ int32_t pb_audio_output_stub(int32_t handle, const void *ptr, PbArgs *a)
     if (pi >= 0) {
         __atomic_add_fetch(&a->a_calls, 1u, __ATOMIC_RELAXED);
         pb_peak(a, pi, (const uint8_t *)ptr);
-        if (a->a_silence) {
+        if (pb_audio_silence_active(a)) {
             uint32_t bytes = a->port[pi].len * a->port[pi].ch * (a->port[pi].fmt ? 4u : 2u);
             if (bytes && bytes <= PB_ZERO_BYTES) { pass = a->zero; __atomic_add_fetch(&a->a_muted, 1u, __ATOMIC_RELAXED); }
         }
@@ -7021,7 +7052,7 @@ int32_t pb_audio_outputs_stub(uint8_t *params, uint32_t num, PbArgs *a)
             if (pi < 0) continue;
             __atomic_add_fetch(&a->a_calls, 1u, __ATOMIC_RELAXED);
             pb_peak(a, pi, (const uint8_t *)ptr);
-            if (a->a_silence) {
+            if (pb_audio_silence_active(a)) {
                 uint32_t bytes = a->port[pi].len * a->port[pi].ch * (a->port[pi].fmt ? 4u : 2u);
                 if (bytes && bytes <= PB_ZERO_BYTES) {
                     const void *z = a->zero; __builtin_memcpy(local + i * 16u + 8u, &z, 8);
@@ -7071,7 +7102,7 @@ int32_t pb_audio2_setattr_stub(uint64_t port, const uint8_t *attrs, uint32_t num
             if (!pcm) continue;
             __atomic_add_fetch(&a->a_calls, 1u, __ATOMIC_RELAXED);
             pb_peak(a, pi, (const uint8_t *)pcm);
-            if (a->a_silence) {
+            if (pb_audio_silence_active(a)) {
                 const void *zp = &zero_pcm; __builtin_memcpy(local + i * 24u + 8u, &zp, 8);
                 pass = local; __atomic_add_fetch(&a->a_muted, 1u, __ATOMIC_RELAXED);
             }
@@ -7169,20 +7200,59 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
         return 1;
     }
     if (pb_found) {
-        uint32_t stripped = 0;
+        /* The v5 and v6 prefixes keep these fields at identical offsets.
+         * Disable old input/audio behavior before touching any import slot. */
+        uint32_t off = 0, silence = 0;
+        if (game_bridge_process_write(
+                target, pb_args + (intptr_t)offsetof(PbArgs, in_enabled),
+                &off, sizeof(off)) != 0 ||
+            game_bridge_process_write(
+                target, pb_args + (intptr_t)offsetof(PbArgs, a_silence),
+                &silence, sizeof(silence)) != 0) {
+            snprintf(why, why_n,
+                     "could not disable an earlier Puckbridge hook page");
+            return -14;
+        }
+        uint32_t stripped = 0, strip_failed = 0;
         for (uint32_t i = 0; i < hook_count; i++) {
             uint64_t cur = 0; uint8_t gwb[16];
-            if (game_bridge_process_read(target, hooks[i].slot, &cur, sizeof(cur)) != 0) continue;
+            if (game_bridge_process_read(target, hooks[i].slot, &cur, sizeof(cur)) != 0) {
+                strip_failed++;
+                continue;
+            }
             if (cur == (uint64_t)hooks[i].original) continue;
-            if (game_bridge_process_read(target, (intptr_t)cur, gwb, sizeof(gwb)) != 0) continue;
+            if (game_bridge_process_read(target, (intptr_t)cur, gwb, sizeof(gwb)) != 0) {
+                strip_failed++;
+                continue;
+            }
             if (gwb[1] != 0x8d || gwb[7] != 0xe9) continue;
             int32_t rel; memcpy(&rel, gwb + 3, 4);
             uint32_t magic = 0;
-            if (game_bridge_process_read(target, (intptr_t)cur + 7 + rel, &magic, sizeof(magic)) != 0 || magic != PB_MAGIC)
+            if (game_bridge_process_read(target, (intptr_t)cur + 7 + rel,
+                                         &magic, sizeof(magic)) != 0) {
+                strip_failed++;
                 continue;
+            }
+            if (magic != PB_MAGIC)
+                continue;
+            uint64_t current = 0;
+            if (game_bridge_process_read(target, hooks[i].slot,
+                                         &current, sizeof(current)) != 0 ||
+                current != cur) {
+                strip_failed++;
+                continue;
+            }
             uint64_t orig = (uint64_t)hooks[i].original; int64_t st[9];
             if (poords4_remote_cow_write(target, hooks[i].slot, &orig, sizeof(orig), (int)hooks[i].protection, st) == 0)
                 stripped++;
+            else
+                strip_failed++;
+        }
+        if (strip_failed) {
+            snprintf(why, why_n,
+                     "could not safely remove %u prior hook slot(s)",
+                     strip_failed);
+            return -14;
         }
         /* re-read slots so the filter below sees the restored originals */
         snprintf(why, why_n, "replaced hooks from an older Puckbridge build (%u)", stripped);
@@ -7249,6 +7319,7 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
     a.hook_count = ns;
     for (uint32_t i = 0; i < ns; i++) {
         a.hook_slot[i] = (uint64_t)sel[i].slot; a.hook_orig[i] = (uint64_t)sel[i].original;
+        a.hook_gateway[i] = (uint64_t)gw_for_kind[sel[i].kind];
         a.hook_prot[i] = sel[i].protection;
     }
     if (game_bridge_process_write(target, args_addr, &a, sizeof(a)) != 0) { snprintf(why, why_n, "args write failed"); return -12; }
@@ -7315,8 +7386,13 @@ pb_hooks_set_silence_locked(pid_t pid, intptr_t args_addr, int on)
 #if !defined(__PROSPERO__)
     (void)pid; (void)args_addr; (void)on; return -1;
 #else
-    uint32_t v = on ? 1u : 0u;
-    return game_bridge_process_write(pid, args_addr + (intptr_t)offsetof(PbArgs, a_silence), &v, sizeof(v));
+    static uint32_t heartbeat;
+    struct { uint32_t silence, sequence; } state = {
+        on ? 1u : 0u, ++heartbeat
+    };
+    return game_bridge_process_write(
+        pid, args_addr + (intptr_t)offsetof(PbArgs, a_silence),
+        &state, sizeof(state));
 #endif
 }
 
@@ -7328,6 +7404,7 @@ pb_hooks_read_locked(pid_t pid, intptr_t args_addr, PbStatus *st)
 #else
     static PbArgs a;   /* only the header part is read (not the silence buffer) */
     if (game_bridge_process_read(pid, args_addr, &a, offsetof(PbArgs, zero)) != 0 || a.magic != PB_MAGIC) return -1;
+    if (a.hook_count > PB_MAX_HOOKS) return -1;
     st->vseq = a.vseq; st->vlarge = a.vlarge; st->vsmall = a.vsmall; st->vhandle = a.vhandle;
     st->vcalls = a.vcalls; st->in_calls = a.in_calls; st->in_merged = a.in_merged;
     st->tseq = a.tseq; memcpy(st->tcmd, a.tcmd, sizeof(st->tcmd));
@@ -7351,15 +7428,42 @@ pb_hooks_remove_locked(pid_t pid, intptr_t args_addr)
 #else
     static PbArgs a;   /* only the header part is read (not the silence buffer) */
     if (game_bridge_process_read(pid, args_addr, &a, offsetof(PbArgs, zero)) != 0 || a.magic != PB_MAGIC) return -1;
+    if (a.hook_count > PB_MAX_HOOKS) return -1;
     uint32_t off = 0;                     /* stop merging first */
-    (void)game_bridge_process_write(pid, args_addr + (intptr_t)offsetof(PbArgs, in_enabled), &off, sizeof(off));
-    int bad = 0;
-    for (uint32_t i = 0; i < a.hook_count && i < PB_MAX_HOOKS; i++) {
-        int64_t st[9]; uint64_t orig = a.hook_orig[i];
-        if (poords4_remote_cow_write(pid, (intptr_t)a.hook_slot[i], &orig, sizeof(orig), (int)a.hook_prot[i], st) != 0)
-            bad++;
+    int retry = game_bridge_process_write(
+        pid, args_addr + (intptr_t)offsetof(PbArgs, in_enabled),
+        &off, sizeof(off)) != 0;
+    if (pb_hooks_set_silence_locked(pid, args_addr, 0) != 0)
+        retry = 1;
+    int conflict = 0;
+    for (uint32_t i = 0; i < a.hook_count; i++) {
+        int64_t st[9]; uint64_t current = 0;
+        uint64_t gateway = a.hook_gateway[i];
+        uint64_t orig = a.hook_orig[i];
+        if (a.hook_slot[i] == 0) {
+            retry++;
+            continue;
+        }
+        if (game_bridge_process_read(pid, (intptr_t)a.hook_slot[i],
+                                     &current, sizeof(current)) != 0) {
+            retry++;
+            continue;
+        }
+        game_hook_slot_action_t action =
+            game_hook_slot_restore_action(current, gateway, orig);
+        if (action == GAME_HOOK_SLOT_ALREADY_RESTORED)
+            continue;
+        if (action == GAME_HOOK_SLOT_CONFLICT) {
+            conflict++;
+            continue; /* never overwrite a later hook owned by another module */
+        }
+        if (action != GAME_HOOK_SLOT_RESTORE ||
+            poords4_remote_cow_write(pid, (intptr_t)a.hook_slot[i], &orig,
+                                     sizeof(orig), (int)a.hook_prot[i], st) != 0)
+            retry++;
     }
-    return bad ? -2 : 0;
+    if (retry) return PB_HOOKS_REMOVE_RETRY;
+    return conflict ? PB_HOOKS_REMOVE_CONFLICT : 0;
 #endif
 }
 
