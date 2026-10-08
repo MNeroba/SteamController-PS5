@@ -636,9 +636,18 @@ static int usb_platform_start_transfer(int fd, void *configuration,
 }
 
 static int usb_platform_complete_transfer(int fd, void *configuration,
+                                          uint8_t *completed_endpoint_index,
                                           void *context) {
     (void)context;
-    return ioctl(fd, USB_FS_COMPLETE, configuration);
+    if (!completed_endpoint_index) {
+        errno = EINVAL;
+        return -1;
+    }
+    int result = ioctl(fd, USB_FS_COMPLETE, configuration);
+    if (result == 0)
+        *completed_endpoint_index =
+            ((struct usb_fs_complete *)configuration)->ep_index;
+    return result;
 }
 
 static int usb_platform_stop_transfer(int fd, uint8_t endpoint_index,
@@ -766,7 +775,7 @@ static void *usb_hid_thread(void *arg) {
             &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
         gp_log("slot[%d] Xbox OUT ep=0x%02x opened=%d\n", slot, XBOX_EP_OUT, out_opened);
 
-        xbox_gip_handshake(fd, eps);
+        xbox_gip_handshake(&usb_resources, &g_usb_session_ops, eps);
         goto main_loop;
     }
 
@@ -1023,8 +1032,10 @@ static void *usb_hid_thread(void *arg) {
     }
     gp_log("slot[%d] Nintendo OUT opened=%d\n", slot, out_opened);
     if (out_opened) {
-        usb_send_cmd(fd,&eps[1],0x80,0x02); usleep(30000);
-        usb_send_cmd(fd,&eps[1],0x80,0x04); usleep(50000);
+        (void)usb_send_cmd(&usb_resources, &g_usb_session_ops, &eps[1], 1,
+                           0x80, 0x02, 50000, 20, NULL); usleep(30000);
+        (void)usb_send_cmd(&usb_resources, &g_usb_session_ops, &eps[1], 1,
+                           0x80, 0x04, 50000, 20, NULL); usleep(50000);
         gp_log("slot[%d] Nintendo [80 02]+[80 04] sent\n", slot);
     }
 
@@ -1062,9 +1073,15 @@ main_loop: ;
 
         int ok=0, cerr=0, cw=0;
         for(cw=0;cw<60;cw++){
-            memset(&complete,0,sizeof(complete)); complete.ep_index=0;
-            if(usb_session_complete_transfer(&usb_resources,
-                &g_usb_session_ops, 0, &complete, NULL)==0){ok=1;break;}
+            memset(&complete,0,sizeof(complete));
+            uint8_t completed_endpoint = UINT8_MAX;
+            int complete_result = usb_session_complete_transfer(
+                &usb_resources, &g_usb_session_ops, 0, &complete,
+                &completed_endpoint, NULL);
+            if(complete_result == USB_SESSION_OK && completed_endpoint == 0){
+                ok=1;break;
+            }
+            if(complete_result == USB_SESSION_COMPLETED_OTHER) continue;
             cerr=errno;
             if(cerr==ENXIO||cerr==ENOTTY){gp_log("slot[%d] COMPLETE errno=%d — gone\n",slot,cerr);goto reinit;}
             if(cerr!=EBUSY) break;
@@ -1083,7 +1100,8 @@ main_loop: ;
         int injected = 0;
 
         if (pid == PID_XBOX) {
-            injected = xbox_handle_packet(fd, eps, buf, len, &pad);
+            injected = xbox_handle_packet(&usb_resources, &g_usb_session_ops,
+                                          eps, buf, len, &pad);
         } else if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
             int was = sc2_link;
             injected = sc2_handle_packet(buf, len, &pad, &sc2_link,
@@ -1108,7 +1126,8 @@ main_loop: ;
                  * everything and remove the virtual pad; the hooks see it as
                  * off. Reports are still read to catch the resume / Steam button. */
                 game_hooks_feed(NULL, 0);
-                sc2_haptic_service(slot_token, fd, eps, out_opened, sc2_iface, sc2_n_out);
+                sc2_haptic_service(slot_token, &usb_resources,
+                    &g_usb_session_ops, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
                 if (slot_virtual_ready(slot_token)) {
                     ScePadData rel; memset(&rel, 0, sizeof(rel));
@@ -1145,7 +1164,8 @@ main_loop: ;
                     ds_handoff_sc2_used();
                 if (injected) game_hooks_feed(&pad, sc2_link);
                 else if (!sc2_link) game_hooks_feed(NULL, 0);
-                sc2_haptic_service(slot_token, fd, eps, out_opened, sc2_iface, sc2_n_out);
+                sc2_haptic_service(slot_token, &usb_resources,
+                    &g_usb_session_ops, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
                 if (was && !sc2_link) {
                     ds_handoff_sc2_session(0);
@@ -1171,7 +1191,9 @@ main_loop: ;
             injected = steam_handle_packet(buf, len, &pad, &session.steam_input);
             if ((++steam_pkts % 1250u) == 0) steam_keepalive(fd);   /* ~every 5s */
         } else {
-            injected = nintendo_handle_packet(fd, eps, buf, len, &hs_state, &nintendo_seq, &pad);
+            injected = nintendo_handle_packet(&usb_resources,
+                &g_usb_session_ops, eps, buf, len, &hs_state, &nintendo_seq,
+                &pad);
         }
 
         if (injected > 0) {
@@ -1198,8 +1220,9 @@ reinit:
 uninit_exit:
 cleanup_usb:
     if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED)
-        (void)sc2_haptic_session_release(slot_token, fd, eps, out_opened,
-                                         sc2_iface, sc2_n_out);
+        (void)sc2_haptic_session_release(slot_token, &usb_resources,
+                                         &g_usb_session_ops, eps,
+                                         out_opened, sc2_iface, sc2_n_out);
     if (usb_resources.fd >= 0) {
         int cleanup_result = usb_session_cleanup(&usb_resources,
             &g_usb_session_ops, NULL);

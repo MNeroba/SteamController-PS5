@@ -22,7 +22,16 @@ static _Atomic int session_b_primary_reports;
 static _Atomic int zero_rumble_stop_reports;
 static int checks;
 
-typedef struct { int fd; slot_registry_token_t owner; } worker_t;
+typedef struct {
+    int fd;
+    slot_registry_token_t owner;
+    usb_resources_t resources;
+} worker_t;
+
+static void init_fake_resources(usb_resources_t *resources, int fd) {
+    usb_resources_init(resources);
+    resources->fd = fd;
+}
 
 #define CHECK(expr) do { \
     checks++; \
@@ -63,7 +72,7 @@ void sc2_status_haptic_result(int via, int error) { (void)via; (void)error; }
 
 static void *run_service(void *opaque) {
     worker_t *worker = opaque;
-    sc2_haptic_service(worker->owner, worker->fd, NULL, 1, 0,
+    sc2_haptic_service(worker->owner, &worker->resources, NULL, NULL, 1, 0,
                        worker->fd == 1 ? 0 : 2);
     return NULL;
 }
@@ -81,7 +90,7 @@ static void *run_stress(void *opaque) {
         sched_yield();
     for (int i = 0; i < 2000; ++i) {
         sc2_haptic_pulse(SC2_PAD_LEFT, 400, 100, 1);
-        sc2_haptic_service(worker->owner, worker->fd, NULL, 1, 0,
+        sc2_haptic_service(worker->owner, &worker->resources, NULL, NULL, 1, 0,
                            worker->fd == 3 ? 1 : 2);
     }
     return NULL;
@@ -100,6 +109,8 @@ int main(void) {
 
     worker_t first = {.fd = 1, .owner = session_a};
     worker_t second = {.fd = 2, .owner = session_a};
+    init_fake_resources(&first.resources, first.fd);
+    init_fake_resources(&second.resources, second.fd);
     pthread_t a, b;
     CHECK(pthread_create(&a, NULL, run_service, &first) == 0);
     pthread_mutex_lock(&gate_lock);
@@ -119,6 +130,8 @@ int main(void) {
         {.fd = 3, .owner = session_a},
         {.fd = 4, .owner = session_a}
     };
+    init_fake_resources(&stress[0].resources, stress[0].fd);
+    init_fake_resources(&stress[1].resources, stress[1].fd);
     CHECK(pthread_create(&a, NULL, run_stress, &stress[0]) == 0);
     CHECK(pthread_create(&b, NULL, run_stress, &stress[1]) == 0);
     atomic_store_explicit(&start_stress, 1, memory_order_release);
@@ -132,35 +145,45 @@ int main(void) {
 
     atomic_store(&fake_method, 4);
     sc2_haptic_pulse(SC2_PAD_LEFT, 400, 100, 1);
-    sc2_haptic_service(session_a, 5, NULL, 1, 0, 100);
+    usb_resources_t one_call;
+    init_fake_resources(&one_call, 5);
+    sc2_haptic_service(session_a, &one_call, NULL, NULL, 1, 0, 100);
     CHECK(atomic_load(&over_limit_extra_reports) == SC2_HAP_MAX_OUT);
     sc2_haptic_pulse(SC2_PAD_LEFT, 400, 100, 1);
-    sc2_haptic_service(session_a, 6, NULL, 1, 0, -10);
+    init_fake_resources(&one_call, 6);
+    sc2_haptic_service(session_a, &one_call, NULL, NULL, 1, 0, -10);
     CHECK(atomic_load(&negative_extra_reports) == 0);
 
     /* A non-owner service call must not drain the sole owner's queue. */
     atomic_store(&fake_method, 0);
     CHECK(pthread_create(&a, NULL, enqueue_from_process_producer, NULL) == 0);
     CHECK(pthread_join(a, NULL) == 0);
-    sc2_haptic_service(session_b, 12, NULL, 1, 0, 0);
+    init_fake_resources(&one_call, 12);
+    sc2_haptic_service(session_b, &one_call, NULL, NULL, 1, 0, 0);
     CHECK(atomic_load(&session_b_primary_reports) == 0);
     CHECK(atomic_load(&session_a_primary_reports) == 0);
-    sc2_haptic_service(session_a, 11, NULL, 1, 0, 0);
+    init_fake_resources(&one_call, 11);
+    sc2_haptic_service(session_a, &one_call, NULL, NULL, 1, 0, 0);
     CHECK(atomic_load(&session_a_primary_reports) == 1);
 
     /* Teardown clears queued output and rumble before another generation can
      * claim the sole SC2 haptic session. A stale token cannot release B. */
     sc2_haptic_pulse(SC2_PAD_LEFT, 400, 100, 1);
     sc2_haptic_rumble_set(0x4000, 0x4000);
-    CHECK(sc2_haptic_session_release(session_a, 11, NULL, 1, 0, 0));
+    init_fake_resources(&one_call, 11);
+    CHECK(sc2_haptic_session_release(session_a, &one_call, NULL, NULL,
+                                     1, 0, 0));
     CHECK(atomic_load(&zero_rumble_stop_reports) == 1);
     CHECK(!sc2_haptic_session_is_owner(session_a));
     CHECK(sc2_haptic_session_claim(session_b));
     sc2_haptic_session_abandon(session_a);
     CHECK(sc2_haptic_session_is_owner(session_b));
-    sc2_haptic_service(session_b, 12, NULL, 1, 0, 0);
+    init_fake_resources(&one_call, 12);
+    sc2_haptic_service(session_b, &one_call, NULL, NULL, 1, 0, 0);
     CHECK(atomic_load(&session_b_primary_reports) == 0);
-    CHECK(sc2_haptic_session_release(session_b, -1, NULL, 0, 0, 0));
+    init_fake_resources(&one_call, -1);
+    CHECK(sc2_haptic_session_release(session_b, &one_call, NULL, NULL,
+                                     0, 0, 0));
 
     printf("sc2 haptic queue: %d checks passed, 4,000 concurrent service reports\n", checks);
     return 0;

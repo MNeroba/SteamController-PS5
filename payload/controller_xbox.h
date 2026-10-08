@@ -3,6 +3,7 @@
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ioctl.h>
 #include "gc_types.h"
+#include "usb_session.h"
 
 /*
  * Xbox One (VID=0x045E PID=0x02EA) — GIP protocol over USB
@@ -43,9 +44,13 @@ void xbox_parse_input(const uint8_t *buf, ScePadData *o);
 /* GIP handshake: catch ANNOUNCE → ACK → POWER.
  * Call immediately after opening IN+OUT endpoints.
  * eps[0]=IN eps[1]=OUT. */
-void xbox_gip_handshake(int fd, struct usb_fs_endpoint *eps);
+void xbox_gip_handshake(usb_resources_t *resources,
+                        const usb_session_ops_t *ops,
+                        struct usb_fs_endpoint *eps);
 
 /* Handle one IN packet. Returns 1 if pad updated, 0 to skip, -1 to reinit. */
-int  xbox_handle_packet(int fd, struct usb_fs_endpoint *eps,
+int  xbox_handle_packet(usb_resources_t *resources,
+                        const usb_session_ops_t *ops,
+                        struct usb_fs_endpoint *eps,
                         const uint8_t *buf, uint32_t len,
                         ScePadData *out_pad);

@@ -149,52 +149,47 @@ static int ctrl_report(int fd, int iface, int type, const uint8_t *b, uint8_t n)
 /* Interrupt OUT on any opened FS endpoint index */
 #ifdef SC2_HAPTICS_TEST
 int sc2_haptics_test_send_out(int fd, int idx, const uint8_t *data, uint32_t len);
-static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx,
+static int send_out_idx(usb_resources_t *resources,
+                        const usb_session_ops_t *ops,
+                        struct usb_fs_endpoint *eps, int idx,
                         const uint8_t *data, uint32_t len) {
+    (void)ops;
     (void)eps;
-    return sc2_haptics_test_send_out(fd, idx, data, len);
+    if (!resources) return -1;
+    return sc2_haptics_test_send_out(resources->fd, idx, data, len);
 }
 #else
-static int send_out_idx(int fd, struct usb_fs_endpoint *eps, int idx, const uint8_t *data, uint32_t len) {
-    void *bufs[1] = { (void *)data };
-    uint32_t lens[1] = { len };
-    struct usb_fs_endpoint *ep = &eps[idx];
-    ep->ppBuffer = bufs; ep->pLength = lens; ep->nFrames = 1;
-    ep->timeout = 150; ep->flags = 0; ep->aFrames = 0; ep->status = 0;
-    struct usb_fs_start st; memset(&st, 0, sizeof(st)); st.ep_index = (uint8_t)idx;
-    if (ioctl(fd, USB_FS_START, &st) != 0) return -errno;
-    for (int w = 0; w < 20; w++) {
-        struct usb_fs_complete c; memset(&c, 0, sizeof(c));
-        if (ioctl(fd, USB_FS_COMPLETE, &c) == 0) return ep->status ? -1000 - ep->status : 0;
-        if (errno != EBUSY) {
-            int saved_errno = errno;
-            struct usb_fs_stop sp; memset(&sp, 0, sizeof(sp));
-            sp.ep_index = (uint8_t)idx;
-            ioctl(fd, USB_FS_STOP, &sp);
-            return -saved_errno;
-        }
-        usleep(10000);
-    }
-    struct usb_fs_stop sp; memset(&sp, 0, sizeof(sp)); sp.ep_index = (uint8_t)idx;
-    ioctl(fd, USB_FS_STOP, &sp);
-    return -ETIMEDOUT;
+static int send_out_idx(usb_resources_t *resources,
+                        const usb_session_ops_t *ops,
+                        struct usb_fs_endpoint *eps, int idx,
+                        const uint8_t *data, uint32_t len) {
+    if (!resources || !ops || !eps || idx < 0 ||
+        idx >= USB_RESOURCES_MAX_ENDPOINTS)
+        return -EINVAL;
+    return usb_send_out(resources, ops, &eps[idx], (uint8_t)idx, data, len,
+                        "SC2 haptic", 10000, 20, NULL);
 }
 #endif
 
-static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int iface,
+static int send_report(usb_resources_t *resources,
+                       const usb_session_ops_t *ops,
+                       struct usb_fs_endpoint *eps, int out_opened, int iface,
                        int n_extra, const uint8_t *b, uint8_t n) {
     int m = sc2_status_haptic_method(), r = -1, used = 0;
-    if ((m == 0 || m == 1) && out_opened) { r = send_out_idx(fd, eps, 1, b, n); used = 1; }
+    if ((m == 0 || m == 1) && out_opened) { r = send_out_idx(resources, ops, eps, 1, b, n); used = 1; }
     if (m == 4) {
-        used = 4; r = out_opened ? send_out_idx(fd, eps, 1, b, n) : -1;
+        used = 4; r = out_opened ? send_out_idx(resources, ops, eps, 1, b, n) : -1;
         for (int k = 0; k < n_extra; k++) {
-            int rk = send_out_idx(fd, eps, 2 + k, b, n);
+            int rk = send_out_idx(resources, ops, eps, 2 + k, b, n);
             LOG("haptics: broadcast OUT index %d → %d\n", 2 + k, rk);
             if (rk == 0) r = 0;
         }
     }
-    if (r != 0 && (m == 0 || m == 2))    { r = ctrl_report(fd, iface, 2, b, n); used = 2; }
-    if (r != 0 && m == 3)                { r = ctrl_report(fd, iface, 3, b, n); used = 3; }
+    if (r != 0 && resources && resources->fd >= 0 &&
+        (m == 0 || m == 2)) { r = ctrl_report(resources->fd, iface, 2, b, n); used = 2; }
+    if (r != 0 && resources && resources->fd >= 0 && m == 3) {
+        r = ctrl_report(resources->fd, iface, 3, b, n); used = 3;
+    }
     sc2_status_haptic_result(used, r);
     pthread_mutex_lock(&log_lock);
     int should_log = m != last_method || r != 0;
@@ -210,7 +205,9 @@ static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int 
     return r;
 }
 
-int sc2_haptic_session_release(slot_registry_token_t owner, int fd,
+int sc2_haptic_session_release(slot_registry_token_t owner,
+                               usb_resources_t *resources,
+                               const usb_session_ops_t *ops,
                                struct usb_fs_endpoint *eps, int out_opened,
                                int iface, int n_extra) {
     pthread_mutex_lock(&q_lock);
@@ -224,19 +221,22 @@ int sc2_haptic_session_release(slot_registry_token_t owner, int fd,
     clear_session_locked();
     pthread_mutex_unlock(&q_lock);
 
-    if (!stop_rumble || fd < 0) return 1;
+    if (!stop_rumble || !resources || resources->fd < 0) return 1;
     if (n_extra < 0) n_extra = 0;
     if (n_extra > SC2_HAP_MAX_OUT) n_extra = SC2_HAP_MAX_OUT;
     uint8_t report[STEAM_HAPTIC_RUMBLE_SIZE];
     int n = steam_feedback_encode_rumble(report, sizeof(report), 0, 0);
     if (n <= 0) return 0;
-    return send_report(fd, eps, out_opened, iface, n_extra, report,
+    return send_report(resources, ops, eps, out_opened, iface, n_extra, report,
                        (uint8_t)n) == 0;
 }
 
-void sc2_haptic_service(slot_registry_token_t owner, int fd,
+void sc2_haptic_service(slot_registry_token_t owner,
+                        usb_resources_t *resources,
+                        const usb_session_ops_t *ops,
                         struct usb_fs_endpoint *eps, int out_opened,
                         int iface, int n_extra) {
+    if (!resources || resources->fd < 0) return;
     if (n_extra < 0) n_extra = 0;
     if (n_extra > SC2_HAP_MAX_OUT) n_extra = SC2_HAP_MAX_OUT;
     uint8_t b[12]; uint8_t n;
@@ -249,7 +249,7 @@ void sc2_haptic_service(slot_registry_token_t owner, int fd,
         q_head = (q_head + 1) % QN;
         pthread_mutex_unlock(&q_lock);
 
-        int r = send_report(fd, eps, out_opened, iface, n_extra, b, n);
+        int r = send_report(resources, ops, eps, out_opened, iface, n_extra, b, n);
         pthread_mutex_lock(&log_lock);
         int log_failure = r && !logged_fail;
         int log_success = !r && !logged_ok;
@@ -272,6 +272,7 @@ void sc2_haptic_service(slot_registry_token_t owner, int fd,
     pthread_mutex_unlock(&q_lock);
     if (send) {
         steam_feedback_encode_rumble(b, sizeof(b), l, r);
-        send_report(fd, eps, out_opened, iface, n_extra, b, STEAM_HAPTIC_RUMBLE_SIZE);
-    }
+        send_report(resources, ops, eps, out_opened, iface, n_extra, b,
+                    STEAM_HAPTIC_RUMBLE_SIZE);
+}
 }

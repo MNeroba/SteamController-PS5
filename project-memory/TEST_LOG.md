@@ -482,6 +482,17 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - Push workflows for this source commit are queued: run `37838885358` PS5 cross-build and run `37838885367` Host tests. Older `c87ff0e` runs remain queued too; no GitHub CI pass is claimed.
 
 
+## M1-193 USB COMPLETE endpoint accounting and OUT lifecycle — 2026-10-08 20:34 UTC
+
+- M1-193a expected-red regression: a two-active-endpoint test made the fake COMPLETE return endpoint 1 while the caller waited for endpoint 0. Before the fix, `test_usb_session` returned success instead of the distinct other-endpoint result (exit 1 at the new assertion). This reproduced the old incorrect state transition.
+- M1-193b full normal host suite: `make -C tests clean test`; PASS (exit 0), 1123 counted checks, 340,000 concurrent operations/snapshots, and 100,000 Steam-report plus 100,000 USB-descriptor deterministic inputs. New cases cover actual COMPLETE endpoint reporting, other-endpoint-first polling, failed COMPLETE/STOP ownership retention, duplicate START prevention, and session-cleanup STOP retry.
+- M1-193c full AddressSanitizer/UndefinedBehaviorSanitizer suite: `make -C tests clean sanitize`; PASS (exit 0), the same 1123 checks/stress/input counts, no sanitizer reports.
+- M1-193d PS5 SDK v0.43/LLVM 18.1.8 cross-build: `make -C payload clean all PS5_PAYLOAD_SDK=/Users/mneroba/GitHub/SteamController-PS5/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config`; PASS (exit 0), Darwin 27.0.0 arm64 / Apple clang 21.0.0; ELF64 x86-64 PIE SHA-256 `52f43e080aa171e9290441b10fe503f4a39bc8b8aac36f17bd61655145edcb22`. Compile/link only.
+- M1-193e `git diff --check`: PASS. Source evidence is SDK commit `d9c9519116944a7f1c22d262012c53b80b3520b7`, `target/include/dev/usb/usb_ioctl.h:170-172,331`; the header proves the declared output structure, not Prospero scheduling or runtime behavior.
+- Source and memory are prepared for direct fast-forward publication; GitHub `main` was rechecked at `3320e8d757f78c9056b8b5c6dd6812107a809e81`. The local Git HEAD remains the upstream Puckbridge pin `78460113ef7c48502c765a1f83ba34d53c977134`, so the publication must overlay verified changed blobs onto the remote main tree and validate the full recursive tree before advancing its ref.
+- No physical PS5, Puck, Steam Controller or DualSense was available. No BLE/HCI/radio or firmware operation was run. USB kernel behavior remains unverified and no binary was released.
+
+
 ## M1-190 validation-memory publication — 2026-10-08 20:11 UTC
 
 - Published the clean-tree build record and final recovery/memory synchronization directly to `main` as commit `c87ff0e2bdbee41549b197a70ec5da6f70ffbd84`, parent `0f122c64eff0b196ba023c75af9a61ba1cc9514a`, tree `e03ee1fab971b0f1dd3430923925f485fb81e385`. Six changed file blobs matched their local Git object IDs; GitHub recursive tree still contains exactly the 195 local paths/modes/blobs.

@@ -86,6 +86,7 @@ int usb_resources_note_transfer_start(usb_resources_t *resources,
     if (!resources || resources->fd < 0 || !resources->fs_initialized ||
         !(resources->opened_endpoints & bit))
         return USB_RESOURCES_BAD_STATE;
+    if (resources->active_transfers & bit) return USB_RESOURCES_BAD_STATE;
     resources->active_transfers |= bit;
     return USB_RESOURCES_OK;
 }

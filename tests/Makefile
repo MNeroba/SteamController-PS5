@@ -1,7 +1,7 @@
 CC := clang
 CFLAGS ?= -std=c11 -O2 -Wall -Wextra -Werror -pedantic
 BUILD := build
-TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue
+TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_usb_helpers $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue
 
 .PHONY: all test sanitize clean
 
@@ -32,6 +32,7 @@ test: $(TESTS)
 	./$(BUILD)/test_slot_lifecycle
 	./$(BUILD)/test_usb_resources
 	./$(BUILD)/test_usb_session
+	./$(BUILD)/test_usb_helpers
 	./$(BUILD)/test_game_hook_safety
 	./$(BUILD)/test_ds_handoff
 	./$(BUILD)/test_sc2_status
@@ -118,7 +119,10 @@ $(BUILD)/test_usb_resources: test_usb_resources.c ../payload/usb_resources.c | $
 	$(CC) $(CFLAGS) -I../payload $^ -o $@
 
 $(BUILD)/test_usb_session: test_usb_session.c ../payload/usb_session.c ../payload/usb_resources.c | $(BUILD)
-	$(CC) $(CFLAGS) -I../payload $^ -o $@
+	$(CC) $(CFLAGS) -Ihost_stubs -I../payload $^ -o $@
+
+$(BUILD)/test_usb_helpers: test_usb_helpers.c ../payload/usb_helpers.c ../payload/usb_session.c ../payload/usb_resources.c | $(BUILD)
+	$(CC) $(CFLAGS) -D_DEFAULT_SOURCE -Ihost_stubs -I../payload $^ -o $@
 
 $(BUILD)/test_game_hook_safety: test_game_hook_safety.c ../payload/game_hook_safety.h | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $< -o $@
@@ -141,7 +145,7 @@ $(BUILD)/test_sc2_flick: test_sc2_flick.c ../payload/sc2_flick.c | $(BUILD)
 $(BUILD)/test_sc2_trigfx_state: test_sc2_trigfx_state.c ../payload/sc2_trigfx.c | $(BUILD)
 	$(CC) $(CFLAGS) -Ihost_stubs -I../payload $^ -pthread -o $@
 
-$(BUILD)/test_sc2_haptics_queue: test_sc2_haptics_queue.c ../payload/sc2_haptics.c ../payload/steam_feedback.c | $(BUILD)
+$(BUILD)/test_sc2_haptics_queue: test_sc2_haptics_queue.c ../payload/sc2_haptics.c ../payload/steam_feedback.c ../payload/usb_resources.c | $(BUILD)
 	$(CC) $(CFLAGS) -DSC2_HAPTICS_TEST -Ihost_stubs -I../payload $^ -pthread -o $@
 
 clean:

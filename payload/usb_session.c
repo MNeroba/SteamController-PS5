@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "usb_session.h"
 
+#include <errno.h>
+
 int usb_session_open(usb_resources_t *resources,
                      const usb_session_ops_t *ops,
                      const char *path, int flags, void *context) {
@@ -75,25 +77,39 @@ int usb_session_start_transfer(usb_resources_t *resources,
         return USB_SESSION_ERROR;
     /* Treat a failed START as possibly issued; cleanup will attempt STOP. */
     int result = usb_resources_note_transfer_start(resources, endpoint_index);
-    if (result != USB_RESOURCES_OK) return USB_SESSION_BAD_STATE;
+    if (result != USB_RESOURCES_OK) {
+        errno = EBUSY;
+        return USB_SESSION_BAD_STATE;
+    }
     return ops->start_transfer(resources->fd, configuration, context);
 }
 
 int usb_session_complete_transfer(usb_resources_t *resources,
                                   const usb_session_ops_t *ops,
                                   uint8_t endpoint_index, void *configuration,
+                                  uint8_t *completed_endpoint_index,
                                   void *context) {
-    if (!resources || !ops || !ops->complete_transfer)
+    if (!resources || !ops || !ops->complete_transfer ||
+        !completed_endpoint_index)
         return USB_SESSION_ERROR;
     if (resources->fd < 0 || endpoint_index >= USB_RESOURCES_MAX_ENDPOINTS ||
         !(resources->opened_endpoints & (UINT32_C(1) << endpoint_index)) ||
         !(resources->active_transfers & (UINT32_C(1) << endpoint_index)))
         return USB_SESSION_BAD_STATE;
-    int result = ops->complete_transfer(resources->fd, configuration, context);
+    uint8_t completed = UINT8_MAX;
+    int result = ops->complete_transfer(resources->fd, configuration,
+                                        &completed, context);
     if (result != 0) return result;
 
-    result = usb_resources_note_transfer_complete(resources, endpoint_index);
-    return result == USB_RESOURCES_OK ? USB_SESSION_OK : USB_SESSION_BAD_STATE;
+    if (completed >= USB_RESOURCES_MAX_ENDPOINTS ||
+        usb_resources_note_transfer_complete(resources, completed) !=
+            USB_RESOURCES_OK) {
+        errno = EPROTO;
+        return USB_SESSION_BAD_STATE;
+    }
+    *completed_endpoint_index = completed;
+    return completed == endpoint_index ? USB_SESSION_OK :
+           USB_SESSION_COMPLETED_OTHER;
 }
 
 int usb_session_stop_transfer(usb_resources_t *resources,

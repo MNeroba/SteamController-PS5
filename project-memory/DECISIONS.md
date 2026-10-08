@@ -190,3 +190,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: scanner ioctl operations are still direct and cannot yet inject each platform operation through the `usb_session_ops_t` table. Host tests verify state transitions and retries but not Prospero kernel semantics.
 - Verification gate: concurrent scanner test plus fail-once CLOSE/retry under normal, ASan/UBSan, and TSan; full SDK v0.43 compile/link. PS5 USB ioctl and physical Puck tests remain required.
 - Reconsider if the target's documented USB FS behavior requires scanner-specific operation callbacks or different partial-close semantics.
+
+
+## ADR-031 — Account USB COMPLETE by the returned endpoint
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: SDK v0.43 declares `USB_FS_COMPLETE` as `_IOR` and its output structure contains the completed endpoint index. The generic session API instead cleared the endpoint index supplied by the caller. With overlapping input/output work, a different endpoint can complete first. Separate Xbox and SC2 OUT helpers also managed START/COMPLETE/STOP outside the shared resource owner and discarded STOP failures.
+- Evidence: SDK commit `d9c9519116944a7f1c22d262012c53b80b3520b7`, `target/include/dev/usb/usb_ioctl.h:170-172,331`; expected-red two-active-endpoint host regression in `tests/test_usb_session.c`; fail-once COMPLETE/STOP regression in `tests/test_usb_helpers.c`; F065/T-P41/M1-193.
+- Decision: make the injected COMPLETE callback return the actual completed endpoint, clear that endpoint's transfer ownership, and distinguish an unrelated completion so a caller continues polling. Reject a new START while that endpoint remains active. Route Xbox handshake input, Xbox/Nintendo OUT commands, and SC2 haptics through the session/resource helper. If STOP fails, retain the active bit and retry through common session cleanup.
+- Tradeoff: a caller may observe and drain completions for other active endpoints while waiting on its own transfer. The SC2 candidate scanner still handles multiplexed completions through its direct but tracked scan loop.
+- Verification gate: expected-red then fixed endpoint-accounting test, fail-once STOP cleanup retry, full normal/ASan/UBSan host suites, and pinned SDK cross-build. Real PS5 ioctl scheduling, controller/Puck behavior, device removal, and kernel STOP semantics remain unverified.
+- Reconsider if target measurements reveal different COMPLETE semantics or if scanner operations are moved to a transport-specific multiplexing interface.

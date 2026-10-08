@@ -92,7 +92,9 @@ void nintendo_parse_0x3f(const uint8_t *b, ScePadData *o) {
     o->connected=1; o->quat.w=1.0f;
 }
 
-int nintendo_send_subcmd(int fd, struct usb_fs_endpoint *eps,
+int nintendo_send_subcmd(usb_resources_t *resources,
+                         const usb_session_ops_t *ops,
+                         struct usb_fs_endpoint *eps,
                          uint8_t *seq, uint8_t subcmd,
                          const uint8_t *data, uint32_t data_len) {
     static const uint8_t rumble[8] = {0x00,0x01,0x40,0x40,0x00,0x01,0x40,0x40};
@@ -106,10 +108,13 @@ int nintendo_send_subcmd(int fd, struct usb_fs_endpoint *eps,
     if (data_len) memcpy(buf+11, data, data_len);
     *seq = (uint8_t)((*seq+1) & 0x0f);
     char tag[16]; snprintf(tag, sizeof(tag), "sc%02x", subcmd);
-    return usb_send_out(fd, &eps[1], buf, len, tag);
+    return usb_send_out(resources, ops, &eps[1], 1, buf, len, tag,
+                        50000, 20, NULL);
 }
 
-int nintendo_handle_packet(int fd, struct usb_fs_endpoint *eps,
+int nintendo_handle_packet(usb_resources_t *resources,
+                           const usb_session_ops_t *ops,
+                           struct usb_fs_endpoint *eps,
                            const uint8_t *buf, uint32_t len,
                            int *hs_state, uint8_t *seq,
                            ScePadData *out_pad) {
@@ -141,18 +146,20 @@ int nintendo_handle_packet(int fd, struct usb_fs_endpoint *eps,
             return 0;
         }
         if (buf[1] == 0x01 && *hs_state == HS_WAIT_81_01) {
-            usb_send_cmd(fd, &eps[1], 0x80, 0x02);
+            (void)usb_send_cmd(resources, ops, &eps[1], 1,
+                               0x80, 0x02, 50000, 20, NULL);
             LOG("0x81 0x01 → [80 02]\n");
             *hs_state = HS_WAIT_81_02;
         } else if (buf[1] == 0x02 && *hs_state <= HS_WAIT_81_02) {
-            usb_send_cmd(fd, &eps[1], 0x80, 0x04);
+            (void)usb_send_cmd(resources, ops, &eps[1], 1,
+                               0x80, 0x04, 50000, 20, NULL);
             LOG("0x81 0x02 → [80 04] + subcmds\n");
             uint8_t d[]={0x01};
-            nintendo_send_subcmd(fd,eps,seq,0x40,d,1);
-            nintendo_send_subcmd(fd,eps,seq,0x48,d,1);
-            nintendo_send_subcmd(fd,eps,seq,0x30,d,1);
+            nintendo_send_subcmd(resources,ops,eps,seq,0x40,d,1);
+            nintendo_send_subcmd(resources,ops,eps,seq,0x48,d,1);
+            nintendo_send_subcmd(resources,ops,eps,seq,0x30,d,1);
             uint8_t d2[]={0x30};
-            nintendo_send_subcmd(fd,eps,seq,0x03,d2,1);
+            nintendo_send_subcmd(resources,ops,eps,seq,0x03,d2,1);
             *hs_state = HS_STREAMING;
         }
         return 0;

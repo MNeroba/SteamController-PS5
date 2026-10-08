@@ -15,6 +15,7 @@
 | S07 | [PS5 payload SDK](https://github.com/ps5-payload-dev/sdk) | `f7fd02e6e195902a449b5e664917be8c01888b34` | Community SDK provides dynamic-linked PS5 ELF payload builds | Not official NDA PlayStation SDK; distribution license review required |
 | S08 | [PS5Dev/PS5SDK](https://github.com/PS5Dev/PS5SDK) | pin during M0 | Another community homebrew SDK; WIP | Not Sony Partner SDK and no BLE Central promise |
 | S09 | [BlueKitchen BTstack](https://github.com/bluekitchen/btstack) · [LICENSE](https://github.com/bluekitchen/btstack/blob/master/LICENSE) | `e38553977a25fb0b55b383c72c289be0975f422c` | Full BLE stack reference; noncommercial source terms | Research only until rights/licensing resolved; do not merge into GPL payload naively |
+| S10 | [PS5 payload SDK v0.43](https://github.com/ps5-payload-dev/sdk/tree/d9c9519116944a7f1c22d262012c53b80b3520b7) · `target/include/dev/usb/usb_ioctl.h` | `d9c9519116944a7f1c22d262012c53b80b3520b7` | `struct usb_fs_complete` returns `ep_index` at lines 170–172; `USB_FS_COMPLETE` is `_IOR` at line 331 | API declaration confirms COMPLETE reports an endpoint index; it does not establish Prospero runtime scheduling/behavior |
 
 ### Upstream path hints (not contractual)
 

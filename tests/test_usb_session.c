@@ -1,6 +1,8 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later */
 #include "usb_session.h"
 
+#include <dev/usb/usb.h>
+
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -29,6 +31,9 @@ typedef struct {
     int endpoint_close_calls;
     int uninit_calls;
     int fd_close_calls;
+    int completed_endpoint;
+    uint32_t stopped_endpoints;
+    uint32_t closed_endpoints;
 } fake_session_t;
 
 static int fake_open(const char *path, int flags, void *opaque) {
@@ -59,24 +64,30 @@ static int fake_start(int fd, void *configuration, void *opaque) {
     return fake->fail_start ? -1 : 0;
 }
 
-static int fake_complete(int fd, void *configuration, void *opaque) {
+static int fake_complete(int fd, void *configuration,
+                         uint8_t *completed_endpoint_index, void *opaque) {
     fake_session_t *fake = (fake_session_t *)opaque;
     CHECK(fd == 42 && configuration != NULL);
     fake->complete_calls++;
+    ((struct usb_fs_complete *)configuration)->ep_index =
+        (uint8_t)fake->completed_endpoint;
+    *completed_endpoint_index = (uint8_t)fake->completed_endpoint;
     return fake->fail_complete ? -1 : 0;
 }
 
 static int fake_stop(int fd, uint8_t endpoint, void *opaque) {
     fake_session_t *fake = (fake_session_t *)opaque;
-    CHECK(fd == 42 && endpoint == 0);
+    CHECK(fd == 42 && endpoint < USB_RESOURCES_MAX_ENDPOINTS);
     fake->stop_calls++;
+    fake->stopped_endpoints |= UINT32_C(1) << endpoint;
     return 0;
 }
 
 static int fake_endpoint_close(int fd, uint8_t endpoint, void *opaque) {
     fake_session_t *fake = (fake_session_t *)opaque;
-    CHECK(fd == 42 && endpoint == 0);
+    CHECK(fd == 42 && endpoint < USB_RESOURCES_MAX_ENDPOINTS);
     fake->endpoint_close_calls++;
+    fake->closed_endpoints |= UINT32_C(1) << endpoint;
     return 0;
 }
 
@@ -153,7 +164,9 @@ int main(void) {
     CHECK(usb_session_init_fs(&resources, &ops, &config, &fake) == 0);
     CHECK(usb_session_open_endpoint(&resources, &ops, 0, &config, &fake) == 0);
     CHECK(usb_session_start_transfer(&resources, &ops, 0, &config, &fake) == 0);
-    CHECK(usb_session_complete_transfer(&resources, &ops, 0, &config, &fake) == -1);
+    uint8_t completed_endpoint = UINT8_MAX;
+    CHECK(usb_session_complete_transfer(&resources, &ops, 0, &config,
+                                        &completed_endpoint, &fake) == -1);
     CHECK(resources.active_transfers == 1);
     CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
     CHECK(fake.stop_calls == 1);
@@ -164,10 +177,39 @@ int main(void) {
     CHECK(usb_session_init_fs(&resources, &ops, &config, &fake) == 0);
     CHECK(usb_session_open_endpoint(&resources, &ops, 0, &config, &fake) == 0);
     CHECK(usb_session_start_transfer(&resources, &ops, 0, &config, &fake) == 0);
-    CHECK(usb_session_complete_transfer(&resources, &ops, 0, &config, &fake) == 0);
+    CHECK(usb_session_complete_transfer(&resources, &ops, 0, &config,
+                                        &completed_endpoint, &fake) == 0);
     CHECK(resources.active_transfers == 0);
     CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
     CHECK(fake.stop_calls == 0 && fake.fd_close_calls == 1);
+
+    /* COMPLETE returns the index that finished; it is not a request for the
+     * endpoint the caller hoped to complete. A different endpoint can finish
+     * first and must remain accurately represented in the shared tracker. */
+    usb_resources_init(&resources);
+    fake = (fake_session_t){0};
+    CHECK(usb_session_open(&resources, &ops, "/dev/fake", 7, &fake) == 0);
+    CHECK(usb_session_init_fs(&resources, &ops, &config, &fake) == 0);
+    CHECK(usb_session_open_endpoint(&resources, &ops, 0, &config, &fake) == 0);
+    CHECK(usb_session_open_endpoint(&resources, &ops, 1, &config, &fake) == 0);
+    CHECK(usb_session_start_transfer(&resources, &ops, 0, &config, &fake) == 0);
+    CHECK(usb_session_start_transfer(&resources, &ops, 1, &config, &fake) == 0);
+    struct usb_fs_complete completion = {0};
+    fake.completed_endpoint = 1;
+    CHECK(usb_session_complete_transfer(&resources, &ops, 0, &completion,
+                                        &completed_endpoint, &fake) ==
+          USB_SESSION_COMPLETED_OTHER);
+    CHECK(completed_endpoint == 1);
+    CHECK(completion.ep_index == 1);
+    CHECK(resources.active_transfers == UINT32_C(1));
+    fake.completed_endpoint = 0;
+    CHECK(usb_session_complete_transfer(&resources, &ops, 0, &completion,
+                                        &completed_endpoint, &fake) ==
+          USB_SESSION_OK);
+    CHECK(resources.active_transfers == 0);
+    CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
+    CHECK(fake.stopped_endpoints == 0);
+    CHECK(fake.closed_endpoints == (UINT32_C(1) << 0 | UINT32_C(1) << 1));
 
     printf("USB session fault-injection checks passed (%d checks)\n", checks);
     return 0;
