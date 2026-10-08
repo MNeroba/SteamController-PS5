@@ -102,13 +102,12 @@ static uint8_t to_axis(int32_t v, int32_t dz, float gain, int invert) {
     return (uint8_t)(invert ? 255 - u : u);
 }
 
-/* Left stick shares bytes 16..19 with the left pad; keep last real stick value. */
-static int16_t g_lx = 0, g_ly = 0;
-
 /* ── parser ───────────────────────────────────────────────────────────── */
 
-int steam_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o) {
-    if (len < 40 || b[0] != 0x01 || b[2] != 0x01) return 0;   /* input reports only */
+int steam_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o,
+                        steam_legacy_input_state_t *state) {
+    if (!b || !o || !state || len < 40 || b[0] != 0x01 || b[2] != 0x01)
+        return 0;   /* input reports only */
 
     uint8_t b8 = b[8], b9 = b[9], b10 = b[10];
 
@@ -119,17 +118,17 @@ int steam_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o) {
     /* Left stick: bytes 16..19 are the stick unless the left pad is touched.
      * With both in use the firmware alternates; only take stick frames. */
     if (!lpad_touch) {
-        g_lx = le16(b + 16);
-        g_ly = le16(b + 18);
+        state->lx = le16(b + 16);
+        state->ly = le16(b + 18);
     } else if (!lpad_joy) {
-        g_lx = 0; g_ly = 0;                         /* thumb on pad, stick released */
+        state->lx = 0; state->ly = 0;               /* thumb on pad, stick released */
     }
 
     int16_t rx = rpad_touch ? le16(b + 20) : 0;
     int16_t ry = rpad_touch ? le16(b + 22) : 0;
 
-    o->leftStick.x  = to_axis(g_lx, SC_STICK_DEADZONE, 1.0f, 0);
-    o->leftStick.y  = to_axis(g_ly, SC_STICK_DEADZONE, 1.0f, 1);
+    o->leftStick.x  = to_axis(state->lx, SC_STICK_DEADZONE, 1.0f, 0);
+    o->leftStick.y  = to_axis(state->ly, SC_STICK_DEADZONE, 1.0f, 1);
     o->rightStick.x = to_axis(rx, SC_RPAD_DEADZONE, SC_RPAD_GAIN, 0);
     o->rightStick.y = to_axis(ry, SC_RPAD_DEADZONE, SC_RPAD_GAIN, 1);
 

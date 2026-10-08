@@ -231,6 +231,7 @@ static void *klog_capture_thread(void *arg) {
 
 /* ── VDI injection ────────────────────────────────────────────────────── */
 typedef struct {
+    steam_legacy_input_state_t steam_input;
     sc2_input_state_t sc2_input;
     uint32_t inject_count;
     int bind_ok;
@@ -1151,7 +1152,7 @@ main_loop: ;
                     sc2_vda_attach(slot_token, slot, &session);
             }
         } else if (pid == PID_STEAM_WIRED) {
-            injected = steam_handle_packet(buf, len, &pad);
+            injected = steam_handle_packet(buf, len, &pad, &session.steam_input);
             if ((++steam_pkts % 1250u) == 0) steam_keepalive(fd);   /* ~every 5s */
         } else {
             injected = nintendo_handle_packet(fd, eps, buf, len, &hs_state, &nintendo_seq, &pad);

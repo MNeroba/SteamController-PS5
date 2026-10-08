@@ -29,6 +29,13 @@
 #define STEAM_IFACE      2
 #define STEAM_EP_IN      0x83
 
+/* History for the legacy report's shared left-stick/left-pad axes.
+ * Keep this in the USB session that owns the physical controller. */
+typedef struct {
+    int16_t lx;
+    int16_t ly;
+} steam_legacy_input_state_t;
+
 /* Put controller into gamepad-only mode. Call BEFORE USB_FS_INIT.
  * Returns 0 on success, -errno on control-transfer failure. */
 int  steam_init(int fd);
@@ -36,5 +43,7 @@ int  steam_init(int fd);
 /* Re-send lizard-off (harmless; guards against firmware reverting). */
 void steam_keepalive(int fd);
 
-/* Handle one IN packet. Returns 1 if pad updated, 0 to skip. */
-int  steam_handle_packet(const uint8_t *buf, uint32_t len, ScePadData *out_pad);
+/* Handle one IN packet. State must be owned by the caller's USB session.
+ * Returns 1 if pad updated, 0 to skip. */
+int  steam_handle_packet(const uint8_t *buf, uint32_t len, ScePadData *out_pad,
+                         steam_legacy_input_state_t *state);

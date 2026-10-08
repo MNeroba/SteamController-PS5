@@ -27,6 +27,7 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 | ADR-015 | 2026-10-08 | ACCEPTED | Every concurrent `sc2_find_active_ep()` call owns its report buffers for the whole USB scan; do not use function-static storage for endpoint completion data. The manager may run wired and Puck discovery concurrently, and each call classifies mutable completion buffers after returning from ioctl. A deterministic host stub reproduced cross-call contamination with static storage; per-call stack buffers pass the regression. This changes only scanner scratch ownership, not the USB session/resource contract. Evidence: F047 and M1-78–84; scanner fix published in PR commit `b6f5bae3f6cb2c45be0e798c10b6cf2345ce2edf`. Reconsider only if the bounded stack footprint becomes unsafe on the PS5 worker stack; the current allocation is `SC2_MAX_EPS * 64` bytes. |
 | ADR-016 | 2026-10-08 | ACCEPTED | `json_title()` must own a bounded input buffer per call. The profile watcher can resolve the active title while the portal lists games; a 64 KiB function-static buffer made both calls parse whichever file was read last. Allocate one 64 KiB buffer, parse through a pure helper, and free it on return. This adds a small bounded allocation per metadata lookup. Evidence: F048 and M1-86–90; published in commit `dfd8cc9baaf4b49849dc27451d0fffca956c88ed`. Reconsider if target memory pressure is measured; do not replace it with process-global mutable scratch. |
 | ADR-017 | 2026-10-08 | ACCEPTED | One-time diagnostic throttles used by concurrent workers must use an explicit synchronized claim. `inject_pad()`'s local static error flag allowed simultaneous failures to race and duplicate the supposedly once-only log. `gc_diag_once_t` now serializes the claim and leaves the PS5 log I/O outside the helper lock. Evidence: F049 and M1-92–97. Reconsider only if console latency measurements show the short mutex is material. |
+| ADR-018 | 2026-10-08 | ACCEPTED | Legacy wired Steam left-stick history belongs to one USB reader session. The report's bytes 16–19 alternate between left-stick and left-pad data, so the adapter must retain the last real stick sample; use a small caller-owned `steam_legacy_input_state_t` inside `usb_session_state_t`, initialized with that session, rather than function-static process state or a global lock. Evidence: F050 and M1-99–105. This isolates this legacy decoder's stick history only; it does not change Steam Controller 2026's `sc2_input_state_t` or resolve process-wide profile, menu, gyro, status, or haptic queue ownership. Reconsider only if the adapter's session ownership model changes. |
 
 ## ADR-015 — Per-invocation SC2 endpoint scan buffers
 
@@ -57,3 +58,13 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: a short mutex acquisition on the error path only.
 - Verification gate: 80,000 concurrent host claims under normal, ASan/UBSan and TSan; PS5 VDA errors were not induced.
 - Reconsider only if a supported platform atomic or observed contention justifies a change.
+
+## ADR-018 — Legacy wired Steam state is session-owned
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: legacy `steam_handle_packet()` retains the last real left-stick sample because the same report bytes also carry left-pad coordinates. USB readers can run concurrently, but the baseline used process-static `g_lx/g_ly`.
+- Evidence: pinned Puckbridge base `78460113ef7c48502c765a1f83ba34d53c977134`, baseline blob `7131ad17e158b7892ea0deecf6f6de016d8d375c`; `tests/test_steam_legacy_session.c` expected-red result contaminated a fresh reader with x=206 instead of neutral 128.
+- Decision: pass `steam_legacy_input_state_t` to the adapter and store it in the corresponding `usb_session_state_t`; the existing per-reader zero initialization clears it at session start.
+- Tradeoff: the legacy adapter signature now requires the caller's state object, making ownership explicit.
+- Verification gate: normal and ASan/UBSan full host suites, targeted TSan with two concurrent 10,000-report sessions, and SDK v0.43 compile/link pass. Physical controller frames and PS5 runtime remain unverified.
+- Reconsider only if legacy session ownership moves behind a reusable device-session object.
