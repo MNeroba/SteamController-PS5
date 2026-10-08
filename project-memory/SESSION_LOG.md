@@ -390,3 +390,13 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - M1-91 final `git diff --check`, trailing-whitespace scan and bounded credential/private-key pattern scan pass.
 - Evidence tracked as F048/P2-GAME-META-28/ADR-016/T-P27. The latest implementation increment awaits publication on PR head `1179594c4555699d2346d78fb4cf389f61977f4e`; publish with expected-head guard, including all code/test/doc/memory changes. Refresh the PR body to the new ELF SHA and report any queued Actions accurately.
 - Continue source audit for remaining mutable function statics called from concurrent contexts. P1-HAPTIC-26 remains open; PS5 hardware and native BLE remain blocked and untouched.
+
+
+## M1 one-time VDA diagnostic race — 2026-10-08 17:22 UTC
+
+- Source audit found `gc_main.c:inject_pad()` is called by independent USB session workers, but its `static int vdi_err_logged` was guarded by an unsynchronized check-then-set. Two simultaneous `scePadVirtualDeviceInsertData()` failures could both decide to emit the one-time diagnostic.
+- M1-92 wrote and ran a barrier regression before the fix; it deterministically produced two claims (exit 1). The first corrected-target build had a missing `-I../payload` include path (M1-93); fixed the test Makefile and confirmed the target builds.
+- Added `gc_diag_once_t` in `payload/diag_once.h`; `inject_pad()` claims under its mutex, releases it, then calls `gp_log()`. The 16-thread test performs 80,000 claims and verifies one winner. It does not invoke the PS5 VDA API.
+- M1-94 normal suite PASS; M1-95 full ASan/UBSan PASS; M1-96 TSan PASS with exact command `make -C tests clean`, `make -C tests CFLAGS='-std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=thread -fno-omit-frame-pointer' build/test_diag_once`, `./build/test_diag_once` from `tests/`. M1-97 SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `9611bfeedc525e57302bc9b6ea1d9fecaf7d2c7e1a99be302a37655d39b9b785`, six expected SDK libraries inspected. M1-98 local whitespace and bounded credential scans PASS. No target runtime claim.
+- Evidence F049/P2-GC-DIAG-29/ADR-017/T-P28. Current PR #1 head `dfd8cc9baaf4b49849dc27451d0fffca956c88ed` remains open/draft/mergeable; its Host run `37815721373` and PS5 cross-build run `37815721394` were queued at 17:22 UTC with empty combined status (CI-54/55).
+- Next exact action: publish `payload/diag_once.h`, `payload/gc_main.c`, `tests/test_diag_once.c`, `tests/Makefile`, architecture/test plan and memory to draft PR #1 using expected-head guard `dfd8cc9baaf4b49849dc27451d0fffca956c88ed`; update PR body to the new ELF SHA and status. Then continue auditing remaining worker-shared state. Hardware and native BLE gates remain closed.

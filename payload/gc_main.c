@@ -60,6 +60,7 @@
 #include "slot_registry.h"
 #include "slot_lifecycle.h"
 #include "usb_session.h"
+#include "diag_once.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -112,6 +113,7 @@ extern int32_t sceKernelSendNotificationRequest(int unk0, void *req, size_t size
 #define MAX_SLOTS SLOT_REGISTRY_MAX_SLOTS
 
 static slot_registry_t g_slots;
+static gc_diag_once_t g_vdi_error_log = GC_DIAG_ONCE_INIT;
 /* VDA identity is correlated through one klog queue; serialize AddDevice so
  * concurrent Steam reader threads cannot bind each other's virtual pads. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -254,8 +256,8 @@ static void inject_pad(slot_registry_token_t token, int slot,
     uint32_t n = ++session->inject_count;
     if ((n % 600) == 0)
         gp_log("slot[%d] VDI #%u ret=0x%08x\n", slot, n, (uint32_t)vr);
-    static int vdi_err_logged = 0;
-    if (vr != 0 && !vdi_err_logged) { gp_log("VDI error 0x%08x\n",(uint32_t)vr); vdi_err_logged=1; }
+    if (vr != 0 && gc_diag_once_claim(&g_vdi_error_log))
+        gp_log("VDI error 0x%08x\n", (uint32_t)vr);
 }
 
 /* ── ugen detection ───────────────────────────────────────────────────── */
