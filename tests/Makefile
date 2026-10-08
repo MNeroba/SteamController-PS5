@@ -70,7 +70,7 @@ $(BUILD)/test_steam_protocol: test_steam_protocol.c ../payload/steam_protocol.c 
 $(BUILD)/test_steam_parser_fuzz: test_steam_parser_fuzz.c ../payload/steam_protocol.c ../payload/steam_usb.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $^ -o $@
 
-$(BUILD)/test_sc2_usb_scan: test_sc2_usb_scan.c ../payload/controller_sc2.c ../payload/steam_protocol.c ../payload/usb_session.c ../payload/usb_resources.c | $(BUILD)
+$(BUILD)/test_sc2_usb_scan: test_sc2_usb_scan.c ../payload/controller_sc2.c ../payload/steam_protocol.c ../payload/steam_usb.c ../payload/usb_session.c ../payload/usb_resources.c | $(BUILD)
 	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -Ihost_stubs -I../payload $^ -pthread -Wl,-dead_strip -o $@
 
 $(BUILD)/test_game_list_concurrency: test_game_list_concurrency.c ../payload/game_list.c | $(BUILD)

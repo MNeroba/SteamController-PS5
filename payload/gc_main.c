@@ -789,15 +789,28 @@ static void *usb_hid_thread(void *arg) {
         }
         fd = usb_resources.fd;
 
-        sc2_ep_map(fd, &sc2_map);            /* logs every interface's IN/OUT */
         uint8_t addrs[SC2_MAX_EPS];
-        int n_eps = sc2_list_in_eps(fd, is_puck, addrs, SC2_MAX_EPS);
-        if (n_eps == 0) {           /* descriptor read failed: known puck layout guess */
-            /* Config descriptor unreadable (PS5 kernel): try every IN endpoint.
-             * sc2_find_active_ep only accepts one that sends 0x42/0x45 reports. */
-            gp_log("slot[%d] SC2 config descriptor unreadable, trying IN eps 0x81-0x88\n", slot);
+        int map_status = sc2_ep_map(fd, is_puck, &sc2_map);
+        int n_eps = 0;
+        if (map_status == SC2_USB_MAP_UNAVAILABLE) {
+            /* Preserve the known-device compatibility path only when the
+             * kernel refuses GET_FULL_DESC. A parsed-but-empty or malformed
+             * map must not be treated as permission to probe guessed endpoints. */
+            gp_log("slot[%d] SC2 config descriptor unavailable, trying bounded IN eps 0x81-0x88\n", slot);
             for (int k = 0; k < SC2_MAX_EPS; k++) addrs[k] = (uint8_t)(0x81 + k);
             n_eps = SC2_MAX_EPS;
+        } else if (map_status == SC2_USB_MAP_DEVICE_GONE) {
+            gp_log("slot[%d] SC2 device disappeared during config read\n", slot);
+            goto exit_slot;
+        } else if (map_status < 0) {
+            gp_log("slot[%d] SC2 config descriptor invalid; refusing endpoint scan\n", slot);
+            goto exit_slot;
+        } else {
+            n_eps = sc2_collect_in_eps(&sc2_map, addrs, SC2_MAX_EPS);
+            if (n_eps <= 0) {
+                gp_log("slot[%d] SC2 config has no eligible HID IN endpoints\n", slot);
+                goto exit_slot;
+            }
         }
 
         { int ii; for(ii=0;ii<8;ii++){int i2=ii; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2);} }

@@ -519,6 +519,18 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - GitHub Actions runs `37843842873` (Host tests) and `37843843107` (PS5 cross-build) are queued for this source head. Combined commit status is empty; no CI pass is claimed. Local normal, ASan/UBSan, TSan and SDK v0.43 compile/link results remain as recorded above.
 - The user's correction is now reflected in the repository memory: first destructive commit `9235825db8425e4bb335396fcc38e83daf3c3aa7` directly follows complete source commit `e2059116442e0d195b8aacb9b4baf4eb13737e3e`; compare evidence reports 189 paths, 183 removals and 43,543 deleted lines; the suspected tree-construction mechanism is still unproven. History was retained.
 
+## M1-195 SC2 descriptor fallback classification — 2026-10-08 21:12 UTC
+
+- Test-first unavailable-descriptor regression: `make -C tests clean build/test_sc2_usb_scan && ./tests/build/test_sc2_usb_scan` initially exited 1 with `unavailable USB map status collapsed: result=0 reads=1` when the fake `USB_GET_FULL_DESC` returned `EIO`. After distinguishing statuses, a second expected-red case exited 1 with `disconnected USB map was treated as unavailable: result=-1 reads=3` for `ENXIO`.
+- Implementation: `sc2_ep_map()` now distinguishes an unavailable ioctl, malformed map, and `ENXIO` device removal; it parses once and returns a map used by `sc2_collect_in_eps()` and haptic OUT pairing. `gc_main.c` uses guessed `0x81`–`0x88` IN endpoints only for non-ENXIO ioctl failure. A malformed descriptor, removed device, or valid map with no eligible HID IN endpoint stops discovery.
+- Descriptor-policy regression covers five cases: EIO/unavailable, malformed configuration, ENXIO/device gone, valid Puck map with no eligible interface, and valid candidate interface. `make -C tests clean build/test_sc2_usb_scan && ./tests/build/test_sc2_usb_scan`: PASS, exit 0.
+- Full host suite: `make -C tests clean test`: PASS, exit 0; 1148 counted checks, existing 340,000 concurrent operations/snapshots and 200,000 deterministic parser inputs. The new descriptor-policy branches are manual assertions in the scanner test and do not change the printed aggregate check count.
+- Full ASan/UBSan suite: `make -C tests clean sanitize`: PASS, exit 0; same aggregate coverage, no sanitizer report.
+- Targeted ThreadSanitizer: `make -C tests clean && make -C tests CFLAGS='-std=c11 -O1 -g -Wall -Wextra -Werror -pedantic -fsanitize=thread -fno-omit-frame-pointer' build/test_sc2_usb_scan && ./tests/build/test_sc2_usb_scan`: PASS, exit 0, no race report.
+- SDK v0.43 / LLVM 18.1.8 cross-build: `make -C payload clean all PS5_PAYLOAD_SDK=/Users/mneroba/GitHub/SteamController-PS5/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config`: PASS, exit 0; ELF64 x86-64 shared object SHA-256 `87fa9f441430dd1235654e308988bf28144b2fe5a241f692ea9456f1b9d6d73b`; expected PS5 SDK runtime libraries listed by `llvm-readobj`.
+- `git diff --check`: PASS. Evidence is portable host testing and compile/link only. No physical console or Steam Controller/Puck was available; real PS5 `USB_GET_FULL_DESC`/`ENXIO` behavior, report descriptors/usage page, and runtime remain unverified. Native BLE/HCI/radio and firmware operations were not run.
+- The implementation and records are local and awaiting publication. Before changes, GitHub `main` was at memory-sync commit `d4bf2acd02d46542a9b927d004be920bedd2fac3`, tree `ccbe3bc6832f79606c1819ba0897216cb4a107c4`; its Host tests run `37844355107` and PS5 cross-build run `37844355101` were queued, with empty combined status. No CI pass is claimed.
+
 
 ## M1-190 validation-memory publication — 2026-10-08 20:11 UTC
 

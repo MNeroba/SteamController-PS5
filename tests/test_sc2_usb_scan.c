@@ -20,6 +20,10 @@ static _Thread_local int completion_count;
 static _Thread_local int thread_fail_close_once;
 static _Thread_local int thread_fail_stop_once;
 static _Thread_local int thread_scan_mode;
+static const uint8_t *descriptor_data;
+static uint16_t descriptor_length;
+static int descriptor_error;
+static int descriptor_reads;
 
 enum { SCAN_MODE_CONCURRENT, SCAN_MODE_MULTIPLEXED, SCAN_MODE_TIMEOUT };
 
@@ -48,6 +52,23 @@ int ioctl(int fd, unsigned long request, ...) {
     va_start(args, request);
     void *argument = va_arg(args, void *);
     va_end(args);
+
+    if (request == USB_GET_FULL_DESC) {
+        struct usb_gen_descriptor *descriptor = argument;
+        descriptor_reads++;
+        if (descriptor_error != 0) {
+            errno = descriptor_error;
+            return -1;
+        }
+        if (!descriptor || !descriptor_data ||
+            descriptor_length > descriptor->ugd_maxlen) {
+            errno = EINVAL;
+            return -1;
+        }
+        memcpy(descriptor->ugd_data, descriptor_data, descriptor_length);
+        descriptor->ugd_actlen = descriptor_length;
+        return 0;
+    }
 
     if (request == USB_FS_OPEN) {
         thread_call->open_calls++;
@@ -243,7 +264,86 @@ static void init_scan_resources(usb_resources_t *resources, int fd) {
     }
 }
 
+static int test_usb_map_status(void) {
+    static const uint8_t malformed_config[] = {
+        9, 2, 12, 0, 1, 1, 0, 0x80, 50
+    };
+    static const uint8_t puck_interface_excluded[] = {
+        9, 2, 25, 0, 1, 1, 0, 0x80, 50,
+        9, 4, 6, 0, 1, 3, 0, 0, 0,
+        7, 5, 0x86, 3, 64, 0, 10
+    };
+    static const uint8_t valid_puck_interface[] = {
+        9, 2, 25, 0, 1, 1, 0, 0x80, 50,
+        9, 4, 2, 0, 1, 3, 0, 0, 0,
+        7, 5, 0x84, 3, 64, 0, 10
+    };
+    uint8_t addresses[SC2_MAX_EPS] = {0};
+
+    descriptor_reads = 0;
+    descriptor_data = NULL;
+    descriptor_length = 0;
+    descriptor_error = EIO;
+    sc2_ep_map_t map;
+    int result = sc2_ep_map(17, 1, &map);
+    if (result != SC2_USB_MAP_UNAVAILABLE || descriptor_reads != 1) {
+        fprintf(stderr,
+                "unavailable USB map status collapsed: result=%d reads=%d\n",
+                result, descriptor_reads);
+        return 0;
+    }
+
+    descriptor_data = malformed_config;
+    descriptor_length = sizeof(malformed_config);
+    descriptor_error = 0;
+    result = sc2_ep_map(17, 1, &map);
+    if (result != SC2_USB_MAP_INVALID || descriptor_reads != 2) {
+        fprintf(stderr,
+                "invalid USB map status collapsed: result=%d reads=%d\n",
+                result, descriptor_reads);
+        return 0;
+    }
+
+    descriptor_error = ENXIO;
+    result = sc2_ep_map(17, 1, &map);
+    if (result != SC2_USB_MAP_DEVICE_GONE || descriptor_reads != 3) {
+        fprintf(stderr,
+                "disconnected USB map was treated as unavailable: result=%d reads=%d\n",
+                result, descriptor_reads);
+        return 0;
+    }
+
+    descriptor_data = puck_interface_excluded;
+    descriptor_length = sizeof(puck_interface_excluded);
+    descriptor_error = 0;
+    result = sc2_ep_map(17, 1, &map);
+    int endpoint_count = result < 0 ? result :
+        sc2_collect_in_eps(&map, addresses, SC2_MAX_EPS);
+    if (result != 0 || endpoint_count != 0 || descriptor_reads != 4) {
+        fprintf(stderr,
+                "valid map with no Puck endpoint was not distinguished: map=%d endpoints=%d reads=%d\n",
+                result, endpoint_count, descriptor_reads);
+        return 0;
+    }
+
+    descriptor_data = valid_puck_interface;
+    descriptor_length = sizeof(valid_puck_interface);
+    result = sc2_ep_map(17, 1, &map);
+    endpoint_count = result < 0 ? result :
+        sc2_collect_in_eps(&map, addresses, SC2_MAX_EPS);
+    if (result != 1 || endpoint_count != 1 || addresses[0] != 0x84 ||
+        descriptor_reads != 5) {
+        fprintf(stderr,
+                "valid Puck interface map failed: map=%d endpoints=%d ep=0x%02x reads=%d\n",
+                result, endpoint_count, addresses[0], descriptor_reads);
+        return 0;
+    }
+    return 1;
+}
+
 int main(void) {
+    if (!test_usb_map_status()) return 1;
+
     struct scan_call puck = {
         .fd = 1, .address = 0x81, .endpoint_count = 1, .timeout_ms = 5
     };

@@ -38,49 +38,51 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 static int sc2_read_usb_map(int fd, int puck_only, sc2_ep_map_t *map) {
     uint8_t d[1024] = {0};
     struct usb_gen_descriptor g;
-    if (!map) return -1;
+    if (!map) return SC2_USB_MAP_INVALID;
     memset(map, 0, sizeof(*map));
     memset(&g, 0, sizeof(g));
     g.ugd_data = d; g.ugd_maxlen = sizeof(d);
     g.ugd_config_index = 0xFF;                 /* current config */
     if (ioctl(fd, USB_GET_FULL_DESC, &g) != 0) {
-        LOG("sc2: GET_FULL_DESC fail errno=%d\n", errno);
-        return -1;
+        int error = errno;
+        LOG("sc2: GET_FULL_DESC fail errno=%d\n", error);
+        return error == ENXIO ? SC2_USB_MAP_DEVICE_GONE :
+                                SC2_USB_MAP_UNAVAILABLE;
     }
     unsigned total = g.ugd_actlen ? (unsigned)g.ugd_actlen :
                      (unsigned)d[2] | ((unsigned)d[3] << 8);
     if (total > sizeof(d)) {
         LOG("sc2: GET_FULL_DESC length %u exceeds buffer\n", total);
-        return -1;
+        return SC2_USB_MAP_INVALID;
     }
     int n = steam_usb_parse_config(d, total, puck_only, map);
-    if (n < 0) LOG("sc2: malformed USB configuration descriptor (length %u)\n", total);
-    return n;
-}
-
-int sc2_list_in_eps(int fd, int is_puck, uint8_t *out, int max) {
-    sc2_ep_map_t map;
-    if (!out || max <= 0) return 0;
-    int count = sc2_read_usb_map(fd, is_puck, &map);
-    if (count < 0) return 0;
-    int n = 0;
-    for (int i = 0; i < map.n && n < max; i++) {
-        if (map.it[i].iclass == 0x03 && map.it[i].in_ep) {
-            LOG("sc2: iface %d IN ep 0x%02x\n", map.it[i].iface, map.it[i].in_ep);
-            out[n++] = map.it[i].in_ep;
-        }
+    if (n < 0) {
+        LOG("sc2: malformed USB configuration descriptor (length %u)\n", total);
+        return SC2_USB_MAP_INVALID;
     }
     return n;
 }
 
-int sc2_ep_map(int fd, sc2_ep_map_t *m) {
-    if (!m) return 0;
-    int count = sc2_read_usb_map(fd, 0, m);
-    if (count < 0) return 0;
+int sc2_ep_map(int fd, int puck_only, sc2_ep_map_t *m) {
+    if (!m) return SC2_USB_MAP_INVALID;
+    int count = sc2_read_usb_map(fd, puck_only, m);
+    if (count < 0) return count;
     for (int k = 0; k < m->n; k++)
         LOG("sc2: iface %d class 0x%02x: IN 0x%02x OUT 0x%02x\n", m->it[k].iface,
             m->it[k].iclass, m->it[k].in_ep, m->it[k].out_ep);
     return count;
+}
+
+int sc2_collect_in_eps(const sc2_ep_map_t *map, uint8_t *out, int max) {
+    if (!map || !out || max <= 0 || map->n < 0 ||
+        map->n > STEAM_USB_MAX_INTERFACES)
+        return SC2_USB_MAP_INVALID;
+    int n = 0;
+    for (int i = 0; i < map->n && n < max; i++) {
+        if (map->it[i].iclass == 0x03 && map->it[i].in_ep)
+            out[n++] = map->it[i].in_ep;
+    }
+    return n;
 }
 
 int sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep) {

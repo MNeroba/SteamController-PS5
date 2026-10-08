@@ -36,14 +36,20 @@
 
 #define SC2_MAX_EPS    8
 
-/* List interrupt-IN endpoint addresses of the controller interfaces.
- * Returns count found (0 on descriptor read failure). */
-int  sc2_list_in_eps(int fd, int is_puck, uint8_t *out, int max);
+enum {
+    SC2_USB_MAP_UNAVAILABLE = -1,
+    SC2_USB_MAP_INVALID = -2,
+    SC2_USB_MAP_DEVICE_GONE = -3
+};
 
-/* Full interrupt-endpoint map (every interface), read from the config
- * descriptor and logged once. Used to pair a slot's IN with its OUT. */
+/* Read the USB configuration once into a map. For Pucks, retain controller
+ * interfaces 2 through 5. Returns interface count, SC2_USB_MAP_UNAVAILABLE
+ * for a non-ENXIO GET_FULL_DESC error, SC2_USB_MAP_DEVICE_GONE for ENXIO,
+ * or SC2_USB_MAP_INVALID for a malformed map. */
 typedef steam_usb_map_t sc2_ep_map_t;
-int  sc2_ep_map(int fd, sc2_ep_map_t *m);          /* returns interface count */
+int  sc2_ep_map(int fd, int puck_only, sc2_ep_map_t *m);
+/* Collect interrupt-IN endpoints from the already parsed map. */
+int  sc2_collect_in_eps(const sc2_ep_map_t *m, uint8_t *out, int max);
 int  sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep);
 
 /* With FS already initialised (ep_index_max >= n), open all candidate

@@ -212,3 +212,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: the scanner now depends explicitly on the session operation interface, and a session with an unrelated active transfer must finish or clean up before discovery starts. `gc_main.c` performs discovery in that exclusive pre-reader phase. The fake table validates portable ownership/dispatch only; Prospero scheduling, unplug semantics and actual USB behavior remain unverified.
 - Verification gate: endpoint 1 completes before endpoint 0 and the scanner selects the valid endpoint; active-transfer conflict leaves state unchanged; fail-once STOP/CLOSE remains owned and cleanup retries; full normal and ASan/UBSan suites, targeted scanner TSan, and pinned SDK v0.43 compile/link.
 - Reconsider if hardware evidence shows the Prospero USB FS completion queue can safely be consumed concurrently by independent endpoint owners.
+
+
+## ADR-033 — Fail closed on invalid or empty SC2 configuration maps
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: `sc2_read_usb_map()` collapsed ioctl failure and malformed configuration into the same negative result, while `sc2_list_in_eps()` converted that and a valid zero-candidate map into `0`. `gc_main.c` treated `n_eps == 0` as permission to probe all eight guessed endpoint addresses. A removed device (`ENXIO`) therefore also reached the fallback, and the configuration was read twice for IN and OUT discovery.
+- Evidence: baseline GitHub main at memory-sync commit `d4bf2acd02d46542a9b927d004be920bedd2fac3`; expected-red regressions in `tests/test_sc2_usb_scan.c` first observed `GET_FULL_DESC` with `EIO` returning `0` instead of an unavailable status and `ENXIO` returning unavailable instead of device-gone; T-P43/M1-195.
+- Decision: return separate statuses for unavailable ioctl, malformed map, and device disappearance. Use the bounded endpoint compatibility list only for a non-ENXIO `USB_GET_FULL_DESC` failure; reject malformed descriptors and valid maps with no eligible HID IN endpoint. Parse once and derive candidates and haptic interface pairing from that same map.
+- Tradeoff: an unexpected but recoverable descriptor parsing incompatibility will now fail discovery rather than guess. The target kernel's exact error codes and live configuration/report descriptors remain unverified.
+- Verification gate: expected-red then fixed status checks for unavailable, malformed, ENXIO, valid-empty Puck filter, and valid candidate map; full host/ASan/UBSan, targeted scanner TSan, SDK v0.43 cross-build. No real USB ioctl or hardware behavior is claimed.
+- Reconsider if PS5 hardware evidence shows a non-ENXIO ioctl failure that returns usable descriptor data or if the Puck's valid interface topology differs from the pinned parser contract.
