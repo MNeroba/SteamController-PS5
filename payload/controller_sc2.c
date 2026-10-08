@@ -2,6 +2,7 @@
  * Raw report → physical inputs → active profile (sc2_profile.c) → ScePadData */
 
 #include "controller_sc2.h"
+#include "sc2_status.h"
 #include "sc2_profile.h"
 #include "sc2_menu.h"
 #include "sc2_binding.h"
@@ -234,30 +235,25 @@ static uint32_t pad_dpad(int16_t x, int16_t y) {
 
 /* ── battery ──────────────────────────────────────────────────────────── */
 
-volatile int sc2_battery_level = -1;      /* %, -1 = not reported yet */
-volatile int sc2_battery_state = 0;       /* SC2_BATT_* */
-
 /* Report 0x43 (Linux hid-steam, Ibex): [1] charge state, [2] level %,
  * then voltages, currents and temperature. Warns once below 15% and again
  * below 5% while discharging; charging or getting back above 20% re-arms. */
 static void battery_report(uint8_t raw_state, uint8_t raw_level) {
-    static int warned = 0, last_state = -1;
     int lvl = raw_level > 100 ? 100 : raw_level;
     int state = raw_state == 2 ? SC2_BATT_CHARGING :
                 raw_state == 4 ? SC2_BATT_FULL : SC2_BATT_DISCHARGING;
-    if (sc2_battery_level < 0 || state != last_state)
+    unsigned changes = sc2_status_update_battery(lvl, state);
+    if (changes & SC2_STATUS_BATTERY_CHANGED)
         LOG("sc2: battery %d%% (%s)\n", lvl,
             state == SC2_BATT_CHARGING ? "charging" : state == SC2_BATT_FULL ? "charged" : "on battery");
-    last_state = state;
-    sc2_battery_level = lvl; sc2_battery_state = state;
-    if (state != SC2_BATT_DISCHARGING || lvl > 20) { warned = 0; return; }
-    const char *m = NULL;
-    if (lvl <= 5 && warned < 2)       { warned = 2; m = "Puckbridge: Steam Controller battery at 5%. Charge it soon."; }
-    else if (lvl <= 15 && warned < 1) { warned = 1; m = "Puckbridge: Steam Controller battery low (15%)."; }
+    const char *m = changes & SC2_STATUS_BATTERY_WARN_5
+        ? "Puckbridge: Steam Controller battery at 5%. Charge it soon."
+        : changes & SC2_STATUS_BATTERY_WARN_15
+        ? "Puckbridge: Steam Controller battery low (15%)." : NULL;
     if (m && sc2_notify_fn) sc2_notify_fn(m);
 }
 
-void sc2_battery_reset(void) { sc2_battery_level = -1; sc2_battery_state = 0; }
+void sc2_battery_reset(void) { (void)sc2_status_update_battery(-1, 0); }
 
 static uint32_t profile_input_mask(const steam_input_report_t *report) {
     static const uint8_t profile_input[STEAM_CTL_COUNT] = {
@@ -285,17 +281,16 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
          * or touch contacts held in the virtual pad. */
         sc2_neutralize_pad(o);
         *link = 1;
-        sc2_live_inputs = 0;
-        sc2_live_connected = 1;
+        sc2_status_set_input(0, 1);
         sc2_bind_reset(binding_state);
         sc2_flick_reset();
         sc2_gyro_reset();
-        sc2_gyro_moving = 0;
+        sc2_gyro_set_moving(0);
         return 1;
     }
     if (decoded.kind == STEAM_REPORT_WIRELESS) {
         if (decoded.data.wireless.event == 1) {
-            *link = 0; sc2_live_connected = 0; sc2_live_inputs = 0;
+            *link = 0; sc2_status_set_input(0, 0);
             sc2_bind_reset(binding_state);
             sc2_gyro_reset();
             sc2_flick_reset();
@@ -325,8 +320,7 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
     uint32_t in = profile_input_mask(report);
     if (rt > SC2_TRIG_THRESHOLD) in |= (uint32_t)1u << IN_RT;
     if (lt > SC2_TRIG_THRESHOLD) in |= (uint32_t)1u << IN_LT;
-    sc2_live_inputs = in;
-    sc2_live_connected = 1;
+    sc2_status_set_input(in, 1);
 
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     int64_t now = (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
@@ -376,7 +370,7 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
         o->leftStick.x = o->leftStick.y = o->rightStick.x = o->rightStick.y = 128;
         o->buttons = 0; o->connected = 1; o->quat.w = 1.0f;
         sc2_bind_reset(binding_state);
-        sc2_gyro_moving = 0;
+        sc2_gyro_set_moving(0);
         return 1;
     }
 
@@ -388,7 +382,7 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
     if (binding_state->neutral_report) {
         sc2_flick_reset();
         sc2_gyro_reset();
-        sc2_gyro_moving = 0;
+        sc2_gyro_set_moving(0);
         sc2_neutralize_pad(o);
         return 1;
     }
@@ -457,7 +451,7 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
         o->rightStick.x = (uint8_t)(x < 0 ? 0 : x > 255 ? 255 : x);
         o->rightStick.y = (uint8_t)(y < 0 ? 0 : y > 255 ? 255 : y);
     }
-    sc2_gyro_moving = gdx || gdy;
+    sc2_gyro_set_moving(gdx || gdy);
 
     if (ol2) btn |= SCE_PAD_BUTTON_L2; else btn &= ~SCE_PAD_BUTTON_L2;
     if (or2) btn |= SCE_PAD_BUTTON_R2; else btn &= ~SCE_PAD_BUTTON_R2;

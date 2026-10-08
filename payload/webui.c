@@ -4,6 +4,7 @@
 #include "sc2_profile.h"
 #include "game_list.h"
 #include "sc2_haptics.h"
+#include "sc2_status.h"
 #include "sc2_menu.h"
 #include "controller_sc2.h"
 #include "sc2_gyro.h"
@@ -181,6 +182,8 @@ static void handle(int fd) {
         return;
     }
     if (!strncmp(path, "/api/status", 11)) {
+        sc2_status_snapshot_t runtime;
+        sc2_status_snapshot(&runtime);
         char t[SC2_ID_MAX+1], a[SC2_ID_MAX+1], ov[SC2_ID_MAX+1];
         char tn[GC_GAME_NAME_MAX], pn[48];
         sc2_select_status(t, a, ov);
@@ -193,11 +196,11 @@ static void handle(int fd) {
         sb_put(&sb, ",\"active_name\":"); json_str(&sb, pn);
         sb_put(&sb, ",\"override\":"); json_str(&sb, ov);
         sb_printf(&sb, ",\"inputs\":%u,\"connected\":%d,\"menu\":%d,\"haptics\":%d,\"paused\":%d",
-                  (unsigned)sc2_live_inputs, sc2_live_connected, sc2_menu_is_open(), sc2_haptic_available, sc2_pause_is_active());
+                  (unsigned)runtime.live_inputs, runtime.live_connected, sc2_menu_is_open(), runtime.haptic_available, sc2_pause_is_active());
         sb_printf(&sb, ",\"battery\":%d,\"charging\":%d",
-                  sc2_battery_level, sc2_battery_state == SC2_BATT_CHARGING ? 1 : sc2_battery_state == SC2_BATT_FULL ? 2 : 0);
+                  runtime.battery_level, runtime.battery_state == SC2_BATT_CHARGING ? 1 : runtime.battery_state == SC2_BATT_FULL ? 2 : 0);
         sb_printf(&sb, ",\"hap\":{\"q\":%u,\"sent\":%u,\"fail\":%u,\"err\":%d,\"via\":%d,\"out\":%d}",
-                  sc2_hap_queued, sc2_hap_sent, sc2_hap_failed, sc2_hap_last_err, sc2_hap_last_via, sc2_hap_out_ep);
+                  runtime.haptic_queued, runtime.haptic_sent, runtime.haptic_failed, runtime.haptic_last_err, runtime.haptic_last_via, runtime.haptic_out_ep);
         sc2_gyro_status_t gs; sc2_gyro_status(&gs);
         sb_printf(&sb, ",\"gyro\":{\"wanted\":%d,\"imu\":%d,\"active\":%d,\"cal\":%d,\"grips\":%d,\"button\":%d,"
                   "\"yaw\":%.1f,\"pitch\":%.1f,\"roll\":%.1f}}",
@@ -227,9 +230,10 @@ static void handle(int fd) {
         return;
     }
     if (is_post && !strncmp(path, "/api/haptic", 11)) {
-        LOG("haptics: test requested %s (available=%d)\n", path, sc2_haptic_available);
-        if (!sc2_haptic_available) { REPLY_TXT(fd, 400, "Steam Controller isn't connected to the payload"); return; }
-        { const char *m = strstr(path, "via="); if (m && m[4] >= '0' && m[4] <= '4') sc2_haptic_method = m[4] - '0'; }
+        int haptics_available = sc2_status_haptics_available();
+        LOG("haptics: test requested %s (available=%d)\n", path, haptics_available);
+        if (!haptics_available) { REPLY_TXT(fd, 400, "Steam Controller isn't connected to the payload"); return; }
+        { const char *m = strstr(path, "via="); if (m && m[4] >= '0' && m[4] <= '4') sc2_status_set_haptic_method(m[4] - '0'); }
         if      (strstr(path, "kind=left"))   sc2_haptic_pulse(SC2_PAD_LEFT,  0x1F4, 0x1F4, 200);
         else if (strstr(path, "kind=right"))  sc2_haptic_pulse(SC2_PAD_RIGHT, 0x1F4, 0x1F4, 200);
         else if (strstr(path, "kind=rumble")) sc2_haptic_rumble_for(0x9000, 0x6000, 700);

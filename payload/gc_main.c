@@ -48,6 +48,7 @@
 #include "controller_sc2.h"
 #include "sc2_profile.h"
 #include "sc2_control.h"
+#include "sc2_status.h"
 #include "webui.h"
 #include "sc2_haptics.h"
 #include "sc2_menu.h"
@@ -866,8 +867,7 @@ static void *usb_hid_thread(void *arg) {
                            slot, o, sc2_map.it[j].iface);
                 }
             }
-            sc2_haptic_available = 1;
-            sc2_hap_out_ep = out_opened ? own_out : -1;
+            sc2_status_set_haptics(1, out_opened ? own_out : -1);
         }
         goto main_loop;
     }
@@ -1100,7 +1100,9 @@ main_loop: ;
                                    sc2_pause_is_active() ? "paused" : "DualSense in control");
                 }
                 if (was && !sc2_link) ds_handoff_sc2_session(0);   /* it did power off */
-                int steam = sc2_link && (sc2_live_inputs & (1u << IN_STEAM)) != 0;
+                sc2_status_snapshot_t status;
+                sc2_status_snapshot(&status);
+                int steam = sc2_link && (status.live_inputs & (1u << IN_STEAM)) != 0;
                 if (sc2_pause_is_active()) ;                    /* only the … hold resumes */
                 else if (sc2_park_stage == 0 && !steam) sc2_park_stage = 1;
                 else if (sc2_park_stage == 1 &&  steam) sc2_park_stage = 2;
@@ -1172,7 +1174,7 @@ main_loop: ;
 
 reinit:
     if (usb_ready_notified) { notify("Puckbridge: slot[%d] controller disconnected", slot); usb_ready_notified=0; }
-    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) { sc2_haptic_available = 0; sc2_menu_request_close(); sc2_gyro_reset(); sc2_battery_reset(); ds_handoff_sc2_session(0); }
+    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) { sc2_status_set_input(0, 0); sc2_status_set_haptics(0, -1); sc2_menu_request_close(); sc2_gyro_reset(); sc2_battery_reset(); ds_handoff_sc2_session(0); }
     goto cleanup_usb;
 uninit_exit:
 cleanup_usb:

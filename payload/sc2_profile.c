@@ -50,9 +50,6 @@ static const char *k_pad[] = { "OFF", "TOUCH", "STICK", "DPAD" };
 static const char *k_gyro[GYRO_MODES] = { "OFF", "ALWAYS", "GRIP", "GRIPS", "RPAD", "RSTICK" };
 static const char *k_gyro_axis[] = { "YAW", "ROLL" };
 
-volatile uint32_t sc2_live_inputs = 0;
-volatile int      sc2_live_connected = 0;
-
 /* ── profile <-> text ─────────────────────────────────────────────────── */
 
 void sc2_profile_default(sc2_profile_t *p) {

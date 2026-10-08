@@ -6,6 +6,7 @@
  * over 0x..0300): only an id the system log named is ever disconnected. */
 
 #include "ds_handoff.h"
+#include <sys/types.h>
 #include "shellui_pad.h"
 #include "sc2_profile.h"
 #include "bridge/wireless_ds4.h"
@@ -16,7 +17,9 @@
 #include <time.h>
 #include <sys/stat.h>
 
-#ifdef __PROSPERO__
+#if defined(DS_HANDOFF_TEST)
+#define LOG(...) do { if (0) fprintf(stderr, __VA_ARGS__); } while (0)
+#elif defined(__PROSPERO__)
 #define LOG(...) ghostpad_status_log("[GC] " __VA_ARGS__)
 #else
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
@@ -30,12 +33,12 @@ enum { ST_IDLE, ST_NO_ID, ST_WORKING, ST_OFF, ST_BACK, ST_FAILED };
 static const char *k_state[] = { "idle", "no_id", "working", "off", "back", "failed" };
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
-static volatile int g_enabled = 0;
-static volatile int g_armed = 0;          /* this Steam Controller session may still act */
+static int      g_enabled = 0;
+static int      g_armed = 0;              /* this Steam Controller session may still act */
 static int      g_session = 0;            /* Steam Controller is on and in control */
 static int64_t  g_session_ms = 0;         /* since when */
 static int      g_noid_logged = 0;
-static volatile int g_busy = 0;
+static int      g_busy = 0;
 static int      g_state = ST_IDLE, g_last_ret = 0;
 static uint64_t g_pads[MAX_PADS];         /* known physical pads */
 static uint32_t g_seen[MAX_PADS];         /* order each was last seen in */
@@ -45,7 +48,7 @@ static uint64_t g_virt[MAX_VIRT];
 static int      g_n_virt = 0;
 static uint64_t g_off_id = 0;             /* pad we disconnected this session */
 static int64_t  g_off_ms = 0;             /* when */
-static volatile int g_release = 0;        /* DualSense came back: release the Steam Controller */
+static int      g_release = 0;            /* DualSense came back: release the Steam Controller */
 
 static int64_t now_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -62,21 +65,28 @@ static void notify(const char *m) {
 /* ── settings ─────────────────────────────────────────────────────────── */
 
 void ds_handoff_start(void) {
+    int enabled = 0;
     FILE *f = fopen(SETTINGS, "r");
     if (!f) return;
     char l[96];
     while (fgets(l, sizeof(l), f))
-        if (!strncmp(l, "TURN_OFF_DUALSENSE=", 19)) g_enabled = atoi(l + 19) != 0;
+        if (!strncmp(l, "TURN_OFF_DUALSENSE=", 19)) enabled = atoi(l + 19) != 0;
     fclose(f);
-    LOG("dualsense hand-off: %s\n", g_enabled ? "on" : "off");
+    pthread_mutex_lock(&g_lock);
+    g_enabled = enabled;
+    pthread_mutex_unlock(&g_lock);
+    LOG("dualsense hand-off: %s\n", enabled ? "on" : "off");
 }
 
 void ds_handoff_set_enabled(int on) {
-    g_enabled = on ? 1 : 0;
+    int enabled = on ? 1 : 0;
+    pthread_mutex_lock(&g_lock);
+    g_enabled = enabled;
+    pthread_mutex_unlock(&g_lock);
     mkdir("/data/ghostpad", 0777);
     FILE *f = fopen(SETTINGS, "w");
-    if (f) { fprintf(f, "TURN_OFF_DUALSENSE=%d\n", g_enabled); fclose(f); }
-    LOG("dualsense hand-off: %s\n", g_enabled ? "on" : "off");
+    if (f) { fprintf(f, "TURN_OFF_DUALSENSE=%d\n", enabled); fclose(f); }
+    LOG("dualsense hand-off: %s\n", enabled ? "on" : "off");
 }
 
 /* ── known pads ───────────────────────────────────────────────────────── */
@@ -233,7 +243,6 @@ void ds_handoff_klog_line(const char *line) {
 /* ── hand-off ─────────────────────────────────────────────────────────── */
 
 int ds_handoff_take_release(void) {
-    if (!g_release) return 0;                 /* fast path, every report */
     pthread_mutex_lock(&g_lock);
     int r = g_release; g_release = 0;
     pthread_mutex_unlock(&g_lock);
@@ -271,7 +280,6 @@ static void *worker(void *arg) {
 }
 
 void ds_handoff_sc2_used(void) {
-    if (!g_enabled || !g_armed || g_busy) return;          /* fast path, every report */
     pthread_mutex_lock(&g_lock);
     if (!g_enabled || !g_armed || g_busy) { pthread_mutex_unlock(&g_lock); return; }
     int dropped = 0;

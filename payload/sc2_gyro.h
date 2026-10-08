@@ -52,4 +52,5 @@ void sc2_gyro_status(sc2_gyro_status_t *s);
 
 /* Gyro moved the right stick this report (merged game input treats that as
  * the Steam Controller using the stick, even below the usual threshold). */
-extern volatile int sc2_gyro_moving;
+void sc2_gyro_set_moving(int moving);
+int sc2_gyro_is_moving(void);

@@ -19,6 +19,7 @@
 #include <math.h>
 #include <time.h>
 #include <unistd.h>
+#include <pthread.h>
 #include <sys/ioctl.h>
 #include <dev/usb/usb.h>
 #include <dev/usb/usb_ioctl.h>
@@ -26,6 +27,9 @@
 #ifdef __PROSPERO__
 void ghostpad_status_log(const char *fmt, ...);
 #define LOG(...) ghostpad_status_log("[GC] " __VA_ARGS__)
+#elif defined(SC2_GYRO_TEST)
+static void sc2_gyro_test_log(const char *fmt, ...) { (void)fmt; }
+#define LOG(...) sc2_gyro_test_log(__VA_ARGS__)
 #else
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #endif
@@ -61,15 +65,17 @@ void ghostpad_status_log(const char *fmt, ...);
  * turns the whole way; moving back the other way cancels it. */
 #define CARRY_MAX_S       0.35f
 
-volatile int sc2_gyro_moving = 0;
+static pthread_mutex_t g_state_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_service_lock = PTHREAD_MUTEX_INITIALIZER;
+static int             g_moving = 0;
 
-static volatile int     g_wanted = 0;
-static volatile int64_t g_imu_seen = 0;           /* last report with live IMU data */
-static volatile int     g_active = 0, g_grips = 0;
-static volatile float   g_yaw = 0, g_pitch = 0, g_roll = 0;
+static int     g_wanted = 0;
+static int64_t g_imu_seen = 0;           /* last report with live IMU data */
+static int     g_active = 0, g_grips = 0;
+static float   g_yaw = 0, g_pitch = 0, g_roll = 0;
 
 static float   g_bias[3];                         /* raw [40] [42] [44] */
-static volatile int g_cal = 0;
+static int     g_cal = 0;
 static int64_t g_win_start = 0;
 static int     g_win_n = 0;
 static float   g_win_sum[3];
@@ -126,18 +132,20 @@ static void calibrate(const int16_t g[3], const int16_t a[3], int64_t now, int a
     g_win_n = 0;
 }
 
-static volatile uint32_t g_act = 0;               /* gyro buttons held this report */
-static volatile int g_toggled_off = 0;
+static uint32_t g_act = 0;               /* gyro buttons held this report */
+static uint32_t g_prev_act = 0;
+static int g_toggled_off = 0;
 
 void sc2_gyro_buttons(uint32_t act) {
-    static uint32_t prev = 0;
+    pthread_mutex_lock(&g_state_lock);
     act &= PB_ACT_GYRO;
-    if ((act & PB_ACT_GYRO_TOGGLE) && !(prev & PB_ACT_GYRO_TOGGLE)) {
+    if ((act & PB_ACT_GYRO_TOGGLE) && !(g_prev_act & PB_ACT_GYRO_TOGGLE)) {
         g_toggled_off = !g_toggled_off;
         LOG("gyro: %s with the gyro button\n", g_toggled_off ? "off" : "back on");
     }
-    prev = act;
+    g_prev_act = act;
     g_act = act;
+    pthread_mutex_unlock(&g_state_lock);
 }
 
 /* does the profile bind a "gyro on while held" button anywhere? */
@@ -165,15 +173,16 @@ static int gyro_engaged(const sc2_profile_t *P, const steam_input_report_t *repo
 void sc2_gyro_apply(const sc2_profile_t *P, const steam_input_report_t *report,
                     int64_t now, int *dx, int *dy) {
     *dx = *dy = 0;
+    pthread_mutex_lock(&g_state_lock);
     int buttons = has_gyro_on_button(P);
     g_wanted = P->gyro_mode != GYRO_OFF || buttons || P->motion;
-    if (!report || !report->has_imu) { g_active = 0; return; }
+    if (!report || !report->has_imu) { g_active = 0; pthread_mutex_unlock(&g_state_lock); return; }
     g_grips = (report->left_grip_touched ? 1 : 0) |
               (report->right_grip_touched ? 2 : 0);
 
     int16_t a[3] = { report->accel[0], report->accel[1], report->accel[2] };
     int16_t g[3] = { report->gyro[0], report->gyro[1], report->gyro[2] };
-    if (!a[0] && !a[1] && !a[2]) { g_active = 0; return; }   /* IMU off: gravity never reads 0 */
+    if (!a[0] && !a[1] && !a[2]) { g_active = 0; pthread_mutex_unlock(&g_state_lock); return; }   /* IMU off: gravity never reads 0 */
     g_imu_seen = now;
 
     int on = (P->gyro_mode != GYRO_OFF || buttons) && gyro_engaged(P, report);
@@ -189,7 +198,7 @@ void sc2_gyro_apply(const sc2_profile_t *P, const steam_input_report_t *report,
     g_last_ms = now;
     if (dt < 0.0f) dt = 0.0f;
     if (dt > 0.02f) dt = 0.02f;               /* report gap: don't treat as one long frame */
-    if (!on) { memset(g_hist, 0, sizeof(g_hist)); g_carry[0] = g_carry[1] = 0; return; }
+    if (!on) { memset(g_hist, 0, sizeof(g_hist)); g_carry[0] = g_carry[1] = 0; pthread_mutex_unlock(&g_state_lock); return; }
 
     /* aim rates in °/s: +x = aim right, +y = aim up */
     float vx = -(P->gyro_axis == GYRO_AXIS_ROLL ? roll : yaw);
@@ -231,7 +240,7 @@ void sc2_gyro_apply(const sc2_profile_t *P, const steam_input_report_t *report,
         }
     }
     float m = sqrtf(fx * fx + fy * fy);
-    if (m < 0.002f) return;
+    if (m < 0.002f) { pthread_mutex_unlock(&g_state_lock); return; }
     if (m > 1.0f) { fx /= m; fy /= m; m = 1.0f; }
     /* game stick curve: most games bend the stick (half push < half speed),
      * so bend the other way to keep turn speed proportional to the gyro */
@@ -242,6 +251,7 @@ void sc2_gyro_apply(const sc2_profile_t *P, const steam_input_report_t *report,
     fx *= out / m; fy *= out / m;
     *dx = (int)lrintf(fx * 127.0f);
     *dy = (int)lrintf(-fy * 127.0f);                       /* DualSense: +y = down */
+    pthread_mutex_unlock(&g_state_lock);
 }
 
 /* ── motion for games ─────────────────────────────────────────────────── */
@@ -251,8 +261,12 @@ static steam_motion_state_t g_motion_state = {{1.0f, 0.0f, 0.0f, 0.0f}, 0};
 void sc2_gyro_motion(const sc2_profile_t *P, const steam_input_report_t *report,
                      int64_t now, ScePadData *o) {
     if (!P->motion || !report || !o) return;
+    pthread_mutex_lock(&g_state_lock);
     steam_motion_output_t motion;
-    if (!steam_motion_update(&g_motion_state, report, g_bias, now, &motion)) return;
+    if (!steam_motion_update(&g_motion_state, report, g_bias, now, &motion)) {
+        pthread_mutex_unlock(&g_state_lock);
+        return;
+    }
     o->accel.x = motion.acceleration_g[0];
     o->accel.y = motion.acceleration_g[1];
     o->accel.z = motion.acceleration_g[2];
@@ -263,20 +277,25 @@ void sc2_gyro_motion(const sc2_profile_t *P, const steam_input_report_t *report,
     o->quat.y = motion.quaternion[2];
     o->quat.z = motion.quaternion[3];
     o->quat.w = motion.quaternion[0];
+    pthread_mutex_unlock(&g_state_lock);
 }
 
 void sc2_gyro_reset(void) {
+    pthread_mutex_lock(&g_state_lock);
     steam_motion_reset(&g_motion_state);
-    g_act = 0; g_toggled_off = 0;
-    g_imu_seen = 0; g_active = 0; g_grips = 0; sc2_gyro_moving = 0;
+    g_act = 0; g_prev_act = 0; g_toggled_off = 0;
+    g_imu_seen = 0; g_active = 0; g_grips = 0; g_moving = 0;
     g_win_n = 0;
     memset(g_hist, 0, sizeof(g_hist));
     g_carry[0] = g_carry[1] = 0; g_last_ms = 0;
     g_yaw = g_pitch = g_roll = 0;
+    pthread_mutex_unlock(&g_state_lock);
 }
 
 void sc2_gyro_status(sc2_gyro_status_t *s) {
+    if (!s) return;
     int64_t t = now_ms();
+    pthread_mutex_lock(&g_state_lock);
     s->wanted = g_wanted;
     s->imu = g_imu_seen && t - g_imu_seen < 500;
     s->active = s->imu && g_active;
@@ -284,6 +303,20 @@ void sc2_gyro_status(sc2_gyro_status_t *s) {
     s->grips = g_grips;
     s->button = (g_act & PB_ACT_GYRO_ON) ? 1 : (g_act & PB_ACT_GYRO_OFF) ? 2 : g_toggled_off ? 3 : 0;
     s->yaw = g_yaw; s->pitch = g_pitch; s->roll = g_roll;
+    pthread_mutex_unlock(&g_state_lock);
+}
+
+void sc2_gyro_set_moving(int moving) {
+    pthread_mutex_lock(&g_state_lock);
+    g_moving = moving ? 1 : 0;
+    pthread_mutex_unlock(&g_state_lock);
+}
+
+int sc2_gyro_is_moving(void) {
+    pthread_mutex_lock(&g_state_lock);
+    int moving = g_moving;
+    pthread_mutex_unlock(&g_state_lock);
+    return moving;
 }
 
 /* ── IMU on/off ───────────────────────────────────────────────────────── */
@@ -312,22 +345,27 @@ static int send_setting(int fd, int iface, uint8_t reg, uint16_t val) {
 void sc2_gyro_service(int fd, int iface) {
     static int64_t next_try = 0;
     static int tries = 0, sent_on = 0;
+    pthread_mutex_lock(&g_service_lock);
     int64_t t = now_ms();
+    pthread_mutex_lock(&g_state_lock);
+    int wanted = g_wanted;
     int alive = g_imu_seen && t - g_imu_seen < 500;
+    pthread_mutex_unlock(&g_state_lock);
 
-    if (g_wanted && !alive) {
-        if (t < next_try) return;
+    if (wanted && !alive) {
+        if (t < next_try) { pthread_mutex_unlock(&g_service_lock); return; }
         int r = send_setting(fd, iface, SETTING_IMU_MODE, IMU_RAW_ACCEL | IMU_RAW_GYRO);
         tries++; sent_on = 1;
         next_try = t + (tries < 5 ? 1000 : 10000);
         if (tries <= 3 || tries % 30 == 0)
             LOG("gyro: enabling IMU (iface %d, try %d) → %d\n", iface, tries, r);
-    } else if (g_wanted && alive) {
+    } else if (wanted && alive) {
         if (tries) LOG("gyro: IMU streaming\n");
         tries = 0; next_try = 0;
-    } else if (!g_wanted && sent_on) {             /* gyro and motion both off: save battery */
+    } else if (!wanted && sent_on) {               /* gyro and motion both off: save battery */
         int r = send_setting(fd, iface, SETTING_IMU_MODE, 0);
         LOG("gyro: IMU off → %d\n", r);
         sent_on = 0; tries = 0; next_try = 0;
     }
+    pthread_mutex_unlock(&g_service_lock);
 }

@@ -61,7 +61,6 @@ int  sc2_handle_packet(const uint8_t *buf, uint32_t len,
  * see it as switched off, so the DualSense is fully back in charge. */
 /* Battery (report 0x43): level in %, -1 until the controller reports it. */
 enum { SC2_BATT_DISCHARGING = 1, SC2_BATT_CHARGING, SC2_BATT_FULL };
-extern volatile int sc2_battery_level, sc2_battery_state;
 void sc2_battery_reset(void);
 
 void sc2_set_paused(int on);

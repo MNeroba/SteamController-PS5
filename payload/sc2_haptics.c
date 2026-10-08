@@ -5,6 +5,7 @@
  * Rumble has to be refreshed (hid-steam resends every 50 ms). */
 
 #include "sc2_haptics.h"
+#include "sc2_status.h"
 #include "usb_helpers.h"
 #include "steam_feedback.h"
 #include <unistd.h>
@@ -23,11 +24,6 @@ void ghostpad_status_log(const char *fmt, ...);
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
-volatile int sc2_haptic_available = 0;
-volatile int sc2_haptic_method = 0;
-volatile unsigned sc2_hap_queued = 0, sc2_hap_sent = 0, sc2_hap_failed = 0;
-volatile int sc2_hap_last_err = 0, sc2_hap_last_via = 0, sc2_hap_out_ep = 0;   /* 0 auto, 1 interrupt OUT, 2 SET_REPORT output, 3 SET_REPORT feature */
-
 #define QN 8
 static pthread_mutex_t q_lock = PTHREAD_MUTEX_INITIALIZER;
 static struct { uint8_t b[12]; uint8_t n; } q[QN];
@@ -45,7 +41,7 @@ static int64_t now_ms(void) {
 static void push(const uint8_t *b, uint8_t n) {
     pthread_mutex_lock(&q_lock);
     int nx = (q_tail + 1) % QN;
-    if (nx != q_head) { memcpy(q[q_tail].b, b, n); q[q_tail].n = n; q_tail = nx; sc2_hap_queued++; }
+    if (nx != q_head) { memcpy(q[q_tail].b, b, n); q[q_tail].n = n; q_tail = nx; sc2_status_haptic_queued(); }
     pthread_mutex_unlock(&q_lock);
 }
 
@@ -116,7 +112,7 @@ static int g_n_extra = 0;
 static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int iface,
                        const uint8_t *b, uint8_t n) {
     static int last_method = -1;
-    int m = sc2_haptic_method, r = -1, used = 0;
+    int m = sc2_status_haptic_method(), r = -1, used = 0;
     if ((m == 0 || m == 1) && out_opened) { r = send_out_idx(fd, eps, 1, b, n); used = 1; }
     if (m == 4) {
         used = 4; r = out_opened ? send_out_idx(fd, eps, 1, b, n) : -1;
@@ -128,8 +124,7 @@ static int send_report(int fd, struct usb_fs_endpoint *eps, int out_opened, int 
     }
     if (r != 0 && (m == 0 || m == 2))    { r = ctrl_report(fd, iface, 2, b, n); used = 2; }
     if (r != 0 && m == 3)                { r = ctrl_report(fd, iface, 3, b, n); used = 3; }
-    sc2_hap_last_via = used; sc2_hap_last_err = r;
-    if (r == 0) sc2_hap_sent++; else sc2_hap_failed++;
+    sc2_status_haptic_result(used, r);
     if (m != last_method || r != 0) {
         static int n_err_logs = 0;
         if (r == 0 || n_err_logs++ < 10)

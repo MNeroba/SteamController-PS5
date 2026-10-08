@@ -12,7 +12,7 @@ typedef struct {
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static fx_t    g_fx[2];
-static volatile int g_on = 0;
+static int     g_on = 0;
 static int     g_zone[2] = { -1, -1 };
 static int64_t g_buzz_until[2];
 static int     g_pct = 100;             /* strength, % */
@@ -30,7 +30,11 @@ void sc2_trigfx_clear(void) {
     pthread_mutex_lock(&g_lock); memset(g_fx, 0, sizeof(g_fx)); pthread_mutex_unlock(&g_lock);
 }
 
-void sc2_trigfx_enable(int on) { g_on = on ? 1 : 0; }
+void sc2_trigfx_enable(int on) {
+    pthread_mutex_lock(&g_lock);
+    g_on = on ? 1 : 0;
+    pthread_mutex_unlock(&g_lock);
+}
 
 static void click(int side, int strength) {          /* strength 1-8 */
     if (strength < 1) strength = 1;
@@ -92,10 +96,13 @@ static void apply_one(int t, const fx_t *f, uint8_t pull, int64_t now) {
 }
 
 void sc2_trigfx_apply(uint8_t l2, uint8_t r2, int64_t now, int pct) {
-    if (!g_on || pct <= 0) { g_zone[0] = g_zone[1] = -1; return; }
-    g_pct = pct > 200 ? 200 : pct;
     fx_t f[2];
-    pthread_mutex_lock(&g_lock); memcpy(f, g_fx, sizeof(f)); pthread_mutex_unlock(&g_lock);
+    pthread_mutex_lock(&g_lock);
+    int on = g_on;
+    if (on) memcpy(f, g_fx, sizeof(f));
+    pthread_mutex_unlock(&g_lock);
+    if (!on || pct <= 0) { g_zone[0] = g_zone[1] = -1; return; }
+    g_pct = pct > 200 ? 200 : pct;
     if (!f[0].mode && !f[1].mode) { g_zone[0] = g_zone[1] = -1; return; }
     apply_one(0, &f[0], l2, now);
     apply_one(1, &f[1], r2, now);

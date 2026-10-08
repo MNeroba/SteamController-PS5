@@ -24,7 +24,7 @@ void poords4_log(const char *format, ...) {
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static int32_t g_user = -1;
-static volatile int g_force = 0;
+static int g_force = 0;
 static struct {
     char title[SC2_ID_MAX + 1];
     int  state;          /* 0 idle, 1 waiting, 2 running, 3 done */
@@ -103,9 +103,12 @@ static void *probe_thread(void *arg) {
     for (;;) {
         char t[SC2_ID_MAX + 1], a[SC2_ID_MAX + 1], o[SC2_ID_MAX + 1];
         sc2_select_status(t, a, o);
+        pthread_mutex_lock(&g_lock);
         int force = g_force;
-        if (t[0] && (strcmp(t, last) || force)) {
-            g_force = 0;
+        int should_probe = t[0] && (strcmp(t, last) || force);
+        if (should_probe) g_force = 0;
+        pthread_mutex_unlock(&g_lock);
+        if (should_probe) {
             pthread_mutex_lock(&g_lock);
             snprintf(g.title, sizeof(g.title), "%s", t); g.state = 1;
             pthread_mutex_unlock(&g_lock);
@@ -129,7 +132,11 @@ void bridge_probe_start(int32_t user_id) {
     else LOG("bridge probe: worker thread failed (%d)\n", r);
 }
 
-void bridge_probe_request(void) { g_force = 1; }
+void bridge_probe_request(void) {
+    pthread_mutex_lock(&g_lock);
+    g_force = 1;
+    pthread_mutex_unlock(&g_lock);
+}
 
 int bridge_probe_json(char *out, size_t n) {
     pthread_mutex_lock(&g_lock);
