@@ -31,6 +31,7 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 | ADR-019 | 2026-10-08 | ACCEPTED | Constrain active Steam Controller 2026 haptic service to one USB/Puck reader until producer and shared-state APIs have a verified multi-session contract. The manager claims an exclusive `slot_registry_token_t`; a second SC2 reader is rejected, service calls must present the owner generation, and teardown clears the queue/rumble state and best-effort sends a zero-rumble report before closing USB. Targetless producer APIs are safe only under this enforced singleton policy. Evidence: F051, T-P30, M1-106–110. Tradeoff: simultaneous wired and Puck SC2 use is unavailable. Manager/USB runtime and hardware remain unverified; revisit only with explicit routing identity through all producers and tested lifecycle semantics. |
 | ADR-020 | 2026-10-08 | ACCEPTED | Compute profile selection outside `g_sel_lock`, but commit the loaded profile and selected ID only if a protected selection generation is unchanged. Advance the generation for override, explicit reload, title and title-name mutations; hold `g_sel_lock` across generation revalidation and `sc2_active_set()` so a completed newer request cannot be overwritten by an older load. Evidence: F052/T-P31/M1-113–117. This avoids keeping the UI/input state mutex held over storage I/O. Revisit if selection moves into a session object or storage operations become asynchronous. |
 | ADR-021 | 2026-10-08 | ACCEPTED | Serialize profile save/delete mutations with a storage mutex around the fixed temporary file, close and atomic rename; keep loads outside the mutation lock so readers can observe either complete version. Evidence: F053/T-P32/M1-120–128; 22 host checks and targeted TSan. Concurrent stale snapshots remain last-writer-wins. |
+| ADR-022 | 2026-10-08 | ACCEPTED | The on-console remap path must propagate storage failure to the notification UI and stop before profile reload/success feedback. Evidence: F054/T-P33/M1-130–136; production menu and store tests. |
 
 ## ADR-015 — Per-invocation SC2 endpoint scan buffers
 
@@ -101,3 +102,12 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: storage mutations for different IDs are also serialized; profile files are small and writes are infrequent. Independently edited read-modify-write snapshots are still last-writer-wins; this is not conflict detection or merge semantics.
 - Verification gate: host tests cover two saves and save/delete overlap against the production module, sanitizer and TSan. PS5 filesystem behavior, crash recovery, and menu/portal runtime integration remain unverified.
 - Reconsider if profile writes become frequent enough for measured contention, or if an API adds explicit versioned updates/merge behavior.
+
+## ADR-022 — Do not report a failed remap as saved
+
+- Date/status: 2026-10-08, ACCEPTED.
+- Context: `do_remap()` ignored the profile-store result, then reloaded and displayed a success notification even when the storage operation failed.
+- Evidence: `tests/test_sc2_menu_storage.c` calls the production menu action and forces `fopen()` failure by placing a directory at the temporary path. The old path still sent “Saved”; the fixed module passes nine checks under normal and ASan/UBSan. See F054/T-P33/M1-130–136.
+- Decision: report a clear save failure and return before reloading the profile or sending success feedback. Retain the normal save/reload/success sequence only when `sc2_store_save()` returns success.
+- Tradeoff: the menu closes after the action as before, but now the final notification identifies the failed persistence. Hardware notification display remains unverified.
+- Reconsider only if the menu gains a recoverable editor state that can retain unsaved changes and offer retry.

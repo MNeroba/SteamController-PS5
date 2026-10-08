@@ -460,3 +460,14 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Next: publish the source/test/docs/memory increment against PR #1 head `203632e26f85636ab22d20a9ec7e2f5a1db59638` with expected-head protection, refresh the PR description, and recheck Actions.
 - Published the source/test/docs increment as `085357422014aa658dcba47298d90a3b1a96b978` (parent `203632e26f85636ab22d20a9ec7e2f5a1db59638`, tree `16d152b8d7e602ab72e1491171462b010b1dcaeb`). All 13 blobs matched local Git object IDs; the branch update used expected-head protection and `force=false`. PR #1 remains open/draft/mergeable; its body was refreshed. The current-head workflow lookup returned no run records/statuses.
 - Next: inspect adjacent profile mutation/error paths; profile tests still do not cover browser/PS5 filesystem integration or merge stale edits.
+
+
+## 2026-10-08 18:22 UTC — Report on-console remap persistence failures
+
+- At session start, reconciled the current branch against PR #1: source commit `085357422014aa658dcba47298d90a3b1a96b978` was followed by memory sync `f9b175857eeafa5f17146b44afdaef5df57dcd09` (tree `7f9a0a2e23bb28cecda3f893787855561cfb3792`), with three matching memory blob IDs and guarded `force=false` branch update. Host `37823299009` and PS5 build `37823298954` were queued at 18:18 UTC; combined status was empty.
+- Continued the adjacent profile-path audit after publishing storage mutation serialization. Found `sc2_menu.c::do_remap()` ignored a failed save and still reloaded and told the user “Saved.”
+- Added a production-module menu/store regression. The expected-red case put a directory at the temporary filename so `fopen()` fails; before the fix, the menu still sent success. The first harness link also caught a missing test-only profile-selection hook stub; documented and corrected it.
+- The menu now shows an explicit storage error and stops before reload/success haptic. The targeted test passes 9 checks; full normal and ASan/UBSan suites pass 930. SDK v0.43/LLVM 18.1.8 cross-build passes, warning-free, ELF SHA-256 `ce13d1d28bc2d4f2c7d799b623a1f7c7b9c05f551142a743fc6f6f5cdcd8cab0`, compile/link only.
+- Updated the architecture, test plan, README count, F054/P2-PROFILE-33/ADR-022, and active snapshot. No borrowed code/assets; no provenance edit. No physical console/controller/Puck or BLE/HCI test.
+- Final review: `git diff --check`, 19-document local Markdown-link validation, and bounded private-key/GitHub-token scan pass. No third-party code/assets were introduced.
+- Pending: publish the narrow menu increment with a guarded fast-forward against PR head `f9b175857eeafa5f17146b44afdaef5df57dcd09`, refresh PR body and inspect current Actions; keep draft open because runtime/hardware gates remain.

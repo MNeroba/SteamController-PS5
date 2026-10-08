@@ -105,13 +105,21 @@ static void do_remap(int from, int to) {
     sc2_profile_t p;
     if (sc2_store_load(id, &p) != 0) sc2_active_get(&p);
     p.map[from] = mask;
-    sc2_store_save(id, &p);
+    if (sc2_store_save(id, &p) != 0) {
+        sc2_haptic_tick();
+        say("Could not save profile \"%s\"\nCheck storage and retry", p.name);
+        return;
+    }
     sc2_select_reload();
 
     char what[64]; sc2_combo_name(mask, what, sizeof(what));
     sc2_haptic_pulse(SC2_PAD_BOTH, 0x190, 0x190, 3);
     say("Saved to \"%s\"\n%s now does %s", p.name, k_in_nice[from], what);
 }
+
+#ifdef SC2_MENU_TEST
+void sc2_menu_test_do_remap(int from, int to) { do_remap(from, to); }
+#endif
 
 void sc2_menu_toggle(void) {
     if (sc2_menu_is_open()) close_menu("Puckbridge menu closed");
