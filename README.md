@@ -31,7 +31,7 @@ Portable protocol, descriptor, portal security/JSON, profile parsing, mapping, m
 make -C tests sanitize
 ```
 
-The latest ASan/UBSan run passes 370 assertions. These host tests do not build or exercise most PS5 adapter code and do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility. The current environment has no configured PS5 SDK or physical console. A missing hardware test is reported as blocked, not as a compatibility failure or pass.
+The latest ASan/UBSan run passes 374 assertions. Profile tests include concurrent parsing through independent parser calls. These host tests do not build or exercise most PS5 adapter code and do not establish live USB/Puck, motion, touch, haptics, game, or console compatibility. The current environment has no configured PS5 SDK or physical console. A missing hardware test is reported as blocked, not as a compatibility failure or pass.
 
 ## Source pins and attribution
 

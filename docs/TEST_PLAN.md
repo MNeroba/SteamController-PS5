@@ -2,7 +2,7 @@
 
 Tests are evidence, not intentions. Codex must create/verify actual runnable commands in selected source tree and update `project-memory/TEST_LOG.md` with exit status and exact environment. Commands below are **targets/examples**, not claims that the current unmodified repo provides these targets.
 
-Current portable targets are in `tests/Makefile`: `make -C tests test` and `make -C tests sanitize`. The latest suite passes 370 checks under ASan/UBSan: HTTP/auth/token storage 57, JSON writer 9, USB configuration parsing 19, Steam report decoding 190, mapping transforms 24, motion math 25, feedback serialization 20, and profile parsing 26. It covers malformed and overflowing profile integers but does not validate session/slot lifecycle, profile transitions, the PS5 adapter's neutral-publication branch, live USB/Puck I/O, or physical console behavior. See the latest entry in `project-memory/TEST_LOG.md` for environment and command.
+Current portable targets are in `tests/Makefile`: `make -C tests test` and `make -C tests sanitize`. The latest suite passes 374 checks under ASan/UBSan: HTTP/auth/token storage 57, JSON writer 9, USB configuration parsing 19, Steam report decoding 190, mapping transforms 24, motion math 25, feedback serialization 20, and profile parsing 30. Profile coverage includes malformed/overflowing integers and concurrent calls. It does not validate session/slot lifecycle, profile transitions, the PS5 adapter's neutral-publication branch, live USB/Puck I/O, or physical console behavior. See the latest entry in `project-memory/TEST_LOG.md` for environment and command.
 
 ## Host tests
 

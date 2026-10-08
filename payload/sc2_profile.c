@@ -95,10 +95,20 @@ static char *trim(char *s) {
 
 static uint32_t parse_combo(const char *v) {
     uint32_t m = 0;
-    char tmp[160]; strncpy(tmp, v, sizeof(tmp)-1); tmp[sizeof(tmp)-1] = 0;
-    for (char *tok = strtok(tmp, "+ \t"); tok; tok = strtok(NULL, "+ \t"))
+    char tmp[160];
+    if (!v) return 0;
+    strncpy(tmp, v, sizeof(tmp)-1); tmp[sizeof(tmp)-1] = 0;
+    char *tok = tmp;
+    while (*tok) {
+        while (*tok == '+' || *tok == ' ' || *tok == '\t') tok++;
+        if (!*tok) break;
+        char *end = tok;
+        while (*end && *end != '+' && *end != ' ' && *end != '\t') end++;
+        if (*end) *end++ = '\0';
         for (int i = 0; i < N_OUT; i++)
             if (!strcasecmp(tok, k_out[i].n)) { m |= k_out[i].m; break; }
+        tok = end;
+    }
     return m;
 }
 
