@@ -12,7 +12,12 @@
  * The IMU is off until SETTING_IMU_MODE (0x30) is written through feature
  * report 1: 0x87 len reg valLo valHi. */
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "sc2_gyro.h"
+#include "runtime_control.h"
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -337,7 +342,7 @@ static int send_setting(int fd, int iface, uint8_t reg, uint16_t val) {
         USETW(req.ucr_request.wLength, sizeof(buf));
         r = ioctl(fd, USB_DO_REQUEST, &req) == 0 ? 0 : -errno;
         if (r != -EPIPE) break;                    /* wireless sometimes stalls once */
-        usleep(20000);
+        runtime_sleep_ms(20);
     }
     return r;
 }

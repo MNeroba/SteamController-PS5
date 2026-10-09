@@ -86,7 +86,7 @@ $(BUILD)/test_steam_protocol: test_steam_protocol.c ../payload/steam_protocol.c 
 $(BUILD)/test_steam_parser_fuzz: test_steam_parser_fuzz.c ../payload/steam_protocol.c ../payload/steam_usb.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $^ -o $@
 
-$(BUILD)/test_sc2_usb_scan: test_sc2_usb_scan.c ../payload/controller_sc2.c ../payload/steam_protocol.c ../payload/steam_usb.c ../payload/usb_session.c ../payload/usb_resources.c | $(BUILD)
+$(BUILD)/test_sc2_usb_scan: test_sc2_usb_scan.c ../payload/controller_sc2.c ../payload/steam_protocol.c ../payload/steam_usb.c ../payload/usb_session.c ../payload/usb_resources.c ../payload/runtime_control.c | $(BUILD)
 	$(CC) $(CFLAGS) -ffunction-sections -fdata-sections -Ihost_stubs -I../payload $^ -pthread $(SC2_SCAN_GC_SECTIONS) -o $@
 
 $(BUILD)/test_game_list_concurrency: test_game_list_concurrency.c ../payload/game_list.c | $(BUILD)
@@ -152,7 +152,7 @@ $(BUILD)/test_sc2_status: test_sc2_status.c ../payload/sc2_status.c | $(BUILD)
 $(BUILD)/test_game_hooks: test_game_hooks.c ../payload/game_hooks.c ../payload/runtime_control.c | $(BUILD)
 	$(CC) $(CFLAGS) -D_DEFAULT_SOURCE -DGAME_HOOKS_TEST -DGAME_HOOKS_SETTINGS_PATH=\"/tmp/steamcontroller-game-hooks-test.ini\" -Ihost_stubs -I../payload $^ -pthread -o $@
 
-$(BUILD)/test_sc2_gyro_state: test_sc2_gyro_state.c ../payload/sc2_gyro.c ../payload/steam_motion.c | $(BUILD)
+$(BUILD)/test_sc2_gyro_state: test_sc2_gyro_state.c ../payload/sc2_gyro.c ../payload/steam_motion.c ../payload/runtime_control.c | $(BUILD)
 	$(CC) $(CFLAGS) -DSC2_GYRO_TEST -Ihost_stubs -I../payload $^ -pthread -lm -o $@
 
 $(BUILD)/test_sc2_flick: test_sc2_flick.c ../payload/sc2_flick.c | $(BUILD)

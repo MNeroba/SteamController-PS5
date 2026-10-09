@@ -14,6 +14,7 @@
 #include "sc2_gyro.h"
 #include "sc2_trigfx.h"
 #include "sc2_flick.h"
+#include "runtime_control.h"
 #include "steam_protocol.h"
 #include "steam_mapping.h"
 #include <time.h>
@@ -36,15 +37,6 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 
 #define RID_INPUT     0x42
 #define RID_INPUT2    0x45
-
-static void sc2_sleep_us(long microseconds) {
-    if (microseconds <= 0) return;
-    struct timespec remaining = {
-        .tv_sec = microseconds / 1000000,
-        .tv_nsec = (microseconds % 1000000) * 1000
-    };
-    while (nanosleep(&remaining, &remaining) != 0 && errno == EINTR) {}
-}
 
 /* ── endpoint discovery ───────────────────────────────────────────────── */
 
@@ -228,7 +220,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             found = first_error;
         }
         if (!found && errno == ENXIO) found = -ENXIO;
-        if (!found) sc2_sleep_us(5000);
+        if (!found) runtime_sleep_ms(5);
     }
 
     if (!found && should_cancel && should_cancel(cancel_context))
@@ -301,7 +293,7 @@ int sc2_power_off(int fd, int iface) {
         USETW(req.ucr_request.wLength, sizeof(buf));
         r = ioctl(fd, USB_DO_REQUEST, &req) == 0 ? 0 : -errno;
         if (r != -EPIPE) break;                          /* wireless sometimes stalls once */
-        sc2_sleep_us(20000);
+        runtime_sleep_ms(20);
     }
     LOG("sc2: power-off request (iface %d) -> %d\n", iface, r);
     return r;
