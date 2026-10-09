@@ -1,3 +1,8 @@
+/* glibc hides POSIX.1-2008 file APIs and flags in strict C11 mode. */
+#if defined(__linux__) && !defined(_POSIX_C_SOURCE)
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "webui_auth.h"
 
 #include <errno.h>

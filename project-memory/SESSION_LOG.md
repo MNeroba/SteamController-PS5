@@ -711,3 +711,21 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Actions 37848691432 (Host tests) and 37848691412 (PS5 cross-build) are queued; combined status has no completed checks. No CI pass is claimed.
 - M1-198 local evidence: regression-first exact-length checks, full normal and ASan/UBSan suites, 27 USB parser checks and 100,000 report + 100,000 configuration parser inputs pass. SDK v0.43/LLVM 18.1.8 cross-build passes; ELF SHA-256 362d584f60d26a0206a983c55980ebe7083f4c05fc9bd7adf9b878839a49fa1c.
 - No physical PS5, Steam Controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio, firmware/system write, or binary release was used. P0-USB-DESC-10 remains blocked pending safe identified hardware evidence.
+
+## M1-199 — Fix strict-C11 Ubuntu host build — 2026-10-09 05:17 UTC
+
+- Re-read the repository instructions, full execution specification, required architecture/BLE/test documentation, and current project-state/evidence logs. Reconciled main as `4c947486fd41371d9a96238d39e8b7a826c1c34c`, tree `9aee8ff14d4c6e9eb1267aa6c8fa94e98422dd18`.
+- GitHub Host tests failed on both initial run `37848828922` attempt 1 and the user-requested rerun attempt 2; earlier source run `37848691432` showed the same error. The failing translation unit was `payload/webui_auth.c` under `-std=c11` on Ubuntu. The existing PS5 cross-build on main passed (`37848829021`).
+- Local workspace remains branch `fix/p0-safety`, HEAD `78460113ef7c48502c765a1f83ba34d53c977134`, with the existing Puckbridge-based overlay and many pre-existing modified/untracked project files. Confirmed the local `payload/webui_auth.c` content matched GitHub main before editing; did not switch branches, reset files, or use a normal Git push.
+- Added guarded `_GNU_SOURCE=1` before every include in `payload/webui_auth.c`. This asks the Linux libc for the declarations/flags used by existing token-storage code under strict C11; it does not relax global compiler flags or change runtime behavior. Added T-P47, ADR-036, F071 and P1-CI-01 and updated the current project-memory snapshot.
+- Verification: strict source syntax compile PASS; `make -C tests clean test` PASS; `make -C tests sanitize` PASS; SDK v0.43 / LLVM 18.1.8 full compile/link PASS, ELF SHA-256 `553ce9f8a69be70f60409292f9f4b01fdaa18815a56e5ded3708f436de6ce497`. Detailed environment/commands are in M1-199 of `TEST_LOG.md`. Post-fix GitHub Actions remain unverified.
+- Safety: no PS5/controller/Puck hardware or USB ioctl; no BLE/HCI/radio, firmware/system write, PR, or binary release.
+- Exact next action: run `git diff --check`, inspect all M1-199 changes and their local blob hashes; publish only `payload/webui_auth.c`, `docs/TEST_PLAN.md`, and the six directly relevant `project-memory/*.md` files over GitHub main expected SHA `4c947486fd41371d9a96238d39e8b7a826c1c34c`, guarded `force=false`; verify the acknowledged commit/tree and wait for the new Host tests and PS5 cross-build.
+
+
+### M1-199 follow-up — final POSIX feature-test macro — 2026-10-09 05:20 UTC
+
+- Replaced the initially tested `_GNU_SOURCE` candidate with the user's recommended `_POSIX_C_SOURCE=200809L`, guarded by `__linux__` and `!defined(_POSIX_C_SOURCE)` before all includes. This scopes feature visibility to the failing Linux host translation unit and preserves default macOS/PS5 SDK declarations.
+- Final variant passes Darwin strict-C11 syntax compilation, full `make -C tests clean test`, full `make -C tests sanitize` (ASan/UBSan), and SDK v0.43/LLVM 18.1.8 clean/build with explicit `PS5_PAYLOAD_SDK`; final ELF SHA-256 `4c27faf3dc8b5e7589f8f9df4ec396f055377be8157ef41e9016fbb93b498aac`. `git diff --check` passes. Linux CI is still required because the local host is Darwin and skips the guarded macro branch.
+- No hardware, radio, firmware, USB ioctl, PR, or binary-release action occurred.
+- Exact next action: re-fetch GitHub `main` and its tree. If main still equals `4c947486fd41371d9a96238d39e8b7a826c1c34c`, publish only the reviewed eight files (`payload/webui_auth.c`, `docs/TEST_PLAN.md`, and six `project-memory/*.md`) using a base-tree-preserving Git Data commit and expected-head ref update with `force=false`; then verify the commit/tree and check both Actions workflows.

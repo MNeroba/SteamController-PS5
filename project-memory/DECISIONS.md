@@ -245,3 +245,14 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: malformed streams and nonstandard vendor encodings of these standard descriptor types are rejected. This does not validate HID report descriptors or actual PS5 ioctl/device behavior.
 - Verification gate: three expected-red regressions fail before and pass after the fix; 27 USB parser checks, full normal and ASan/UBSan suites, and SDK v0.43 compile/link pass. Physical USB/PS5 remains untested.
 - Reconsider only if a standards-backed target ABI explicitly defines a different descriptor type/length; do not relax standard descriptor sizes based on an undocumented capture.
+
+
+## ADR-036 — Request declarations required by strict-C11 token storage builds
+
+- Date/status: 2026-10-09, ACCEPTED.
+- Context: GitHub Ubuntu host CI compiled `webui_auth.c` with `-std=c11` and failed because the system headers hid `O_DIRECTORY`, `O_NOFOLLOW`, `openat()`, `fchmod()`, `unlinkat()`, and `fstatat()`. The PS5 SDK build had passed, and the previous local Darwin build did not reproduce the Linux feature-visibility behavior.
+- Evidence: source at GitHub main `4c947486fd41371d9a96238d39e8b7a826c1c34c`, `payload/webui_auth.c:74-164`; Host Actions `37848828922`, attempts 1 and 2; expected-red CI compile logs; T-P47/M1-199/F071.
+- Decision: define `_POSIX_C_SOURCE=200809L` at the top of `webui_auth.c`, before every include, only when compiling on Linux and only if the build has not already defined it. This requests POSIX.1-2008 declarations in the Ubuntu strict-C11 build without changing global flags or the Darwin/PS5 SDK feature environment.
+- Tradeoff: Linux consumers of this translation unit get POSIX.1-2008 declarations; runtime logic and token-storage behavior are unchanged. Darwin and PS5 compile paths do not define or override the feature macro here.
+- Verification gate: strict local syntax compile, full normal and ASan/UBSan host suites, and SDK v0.43 compile/link pass. GitHub Ubuntu Actions on the fix commit remain the final Linux CI gate; no physical PS5 behavior is implied.
+- Reconsider if a supported host libc cannot expose the required interfaces with this feature request; then add a narrowly scoped portability wrapper rather than weakening global C flags.
