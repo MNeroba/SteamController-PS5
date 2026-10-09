@@ -29,6 +29,11 @@ int main(void)
     CHECK(game_hook_slot_restore_action(gateway, 0, original) ==
           GAME_HOOK_SLOT_INVALID);
 
+    for (unsigned failed = 0;
+         failed < GAME_HOOK_SHUTDOWN_ROLLBACK_ATTEMPTS; failed++)
+        CHECK(game_hook_shutdown_retry(failed));
+    CHECK(!game_hook_shutdown_retry(GAME_HOOK_SHUTDOWN_ROLLBACK_ATTEMPTS));
+
     CHECK(game_hook_audio_lease_active(1, 0, 120));
     CHECK(game_hook_audio_lease_active(1, 120, 120));
     CHECK(!game_hook_audio_lease_active(1, 121, 120));

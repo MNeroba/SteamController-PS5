@@ -1475,6 +1475,7 @@ static int remove_pid_file_if_owned(void) {
 
 static int runtime_shutdown(void) {
     int safe_to_release = 1;
+    int hook_rollback_pending = 0;
     if (g_runtime_shutdown_done) return 0;
 
     /* Close the only worker that can disconnect a physical DualSense before
@@ -1511,9 +1512,13 @@ static int runtime_shutdown(void) {
 
     /* Game hooks own remote import changes and must complete their rollback
      * before their status or shared state is allowed to go away. */
-    if (game_hooks_stop() != 0) {
+    int hooks_stop_result = game_hooks_stop();
+    if (hooks_stop_result < 0) {
         gp_log("shutdown: game-hook worker join / rollback failed\n");
         safe_to_release = 0;
+    } else if (hooks_stop_result == GAME_HOOKS_STOP_ROLLBACK_PENDING) {
+        hook_rollback_pending = 1;
+        gp_log("shutdown: hook worker joined after bounded rollback; target gateway remains mapped for lease fallback until game exit or later cleanup\n");
     }
     if (sc2_select_stop() != 0) {
         gp_log("shutdown: profile watcher join failed\n");
@@ -1549,7 +1554,7 @@ static int runtime_shutdown(void) {
     if (g_log_fd >= 0) { close(g_log_fd); g_log_fd = -1; }
     pthread_mutex_unlock(&g_log_lock);
     g_runtime_shutdown_done = 1;
-    return credentials_restored ? 0 : -2;
+    return credentials_restored && !hook_rollback_pending ? 0 : -2;
 }
 
 /* ── main ─────────────────────────────────────────────────────────────── */

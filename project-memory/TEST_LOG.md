@@ -751,3 +751,19 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - GitHub Host tests `37982788726` — PASS; PS5 cross-build `37982788729` — PASS. Both runs target main commit `d727f28af5f7e94452da2a017270db368266ac59`. Host compile, full ASan/UBSan suite, and payload cross-build now pass in Actions.
 - This closes the strict-C11 POSIX declarations and host linker portability issues recorded under P1-CI-01/P1-CI-02. Earlier failing Actions and exact diagnostics remain documented above; no failure record was removed.
 - CI/build success remains separate from PS5 runtime proof. USB ownership, PID lock, shutdown, system hook rollback, controller/Puck compatibility and the release evidence matrix still require their documented hardware/ABI gates.
+
+### M1-208 — Bound game-hook rollback during shutdown — 2026-10-09
+
+- Expected-red reproduction: `test_game_hooks` installed a mocked active hook, then `pb_hooks_remove()` returned `PB_HOOKS_REMOVE_RETRY` persistently. The old worker did not return from shutdown; a six-second `subprocess.run(..., timeout=6)` expired.
+- Fix: before teardown, best-effort publish a neutral frame and disable audio silence. Attempt exact-owner remote rollback five times, then join with `GAME_HOOKS_STOP_ROLLBACK_PENDING`; retain target-resident gateway memory instead of guessing at unmapping. Main completes local cleanup, records the residual target gateway, and returns a failure exit status. Existing input read-age and audio heartbeat leases are the target-side fallback, still unverified on PS5.
+- Added `game_hook_shutdown_retry()` policy assertions and a production-module regression that injects persistent removal failure; exactly five attempts are required. Added shutdown and safe-mode source contracts; static search finds no production callers of ShellUI VDA patch/unpatch entry points outside `shellui_pad.c/.h`. `shellui_pad_disconnect_device()` remains on the separately opt-in DualSense hand-off path.
+- Expected-red test timed out at 6 seconds before the fix. Post-fix `test_game_hooks` passes 61,004 checks, `test_game_hook_safety` passes 22 checks, `test_shutdown_contract.py` passes 5 checks, and `test_safe_mode_contract.py` passes 6 checks.
+- Full normal tests, ASan/UBSan, SDK v0.43/LLVM 18.1.8 cross-build, `git diff --check`, and GitHub Actions outcomes are recorded after final reruns/publication below. This entry does not claim PS5 memory-call behavior, callback timing, ShellUI ABI behavior, or physical DualSense safety. Hardware matrix and release remain blocked.
+
+### M1-208 final local verification — 2026-10-09
+
+- `make -C tests clean test` — PASS, including the persistent game-hook removal failure regression (61,004 worker checks), shutdown contracts (5), and safe-mode contracts (6).
+- `make -C tests sanitize` — PASS across the full ASan/UBSan suite.
+- SDK v0.43 / LLVM 18.1.8 `make -C payload clean` and `make -C payload` — PASS; ELF SHA-256 `c1fc0b3cad3d5a82119c2d4c01d97686729a3b77e9c8c17b7c2ac85a06071aed`.
+- `git diff --check` — PASS. Expected-red old-worker test exceeded six seconds before the fix. The fixed production worker joins after exactly five injected failures and returns pending status.
+- GitHub Actions for the new source changes are not yet run; publication is pending at this entry. No PS5 hardware, remote-memory syscall, ShellUI patch/unpatch, Bluetooth/HCI, firmware write, or release was attempted.

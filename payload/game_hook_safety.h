@@ -3,6 +3,17 @@
 
 #include <stdint.h>
 
+#define GAME_HOOK_SHUTDOWN_ROLLBACK_ATTEMPTS 5u
+
+/* Bound the number of remote rollback attempts when the target refuses writes.
+ * An individual target call can still have target-dependent latency. Gateway
+ * memory stays mapped; input/audio leases provide fallback after producer exit. */
+static inline int
+game_hook_shutdown_retry(unsigned failed_attempts)
+{
+    return failed_attempts < GAME_HOOK_SHUTDOWN_ROLLBACK_ATTEMPTS;
+}
+
 typedef enum {
     GAME_HOOK_SLOT_INVALID = -1,
     GAME_HOOK_SLOT_ALREADY_RESTORED = 0,

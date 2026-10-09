@@ -7,6 +7,12 @@ ROOT = Path(__file__).resolve().parents[1]
 MAIN = (ROOT / "payload/gc_main.c").read_text()
 WEBUI = (ROOT / "payload/webui.c").read_text()
 POLICY = (ROOT / "payload/runtime_policy.c").read_text()
+PAYLOAD_RUNTIME_SOURCES = {
+    path: path.read_text(encoding="utf-8")
+    for path in (ROOT / "payload").rglob("*")
+    if path.is_file() and path.suffix in {".c", ".h"} and
+    path.name not in {"shellui_pad.c", "shellui_pad.h"}
+}
 
 
 class SafeModeContract(unittest.TestCase):
@@ -46,6 +52,17 @@ class SafeModeContract(unittest.TestCase):
                          "shellui_pad_unpatch(", "shellui_pad_hook_gethandle(",
                          "shellui_pad_hook_setpriv("):
             self.assertNotIn(function, MAIN)
+
+    def test_shellui_vda_patch_and_unpatch_apis_have_no_runtime_callers(self):
+        for function in ("shellui_pad_patch_vda(",
+                         "shellui_pad_patch_vda_self(",
+                         "shellui_pad_unpatch("):
+            with self.subTest(function=function):
+                callers = [str(path.relative_to(ROOT))
+                           for path, source in PAYLOAD_RUNTIME_SOURCES.items()
+                           if function in source]
+                self.assertEqual([], callers,
+                                 f"legacy ShellUI memory patch API has runtime callers: {callers}")
 
 
 if __name__ == "__main__":

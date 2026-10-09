@@ -8,6 +8,7 @@
 #include "sc2_gyro.h"
 #include "sc2_trigfx.h"
 #include "runtime_control.h"
+#include "game_hook_safety.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -31,6 +32,8 @@ static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_settings_io_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t g_hooks_thread;
 static int g_hooks_thread_started;
+/* Written by the worker and observed only after pthread_join synchronizes. */
+static int g_shutdown_rollback_pending;
 typedef struct {
     int input_on, vibe_on, mode, audio_on;
 } GameHookSettings;
@@ -359,20 +362,40 @@ static void *hooks_thread(void *arg) {
     if (rumbling) sc2_haptic_rumble_set(0, 0);
     sc2_trigfx_clear();
     sc2_trigfx_enable(0);
-    if (g.state == 2 && g.pid > 0)
-        (void)pb_hooks_set_silence(g.pid, g.args, 0);
+    g_shutdown_rollback_pending = 0;
+    if (g.state == 2 && g.pid > 0) {
+        PbPublishFrame neutral;
+        memset(&neutral, 0, sizeof(neutral));
+        neutral.lx = neutral.ly = neutral.rx = neutral.ry = 128;
+        int publish_result = pb_hooks_publish(g.pid, g.args, &neutral,
+                                               0, 2, 0, 0);
+        int silence_result = pb_hooks_set_silence(g.pid, g.args, 0);
+        if (publish_result != 0 || silence_result != 0)
+            LOG("game hooks: shutdown neutralization incomplete (input=%d audio=%d); target leases remain authoritative\n",
+                publish_result, silence_result);
+    }
+    unsigned failed_attempts = 0;
     while (unhook("runtime shutdown") != 0) {
-        set_state(2, "hook rollback pending; retaining target ownership");
+        failed_attempts++;
+        g_shutdown_rollback_pending = 1;
+        if (!game_hook_shutdown_retry(failed_attempts)) break;
         usleep(100000);
     }
     active_set(0);
-    set_state(0, "stopped");
+    if (g_shutdown_rollback_pending) {
+        set_state(2, "rollback incomplete; target gateway retained for lease fallback");
+        LOG("game hooks: rollback still pending after %u attempts; leaving target-resident gateway mapped for input/audio lease fallback\n",
+            failed_attempts);
+    } else {
+        set_state(0, "stopped");
+    }
     return NULL;
 }
 
 void game_hooks_start(void) {
     load_settings();
     g.pid = -1;
+    g_shutdown_rollback_pending = 0;
     int r = pthread_create(&g_hooks_thread, NULL, hooks_thread, NULL);
     if (r == 0) {
 #ifdef GAME_HOOKS_TEST
@@ -387,11 +410,14 @@ int game_hooks_stop(void) {
 #ifdef GAME_HOOKS_TEST
     atomic_store_explicit(&g_test_stop, 1, memory_order_relaxed);
 #endif
-    if (!g_hooks_thread_started) return 0;
+    if (!g_hooks_thread_started)
+        return g_shutdown_rollback_pending ?
+            GAME_HOOKS_STOP_ROLLBACK_PENDING : GAME_HOOKS_STOP_OK;
     int result = pthread_join(g_hooks_thread, NULL);
     if (result != 0) return -1;
     g_hooks_thread_started = 0;
-    return 0;
+    return g_shutdown_rollback_pending ?
+        GAME_HOOKS_STOP_ROLLBACK_PENDING : GAME_HOOKS_STOP_OK;
 }
 
 #ifdef GAME_HOOKS_TEST

@@ -17,6 +17,7 @@ class ShutdownContractTests(unittest.TestCase):
                 "gc_main": "payload/gc_main.c",
                 "bridge_probe": "payload/bridge_probe.c",
                 "game_hooks": "payload/game_hooks.c",
+                "game_hook_safety": "payload/game_hook_safety.h",
                 "ds_handoff": "payload/ds_handoff.c",
                 "webui": "payload/webui.c",
                 "sc2_profile": "payload/sc2_profile.c",
@@ -71,6 +72,19 @@ class ShutdownContractTests(unittest.TestCase):
         delete = main.index("scePadVirtualDeviceDeleteDevice(handle)")
         self.assertLess(neutral, delete,
                         "owned input must be neutralized before VDA deletion")
+
+    def test_game_hook_shutdown_is_bounded_and_reports_remote_rollback(self) -> None:
+        hooks = self.sources["game_hooks"]
+        main = self.sources["gc_main"]
+        self.require("GAME_HOOK_SHUTDOWN_ROLLBACK_ATTEMPTS",
+                     self.sources["game_hook_safety"],
+                     "game-hook shutdown must bound target rollback retries")
+        self.require("GAME_HOOKS_STOP_ROLLBACK_PENDING", hooks,
+                     "incomplete remote rollback must be reported after join")
+        self.require("neutral", hooks,
+                     "shutdown must attempt a neutral frame before remote rollback")
+        self.require("target gateway remains mapped for lease fallback", main,
+                     "central shutdown must preserve the documented remote-stub fallback")
 
 
 if __name__ == "__main__":

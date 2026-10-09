@@ -1,6 +1,7 @@
 #define _POSIX_C_SOURCE 200809L
 #include "game_hooks.h"
 #include "bridge/wireless_ds4.h"
+#include "game_hook_safety.h"
 #include "sc2_profile.h"
 
 #include <pthread.h>
@@ -14,6 +15,8 @@
 void game_hooks_test_stop(void);
 
 static atomic_ulong checks;
+static atomic_int mock_remove_result;
+static atomic_int mock_remove_calls;
 
 void ghostpad_status_log(const char *fmt, ...) { (void)fmt; }
 
@@ -55,7 +58,11 @@ int pb_hooks_set_silence(pid_t pid, intptr_t args, int on) {
     return 0;
 }
 
-int pb_hooks_remove(pid_t pid, intptr_t args) { (void)pid; (void)args; return 0; }
+int pb_hooks_remove(pid_t pid, intptr_t args) {
+    (void)pid; (void)args;
+    atomic_fetch_add_explicit(&mock_remove_calls, 1, memory_order_relaxed);
+    return atomic_load_explicit(&mock_remove_result, memory_order_relaxed);
+}
 
 static void pause_ms(long ms) {
     struct timespec req = { ms / 1000, (ms % 1000) * 1000000L };
@@ -147,10 +154,36 @@ int main(void) {
 
     /* Let the hook worker pass its load delay and execute the install/read path. */
     pause_ms(1750);
+    game_hooks_set(1, 0, 2);
     char json[512];
-    if (game_hooks_json(json, sizeof(json)) <= 0 || !strstr(json, "TEST_GAME")) return 1;
-    game_hooks_test_stop();
-    printf("test_game_hooks: concurrent config/pad/status access passed (%lu checks)\n",
+    int hooked = 0;
+    for (int i = 0; i < 150; i++) {
+        if (game_hooks_json(json, sizeof(json)) > 0 &&
+            strstr(json, "TEST_GAME") && strstr(json, "\"state\":2")) {
+            hooked = 1;
+            break;
+        }
+        pause_ms(20);
+    }
+    if (!hooked) {
+        fprintf(stderr, "FAIL test worker did not install mock game hook: %s\n", json);
+        game_hooks_test_stop();
+        return 1;
+    }
+
+    /* A permanent target write failure must not make payload shutdown hang. */
+    atomic_store_explicit(&mock_remove_calls, 0, memory_order_relaxed);
+    atomic_store_explicit(&mock_remove_result, PB_HOOKS_REMOVE_RETRY,
+                          memory_order_relaxed);
+    int stop_result = game_hooks_stop();
+    int remove_calls = atomic_load_explicit(&mock_remove_calls, memory_order_relaxed);
+    if (stop_result != GAME_HOOKS_STOP_ROLLBACK_PENDING ||
+        remove_calls != GAME_HOOK_SHUTDOWN_ROLLBACK_ATTEMPTS) {
+        fprintf(stderr, "FAIL bounded hook rollback: stop=%d remove_calls=%d\n",
+                stop_result, remove_calls);
+        return 1;
+    }
+    printf("test_game_hooks: concurrent access and bounded shutdown rollback passed (%lu checks)\n",
            atomic_load_explicit(&checks, memory_order_relaxed));
     return 0;
 }
