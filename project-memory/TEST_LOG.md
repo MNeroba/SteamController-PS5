@@ -767,3 +767,9 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - SDK v0.43 / LLVM 18.1.8 `make -C payload clean` and `make -C payload` — PASS; ELF SHA-256 `c1fc0b3cad3d5a82119c2d4c01d97686729a3b77e9c8c17b7c2ac85a06071aed`.
 - `git diff --check` — PASS. Expected-red old-worker test exceeded six seconds before the fix. The fixed production worker joins after exactly five injected failures and returns pending status.
 - GitHub Actions for the new source changes are not yet run; publication is pending at this entry. No PS5 hardware, remote-memory syscall, ShellUI patch/unpatch, Bluetooth/HCI, firmware write, or release was attempted.
+
+### M1-208 main publication — 41104df71fd72c711663570db13766161dceb35e — 2026-10-09
+
+- Direct-main fast-forward from `affb04de5e79cefd006363fc33300500c6d6ba3f`; compare reports one commit ahead and exactly the 15 intended source, test, plan and memory paths. All 15 GitHub blob IDs matched the local Git object hashes before ref update. No base files were deleted.
+- GitHub combined status currently returns no check statuses. The available workflow-run endpoint filters to PR-triggered runs, and local `gh run list` cannot connect to `api.github.com`; therefore Host/PS5 Actions for this push are unconfirmed, not passed.
+- Source, test, documentation and project-memory records are published. Physical target tests remain blocked; no release was created.
