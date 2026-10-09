@@ -41,6 +41,7 @@ test: $(TESTS)
 	./$(BUILD)/test_sc2_flick
 	./$(BUILD)/test_sc2_trigfx_state
 	./$(BUILD)/test_sc2_haptics_queue
+	python3 test_vda_ownership.py
 
 sanitize:
 	$(MAKE) clean

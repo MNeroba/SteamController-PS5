@@ -101,7 +101,6 @@ extern int32_t sceUserServiceGetInitialUser(int32_t *outUserId);
 extern int32_t sceUserServiceGetForegroundUser(int32_t *outUserId);
 extern int32_t scePadInit(void);
 extern int32_t scePadSetProcessPrivilege(int32_t privilege);
-extern int32_t scePadGetHandle(int32_t userId, int32_t type, int32_t index);
 extern int32_t scePadVirtualDeviceAddDevice(void *param, int32_t deviceType);
 extern int32_t scePadVirtualDeviceDeleteDevice(int32_t handle);
 extern int32_t scePadVirtualDeviceInsertData(int32_t handle, const void *padData);
@@ -114,48 +113,10 @@ extern int32_t sceKernelSendNotificationRequest(int unk0, void *req, size_t size
 
 static slot_registry_t g_slots;
 static gc_diag_once_t g_vdi_error_log = GC_DIAG_ONCE_INIT;
-/* VDA identity is correlated through one klog queue; serialize AddDevice so
- * concurrent Steam reader threads cannot bind each other's virtual pads. */
+/* Serialize AddDevice calls from concurrent controller sessions. A klog
+ * DEVICE_ADDED event is not an ownership receipt. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
 static int32_t         g_inject_uid = 0x10000000;
-
-/* ── klog device-ID queue ─────────────────────────────────────────────── */
-#define KLOG_QSIZE 16
-static uint64_t        g_klog_q[KLOG_QSIZE];
-static int             g_klog_qw = 0, g_klog_qr = 0;
-static pthread_mutex_t g_klog_lock = PTHREAD_MUTEX_INITIALIZER;
-
-static void klog_enqueue(uint64_t id) {
-    pthread_mutex_lock(&g_klog_lock);
-    int next = (g_klog_qw + 1) % KLOG_QSIZE;
-    if (next != g_klog_qr) { g_klog_q[g_klog_qw] = id; g_klog_qw = next; }
-    pthread_mutex_unlock(&g_klog_lock);
-}
-
-static uint64_t klog_dequeue_ms(int ms) {
-    for (int t = 0; t < ms; t += 100) {
-        pthread_mutex_lock(&g_klog_lock);
-        if (g_klog_qw != g_klog_qr) {
-            uint64_t id = g_klog_q[g_klog_qr];
-            g_klog_qr = (g_klog_qr + 1) % KLOG_QSIZE;
-            pthread_mutex_unlock(&g_klog_lock);
-            return id;
-        }
-        pthread_mutex_unlock(&g_klog_lock);
-        usleep(100000);
-    }
-    return 0;
-}
-
-/* Drop leftover ids so a new virtual pad never picks up an older one's. */
-static void klog_drain(void) {
-    pthread_mutex_lock(&g_klog_lock);
-    while (g_klog_qr != g_klog_qw) {
-        gp_log("klog: dropping stale VDA device 0x%llx\n", (unsigned long long)g_klog_q[g_klog_qr]);
-        g_klog_qr = (g_klog_qr + 1) % KLOG_QSIZE;
-    }
-    pthread_mutex_unlock(&g_klog_lock);
-}
 
 /* ── Notification ─────────────────────────────────────────────────────── */
 typedef struct { char _unk[45]; char message[3075]; } NotifyRequest;
@@ -197,7 +158,6 @@ static void parse_klog_line(const char *line) {
     if (!id) return;
     gp_log("klog: VDA device 0x%llx\n", (unsigned long long)id);
     ds_handoff_note_virtual(id);
-    klog_enqueue(id);
 }
 
 static void *klog_capture_thread(void *arg) {
@@ -455,49 +415,24 @@ done:
     return found;
 }
 
-/* ── Create VDA and force_bind for a slot ─────────────────────────────── */
+/* ── Create VDA for a slot ────────────────────────────────────────────── */
 static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
     struct { int32_t size; int32_t userId; int32_t pad[6]; } vdp;
-    const int32_t SEN = (int32_t)0xDEADBEEFu;
     pthread_mutex_lock(&g_vda_create_lock);
     memset(&vdp,0,sizeof(vdp)); vdp.size=sizeof(vdp); vdp.userId=1;
-    for(int k=0;k<6;k++) vdp.pad[k]=SEN;
 
     if (out_bind_ok) *out_bind_ok = 0;
-    klog_drain();                             /* the next id must be this pad's */
     int ret = scePadVirtualDeviceAddDevice(&vdp, VIRTUAL_DEVICE_TYPE_DUALSENSE);
     gp_log("slot[%d] VDA ret=0x%08x\n", slot, (uint32_t)ret);
 
+    /* Only a positive handle returned by this exact AddDevice call can be
+     * attributed to this session. Output tokens and asynchronous klog records
+     * cannot identify a deletable handle safely. */
     int32_t handle = (ret > 0) ? ret : -1;
-    for(int k=0;k<6;k++){
-        if(vdp.pad[k]!=SEN && vdp.pad[k]>0){if(handle<0)handle=vdp.pad[k];break;}
-    }
-
-    uint64_t dev_id = klog_dequeue_ms(10000);
-    if (dev_id) {
-        handle = (int32_t)(dev_id & 0xffffffffu);
-        pb_kernel_lock();                     /* game hooks read kernel memory too */
-        int br = shellui_pad_force_bind(dev_id, g_inject_uid);
-        pb_kernel_unlock();
-        if (out_bind_ok) *out_bind_ok = (br == 0);
-        gp_log("slot[%d] force_bind(0x%llx, 0x%08x) ret=%d\n",
-               slot, (unsigned long long)dev_id, (uint32_t)g_inject_uid, br);
-    } else if (handle >= 0) {
-        gp_log("slot[%d] klog timeout — using direct handle %d\n", slot, handle);
-    } else {
-        gp_log("slot[%d] GetHandle scan...\n", slot);
-        static const int32_t uids[]={1,0x10000000,(int32_t)0xffffffff};
-        for(int ui=0;ui<3&&handle<0;ui++)
-            for(int idx=0;idx<8&&handle<0;idx++){
-                handle=scePadGetHandle(uids[ui],3,idx);
-                if(handle>=0) gp_log("slot[%d] GetHandle uid=0x%08x idx=%d h=%d\n",
-                                     slot,(uint32_t)uids[ui],idx,handle);
-            }
-    }
     if (handle>=0)
         gp_log("slot[%d] VDI handle=0x%x ready\n", slot, (uint32_t)handle);
     else
-        gp_log("slot[%d] ERROR: no VDA handle\n", slot);
+        gp_log("slot[%d] ERROR: AddDevice did not return an attributable handle; refusing handle scan\n", slot);
     pthread_mutex_unlock(&g_vda_create_lock);
     return handle;
 }
@@ -1492,11 +1427,6 @@ int main(void) {
 
     ret=scePadInit(); gp_log("scePadInit: 0x%08x\n", ret);
     ret=scePadSetProcessPrivilege(1); gp_log("scePadSetProcessPrivilege: 0x%08x\n", ret);
-
-    /* Clean up any orphaned VDA devices */
-    for (int dh=0; dh<64; dh++) {
-        if (scePadVirtualDeviceDeleteDevice(dh)==0) gp_log("deleteDevice(%d)\n", dh);
-    }
 
     /* Start klog capture thread first — must be running before any VDA call */
     pthread_t klog_tid;

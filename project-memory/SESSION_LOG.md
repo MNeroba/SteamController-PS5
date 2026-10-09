@@ -712,7 +712,7 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - M1-198 local evidence: regression-first exact-length checks, full normal and ASan/UBSan suites, 27 USB parser checks and 100,000 report + 100,000 configuration parser inputs pass. SDK v0.43/LLVM 18.1.8 cross-build passes; ELF SHA-256 362d584f60d26a0206a983c55980ebe7083f4c05fc9bd7adf9b878839a49fa1c.
 - No physical PS5, Steam Controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio, firmware/system write, or binary release was used. P0-USB-DESC-10 remains blocked pending safe identified hardware evidence.
 
-## M1-199 — Fix strict-C11 Ubuntu host build — 2026-10-09 05:17 UTC
+## M1-199 initial GNU_SOURCE candidate — strict-C11 Ubuntu host build — 2026-10-09 05:17 UTC
 
 - Re-read the repository instructions, full execution specification, required architecture/BLE/test documentation, and current project-state/evidence logs. Reconciled main as `4c947486fd41371d9a96238d39e8b7a826c1c34c`, tree `9aee8ff14d4c6e9eb1267aa6c8fa94e98422dd18`.
 - GitHub Host tests failed on both initial run `37848828922` attempt 1 and the user-requested rerun attempt 2; earlier source run `37848691432` showed the same error. The failing translation unit was `payload/webui_auth.c` under `-std=c11` on Ubuntu. The existing PS5 cross-build on main passed (`37848829021`).
@@ -729,3 +729,19 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Final variant passes Darwin strict-C11 syntax compilation, full `make -C tests clean test`, full `make -C tests sanitize` (ASan/UBSan), and SDK v0.43/LLVM 18.1.8 clean/build with explicit `PS5_PAYLOAD_SDK`; final ELF SHA-256 `4c27faf3dc8b5e7589f8f9df4ec396f055377be8157ef41e9016fbb93b498aac`. `git diff --check` passes. Linux CI is still required because the local host is Darwin and skips the guarded macro branch.
 - No hardware, radio, firmware, USB ioctl, PR, or binary-release action occurred.
 - Exact next action: re-fetch GitHub `main` and its tree. If main still equals `4c947486fd41371d9a96238d39e8b7a826c1c34c`, publish only the reviewed eight files (`payload/webui_auth.c`, `docs/TEST_PLAN.md`, and six `project-memory/*.md`) using a base-tree-preserving Git Data commit and expected-head ref update with `force=false`; then verify the commit/tree and check both Actions workflows.
+
+
+### M1-199 direct-main publication confirmation — 2026-10-09 05:24 UTC
+
+- Published the final Linux-only `_POSIX_C_SOURCE=200809L` source fix and project-memory update directly to main as `aefa83283ba0360d0ee1444ce0d78d3c7e0504da` (parent `4c947486fd41371d9a96238d39e8b7a826c1c34c`, tree `f9c8a7d93716a900815483d024443f968f1c90f7`). Ref update was expected-head guarded and `force=false`; GitHub acknowledged it.
+- Verified the new recursive tree: 209 entries/196 blobs, `truncated=false`; all eight updated blob IDs match local Git hashes, required core payload files remain present. Host run `37888347135` and PS5 cross-build `37888347062` were queued on the new commit at 05:24 UTC.
+- Exact next action: inspect both Actions workflows after their runners start and record their result; Linux Host completion decides whether this CI failure is truly resolved. No PR, hardware, USB ioctl, BLE/HCI/radio, firmware/system write, or binary release occurred.
+
+### M1-200 — P0-1 virtual-device ownership — 2026-10-09 06:22 UTC
+
+- Re-read P0 instructions and reconfirmed workspace branch `fix/p0-safety`, local HEAD `78460113ef7c48502c765a1f83ba34d53c977134`, pre-publication GitHub `main` `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`; Actions `37888347135` and `37888347062` are still queued.
+- Found and removed the anonymous `0..63` VDA startup-delete sweep. Removed `scePadGetHandle()` fallback, output-token promotion, and async klog-derived IDs as handle/ownership candidates from `create_vda_for_slot()`. Direct ShellUI stubs now gate deletion on the positive handle returned from their own AddDevice call and on that exact handle remaining selected; looked-up/open/injected handles are not deleted.
+- Added `tests/test_vda_ownership.py`, wired it into the full test recipe, and added T-P48/F072/P0-VDA-01/ADR-037. Three source guards failed on pre-fix code and pass now.
+- Normal host suite, ASan/UBSan suite and clean SDK v0.43 cross-build pass; ELF SHA is in M1-200 TEST_LOG. This is compile-only evidence. No target or physical-device operation was run.
+- Remaining uncertainty: the installed SDK has the `libScePad.so` binary but no `AddDevice` API contract header. The code only treats a positive immediate return as attributable; semantics of the API, success-without-returned-handle cleanup, real delete behavior and device reconnection remain target-unverified.
+- Exact next action: publish the reviewed M1-200 paths via GitHub Git Data against a fresh `main` tree and expected-head ref update. Then inspect thread lifecycle ownership and implement P0-2 before starting P0-3.

@@ -502,7 +502,8 @@ pt_call_with_copy(pid_t pid, intptr_t fn, intptr_t trap_rip,
  *   3. fp_vda(&param, 3)  — create virtual DualSense; exit on failure
  *   4. Auto-press Cross  — dismiss "who is using this controller?" dialog
  *   5. Insert loop  — forward pad data from main process at 60 Hz
- *   6. fp_del(handle)  — delete virtual device on exit so next run is clean
+ *   6. fp_del(handle)  — delete only a positive handle returned by this stub's
+ *                        own AddDevice call; looked-up handles are never deleted
  *
  * Rules: position-independent, no direct library calls, no globals/statics.
  * All calls go through fp_* pointers in ShellUiPadArgs.
@@ -517,6 +518,7 @@ void shellui_stub(void *arg)
     int32_t assignment_hint = 0;
     int32_t handle_from_vda_token = 0;
     int32_t initial_pad_handle = a->pad_handle;
+    int32_t created_handle = -1;
 
     /* Early marker so the injector can distinguish "thread never ran" from
      * "thread started and died before reaching ready=1". */
@@ -591,8 +593,9 @@ void shellui_stub(void *arg)
                     a->rc_log[14] = vdp.f[6];
                     a->rc_log[15] = vdp.f[7];
                 }
-                if (vda_ret >= 0) {
+                if (vda_ret > 0) {
                     vda_handle = vda_ret;
+                    created_handle = vda_ret;
                     use_insert = 0;
                     a->pad_handle = vda_handle;
                     a->rc_log[6] = (int32_t)0x60000001;
@@ -703,8 +706,9 @@ void shellui_stub(void *arg)
                     a->rc_log[14] = vdp.f[6];
                     a->rc_log[15] = vdp.f[7];
                 }
-                if (vda_ret >= 0) {
+                if (vda_ret > 0) {
                     vda_handle = vda_ret;
+                    created_handle = vda_ret;
                     a->pad_handle = vda_handle;
                     a->rc_log[6] = (int32_t)0x60000001;
                 } else {
@@ -976,9 +980,12 @@ void shellui_stub(void *arg)
         a->fp_usleep(500);
     }
 
-    /* Delete virtual device on clean exit so next run doesn't get 0x803b0001.
-     * Legacy insert handles (use_insert) are not used in current builds. */
-    if (!use_insert && a->fp_del) a->fp_del(vda_handle);
+    /* Retrieved, injected, and open handles may belong to another process.
+     * Delete only the positive handle returned by this stub's own AddDevice. */
+    if (!use_insert && a->fp_del && created_handle >= 0 &&
+        vda_handle == created_handle) {
+        a->fp_del(created_handle);
+    }
 }
 
 __attribute__((noinline, section(".text.stub")))
@@ -996,6 +1003,7 @@ void shellui_stub_force_vda(void *arg)
     int32_t fallback_use_insert = a->rc_log[1];
     int32_t pad_type = (a->virtual_device_type >= 0) ? a->virtual_device_type : 3;
     int32_t vda_handle = -1;
+    int32_t created_handle = -1;
     int32_t handle_from_vda_token = 0;
     int32_t use_insert = 0;
     int32_t button_probe_done = 0;
@@ -1091,6 +1099,7 @@ void shellui_stub_force_vda(void *arg)
 
             if (vda_ret > 0) {
                 vda_handle = vda_ret;
+                created_handle = vda_ret;
                 a->pad_handle = vda_handle;
                 a->rc_log[6] = (int32_t)0x60000001;
                 a->rc_log[7] = vda_handle;
@@ -1356,8 +1365,9 @@ void shellui_stub_force_vda(void *arg)
         }
     }
 
-    if (!use_insert && a->fp_del) {
-        a->fp_del(vda_handle);
+    if (!use_insert && a->fp_del && created_handle >= 0 &&
+        vda_handle == created_handle) {
+        a->fp_del(created_handle);
     }
 }
 

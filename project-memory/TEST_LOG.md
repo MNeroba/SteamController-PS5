@@ -604,7 +604,7 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - Actions 37848691432 (Host tests) and 37848691412 (PS5 cross-build) are queued; combined status has no completed checks. No CI pass is claimed.
 - M1-198 local evidence: regression-first exact-length checks, full normal and ASan/UBSan suites, 27 USB parser checks and 100,000 report + 100,000 configuration parser inputs pass. SDK v0.43/LLVM 18.1.8 cross-build passes; ELF SHA-256 362d584f60d26a0206a983c55980ebe7083f4c05fc9bd7adf9b878839a49fa1c.
 - No physical PS5, Steam Controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio, firmware/system write, or binary release was used. P0-USB-DESC-10 remains blocked pending safe identified hardware evidence.
-## M1-199 strict-C11 declarations for web token storage — 2026-10-09 05:17 UTC
+## M1-199 initial GNU_SOURCE candidate (superseded before publication) — 2026-10-09 05:17 UTC
 
 - GitHub baseline: main `4c947486fd41371d9a96238d39e8b7a826c1c34c`; Host run `37848828922` attempt 1 and rerun attempt 2 both failed in `Run portable host and sanitizer suite`, compiling `payload/webui_auth.c`. The Linux compiler hid `O_DIRECTORY`, `O_NOFOLLOW`, `openat`, `fchmod`, `unlinkat`, and `fstatat` under the test's `-std=c11`; exact Actions link: https://github.com/MNeroba/SteamController-PS5/actions/runs/37848828922. Earlier source run `37848691432` also failed at the same compile. This was not an Actions runner outage.
 - Fix: add guarded `_GNU_SOURCE=1` at the very start of `payload/webui_auth.c`, before its project header and all system headers. No runtime token logic, storage modes, or API behavior changed. This narrow feature request is covered by ADR-036/F071/P1-CI-01/T-P47.
@@ -625,3 +625,20 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - Payload commands without an explicit SDK variable stop in Makefile parsing (`PS5_PAYLOAD_SDK is not set`), including `clean`. Retried separately with `PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk" LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config`: `make -C payload clean` PASS; `make -C payload` PASS. SDK v0.43 (`d9c9519116944a7f1c22d262012c53b80b3520b7`), LLVM 18.1.8; ELF64 x86-64 SharedObject SHA-256 `4c27faf3dc8b5e7589f8f9df4ec396f055377be8157ef41e9016fbb93b498aac`. This is a cross-build only.
 - Darwin does not define the Linux-only macro branch, so local compilation does not prove Ubuntu's declarations. GitHub Ubuntu Actions on the fix commit remain required before marking the CI issue resolved. No post-fix Actions run exists yet.
 - No physical PS5, Steam Controller, Puck, DualSense interface, USB ioctl, BLE/HCI/radio, firmware/system write, PR, or binary release was used. Direct-to-main remains authorized by the owner; publication must use the rechecked expected main SHA and `force=false`.
+
+
+### M1-199 direct-main publication confirmation — 2026-10-09 05:24 UTC
+
+- Published the final POSIX macro fix, T-P47, and current project-memory entries directly to `main` as commit `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`, parent `4c947486fd41371d9a96238d39e8b7a826c1c34c`, tree `f9c8a7d93716a900815483d024443f968f1c90f7`, message `fix(ci): expose POSIX token storage declarations`. The GitHub ref update acknowledged success, was guarded by expected head `4c947486...`, and used `force=false`; no PR or history rewrite.
+- Published exactly 8 paths: `payload/webui_auth.c`, `docs/TEST_PLAN.md`, and six `project-memory/*.md` files. Each GitHub blob SHA was checked against the local Git object hash; re-fetched recursive tree is not truncated, contains 209 entries/196 blobs, all eight expected SHAs, and the critical payload paths `gc_main.c`, `controller_sc2.c`, `sc2_haptics.c`, `slot_registry.c`, `steam_protocol.c` remain present.
+- New Host tests run `37888347135` and PS5 cross-build run `37888347062` both target the fix commit and were still `queued` at 05:24 UTC. No remote CI pass is claimed. Prior M1-199 entries describe the initial GNU candidate and pre-publication state; the 05:20 follow-up gives final local verification and this entry records publication.
+- Exact next action: check those two Actions runs until they complete; if either fails, inspect its job logs and correct the fix. Then append the actual CI outcomes and publish the final memory snapshot directly to main using an expected-head guard.
+
+### M1-200 — P0 VDA ownership hardening — 2026-10-09 06:24 UTC
+
+- Regression-first result: the new `tests/test_vda_ownership.py` guards initially failed against the old startup sweep, klog/GetHandle ownership inference, and unguarded ShellUI deletion paths. After the change, all 3 source-invariant tests pass.
+- `make -C tests clean test` — PASS. Existing portable targets pass, including slot-registry (123 checks), lifecycle (85), USB session/resource tests, parser properties, concurrency targets, and the 3 new VDA ownership guards.
+- `make -C tests sanitize` — PASS under AddressSanitizer and UndefinedBehaviorSanitizer, including all three VDA ownership guards.
+- `PS5_PAYLOAD_SDK=.../ps5-payload-sdk LLVM_CONFIG=... make -C payload clean` followed by `make -C payload` — PASS (exit 0), SDK v0.43 pin `d9c9519116944a7f1c22d262012c53b80b3520b7`, LLVM 18.1.8. ELF64 x86-64 PIE SHA-256 `d2484cf3c96616c02b1ccf6d5983c986e46d20d2056e7007913d1ddb119d1f42`; compile/link evidence only.
+- `git diff --check` — PASS. No PS5, DualSense, Steam Controller, Puck, USB ioctl, or Bluetooth hardware operation was performed. The SDK `AddDevice` return contract and target cleanup/reconnect behavior remain unverified.
+- Exact follow-up: publish the reviewed P0-1 source, test and memory changes to `main` with a fresh expected-head check; then begin P0-2 centralized shutdown without using detach/reset or hardware probes.

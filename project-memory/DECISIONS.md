@@ -256,3 +256,13 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Tradeoff: Linux consumers of this translation unit get POSIX.1-2008 declarations; runtime logic and token-storage behavior are unchanged. Darwin and PS5 compile paths do not define or override the feature macro here.
 - Verification gate: strict local syntax compile, full normal and ASan/UBSan host suites, and SDK v0.43 compile/link pass. GitHub Ubuntu Actions on the fix commit remain the final Linux CI gate; no physical PS5 behavior is implied.
 - Reconsider if a supported host libc cannot expose the required interfaces with this feature request; then add a narrowly scoped portability wrapper rather than weakening global C flags.
+
+## ADR-037 — Delete only VDA handles attributable to the current payload call
+
+- Date/status: 2026-10-09, ACCEPTED WITH TARGET ABI LIMITS.
+- Context: startup deleted every device ID in a guessed numeric range. The create path also promoted VDA output tokens, asynchronous klog DeviceIds, and handles found by `scePadGetHandle()` scans into registry-owned values. ShellUI stubs could later delete injected or recovered handles that belonged to another process/session.
+- Evidence: pre-fix expected-red `tests/test_vda_ownership.py`; `payload/gc_main.c::main()`, `create_vda_for_slot()`, `delete_vda_handle()`; `payload/shellui_pad.c::shellui_stub()` and `shellui_stub_force_vda()`; Puckbridge-derived source pin `78460113ef7c48502c765a1f83ba34d53c977134`; T-P48/F072/M1-200.
+- Decision: remove global ID-range cleanup. The managed slot registry may own only a positive handle returned immediately from that session's `scePadVirtualDeviceAddDevice()` call. Async klog IDs, output tokens, and `GetHandle`/open results are diagnostic/lookup data, never deletion authority. The standalone ShellUI stubs delete only a positive direct return from their own AddDevice call, and only while that same handle remains selected.
+- Tradeoff: if the target API creates a device but does not return a usable positive handle, this implementation fails closed and may leave an unmanaged device until a safe target-specific cleanup contract is established. The installed SDK exposes no public contract header for this call; positive-return semantics and all physical cleanup remain unverified.
+- Verification gate: three source-invariant regressions pass; full normal and ASan/UBSan suites pass; SDK v0.43 compile/link passes. No PS5, DualSense, Puck, controller, or USB/Bluetooth I/O was run.
+- Reconsider only with primary ABI evidence or a reversible physical-console test proving a safe way to map the exact AddDevice-created device to a deletion handle. Never restore an ID-range sweep or delete a looked-up controller handle.
