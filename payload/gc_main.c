@@ -64,6 +64,7 @@
 #include "diag_once.h"
 #include "runtime_control.h"
 #include "credential_kernel.h"
+#include "runtime_policy.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -73,6 +74,7 @@
 
 static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_log_fd = -1;
+static runtime_policy_t g_runtime_policy;
 
 void ghostpad_status_log_reset(void) {
     pthread_mutex_lock(&g_log_lock);
@@ -279,6 +281,19 @@ static int runtime_cancel_requested(void *context) {
     return runtime_is_stopping();
 }
 
+static void load_runtime_policy(runtime_policy_t *policy) {
+    if (runtime_policy_load_file(RUNTIME_POLICY_PATH, policy) != 0) {
+        runtime_policy_defaults(policy);
+        gp_log("runtime policy: no valid regular file at %s; using safe defaults\n",
+               RUNTIME_POLICY_PATH);
+    }
+
+    gp_log("runtime policy: opt-ins bridge=%d hooks=%d dualsense=%d webui=%d legacy-usb=%d\n",
+           policy->enable_bridge_probe, policy->enable_game_hooks,
+           policy->enable_ds_handoff, policy->enable_webui,
+           policy->enable_legacy_usb_probe);
+}
+
 /* ── ugen detection ───────────────────────────────────────────────────── */
 #define VID_NATIVE  0x2dc8u
 #define PID_NATIVE  0x310bu
@@ -425,6 +440,13 @@ static int probe_one_path(const char *path, uint16_t *out_vid, uint16_t *out_pid
         *out_vid=VID_STEAM; *out_pid=pid;
         close(fd);
         return 1;
+    }
+
+    /* Safe mode enumerates exact Steam IDs only. Do not initialize USBFS or
+     * detach any interface to guess whether an unknown device is a controller. */
+    if (!g_runtime_policy.enable_legacy_usb_probe) {
+        close(fd);
+        return 0;
     }
 
     /* Everything below only ever touches the external bus. */
@@ -1749,6 +1771,8 @@ int main(void) {
     gp_log("Ghost-Control v5 starting — %d slots\n", MAX_SLOTS);
     notify("PuckbridgePS5 (built on Ghostcontrol by StonedModder) — plug in controllers now");
 
+    load_runtime_policy(&g_runtime_policy);
+
     /* Kill previous instance */
     { int pfd=open(PID_PATH,O_RDONLY);
       if(pfd>=0){char pb[16]={0};read(pfd,pb,15);close(pfd);
@@ -1788,13 +1812,22 @@ int main(void) {
     /* Remap portal + per-game profile switching */
     sc2_notify_fn = notify_str;
     if (!g_signal_stop && !runtime_is_stopping()) sc2_select_start();
-    if (!g_signal_stop && !runtime_is_stopping()) bridge_probe_start(g_inject_uid);
-    if (!g_signal_stop && !runtime_is_stopping()) game_hooks_start();
-    if (!g_signal_stop && !runtime_is_stopping()) ds_handoff_start();
-    if (!g_signal_stop && !runtime_is_stopping()) {
+    if (g_runtime_policy.enable_bridge_probe &&
+        !g_signal_stop && !runtime_is_stopping())
+        bridge_probe_start(g_inject_uid);
+    if (g_runtime_policy.enable_game_hooks &&
+        !g_signal_stop && !runtime_is_stopping())
+        game_hooks_start();
+    if (g_runtime_policy.enable_ds_handoff &&
+        !g_signal_stop && !runtime_is_stopping())
+        ds_handoff_start();
+    if (g_runtime_policy.enable_webui &&
+        !g_signal_stop && !runtime_is_stopping()) {
         webui_start();
         notify("Puckbridge: remap portal on port %d", WEBUI_PORT);
     }
+    gp_log("safe mode defaults: game-memory probe/hooks, DualSense hand-off and WebUI require explicit runtime-policy opt-in; non-Steam USB endpoint probing is %s\n",
+           g_runtime_policy.enable_legacy_usb_probe ? "enabled by config" : "disabled");
 
     /* Start controller manager — handles all detection, VDA creation, USB threads */
     if (!g_signal_stop && !runtime_is_stopping() &&

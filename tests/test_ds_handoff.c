@@ -1,6 +1,7 @@
 #include "ds_handoff.h"
 #include "sc2_profile.h"
 
+#include <assert.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -40,6 +41,9 @@ static void *observe_worker(void *arg) {
 }
 
 int main(void) {
+    assert(ds_handoff_set_enabled(1) != 0);
+    ds_handoff_start();
+    assert(ds_handoff_set_enabled(1) == 0);
     pthread_t writer, readers[3];
     void *result = NULL;
 

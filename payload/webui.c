@@ -380,7 +380,10 @@ static void handle(int fd) {
                 (strcmp(on, "0") && strcmp(on, "1"))) {
                 REPLY_TXT(fd, 400, "invalid on parameter"); return;
             }
-            ds_handoff_set_enabled(on[0] == '1');
+            if (ds_handoff_set_enabled(on[0] == '1') != 0) {
+                REPLY_TXT(fd, 403, "DualSense hand-off is disabled by runtime policy");
+                return;
+            }
         }
         char out[160]; int n = ds_handoff_json(out, sizeof(out));
         if (n < 0 || (size_t)n >= sizeof(out)) REPLY_TXT(fd, 500, "DualSense response overflow");

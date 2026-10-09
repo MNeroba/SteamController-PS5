@@ -31,6 +31,29 @@ SteamController-PS5 is a focused payload project for carrying Steam Controller i
 
 Evidence labels used in the project: `VERIFIED_CODE`, `VERIFIED_HOST_TEST`, `VERIFIED_PS5_BUILD`, `VERIFIED_HARDWARE`, `UPSTREAM_CLAIM`, `EXTERNAL_HARDWARE`, `HYPOTHESIS`, and `BLOCKED`. A cross-build is not a runtime or hardware test. See the [test plan](docs/TEST_PLAN.md) and [hardware matrix](project-memory/HARDWARE_MATRIX.md) for detail.
 
+## Default runtime safety mode
+
+At startup, the payload reads the optional local file
+`/data/ghostpad/runtime-policy.ini`. If it is missing, malformed, oversized,
+or a symlink, every optional service stays disabled. Safe defaults disable
+game-memory bridge probing, game hooks, DualSense hand-off, and the WebUI.
+USB discovery still accepts exact Steam Controller/Puck VID:PID matches; the
+Nintendo/Xbox endpoint-guessing path and its interface detaches are disabled.
+
+Optional services require explicit local configuration, one setting per line:
+
+```ini
+ENABLE_WEBUI=1
+# ENABLE_GAME_HOOKS=1
+# ENABLE_BRIDGE_PROBE=1
+# ENABLE_DUALSENSE_HANDOFF=1
+```
+
+Only uncomment a setting after reviewing its effects. The legacy USB probe
+setting is intentionally omitted: enabling it reopens heuristic probing and
+is not recommended. A WebUI request cannot enable DualSense hand-off unless
+that separate policy opt-in is present.
+
 ## What it is designed to do
 
 - Focus on **Steam Controller 2026**, rather than being a generic controller hub.

@@ -41,6 +41,7 @@ static int g_worker_done;
 static int g_worker_reaping;
 static int g_stopping;
 static int      g_enabled = 0;
+static int      g_allowed = 0;
 static int      g_armed = 0;              /* this Steam Controller session may still act */
 static int      g_session = 0;            /* Steam Controller is on and in control */
 static int64_t  g_session_ms = 0;         /* since when */
@@ -72,28 +73,38 @@ static void notify(const char *m) {
 /* ── settings ─────────────────────────────────────────────────────────── */
 
 void ds_handoff_start(void) {
+    pthread_mutex_lock(&g_lock);
+    g_allowed = 1;
+    pthread_mutex_unlock(&g_lock);
     int enabled = 0;
     FILE *f = fopen(SETTINGS, "r");
-    if (!f) return;
-    char l[96];
-    while (fgets(l, sizeof(l), f))
-        if (!strncmp(l, "TURN_OFF_DUALSENSE=", 19)) enabled = atoi(l + 19) != 0;
-    fclose(f);
+    if (f) {
+        char l[96];
+        while (fgets(l, sizeof(l), f))
+            if (!strncmp(l, "TURN_OFF_DUALSENSE=", 19)) enabled = atoi(l + 19) != 0;
+        fclose(f);
+    }
     pthread_mutex_lock(&g_lock);
     g_enabled = enabled;
     pthread_mutex_unlock(&g_lock);
     LOG("dualsense hand-off: %s\n", enabled ? "on" : "off");
 }
 
-void ds_handoff_set_enabled(int on) {
+int ds_handoff_set_enabled(int on) {
     int enabled = on ? 1 : 0;
     pthread_mutex_lock(&g_lock);
+    if (enabled && (!g_allowed || g_stopping || runtime_is_stopping())) {
+        pthread_mutex_unlock(&g_lock);
+        LOG("dualsense hand-off: enable rejected by safe runtime policy\n");
+        return -1;
+    }
     g_enabled = enabled;
     pthread_mutex_unlock(&g_lock);
     mkdir("/data/ghostpad", 0777);
     FILE *f = fopen(SETTINGS, "w");
     if (f) { fprintf(f, "TURN_OFF_DUALSENSE=%d\n", enabled); fclose(f); }
     LOG("dualsense hand-off: %s\n", enabled ? "on" : "off");
+    return 0;
 }
 
 /* ── known pads ───────────────────────────────────────────────────────── */
@@ -372,6 +383,8 @@ int ds_handoff_stop(void) {
     while (g_worker_reaping)
         pthread_cond_wait(&g_worker_changed, &g_lock);
     if (!g_worker_started) {
+        g_allowed = 0;
+        g_enabled = 0;
         pthread_mutex_unlock(&g_lock);
         return 0;
     }
@@ -384,6 +397,8 @@ int ds_handoff_stop(void) {
     if (result == 0) {
         g_worker_started = 0;
         g_worker_done = 0;
+        g_allowed = 0;
+        g_enabled = 0;
     }
     g_worker_reaping = 0;
     pthread_cond_broadcast(&g_worker_changed);

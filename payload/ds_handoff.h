@@ -29,5 +29,6 @@ void ds_handoff_sc2_used(void);
  * Controller should step aside (power off / park) until its Steam button. */
 int  ds_handoff_take_release(void);
 
-void ds_handoff_set_enabled(int on);
+/* Returns -1 if hand-off was not explicitly enabled by runtime policy. */
+int  ds_handoff_set_enabled(int on);
 int  ds_handoff_json(char *out, size_t n);
