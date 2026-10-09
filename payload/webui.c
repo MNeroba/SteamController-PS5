@@ -17,6 +17,7 @@
 #include "webui_route.h"
 #include "webui_peer_policy.h"
 #include "webui_json.h"
+#include "runtime_control.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -26,6 +27,7 @@
 #include <pthread.h>
 #include <sys/socket.h>
 #include <sys/time.h>
+#include <sys/select.h>
 #include <time.h>
 #include <netinet/in.h>
 
@@ -41,6 +43,8 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 #define WEBUI_RESPONSE_TIMEOUT_MS 5000u
 
 static char g_webui_token[WEBUI_TOKEN_HEX_LENGTH + 1];
+static pthread_t g_webui_thread;
+static int g_webui_thread_started;
 
 static void send_response_chunks(int fd, const webui_http_chunk_t *chunks,
                                  size_t chunk_count);
@@ -429,11 +433,31 @@ static void *server_thread(void *arg) {
         close(s); return NULL;
     }
     LOG("webui: listening on :%d\n", WEBUI_PORT);
-    for (;;) {
+    while (!runtime_is_stopping()) {
+        if (s >= FD_SETSIZE) {
+            LOG("webui: listener descriptor exceeds select capacity\n");
+            break;
+        }
+        fd_set readable;
+        FD_ZERO(&readable);
+        FD_SET(s, &readable);
+        struct timeval wait = { 0, 200000 };
+        int ready = select(s + 1, &readable, NULL, NULL, &wait);
+        if (ready == 0) continue;
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            LOG("webui: select failed errno=%d\n", errno);
+            break;
+        }
+        if (runtime_is_stopping()) break;
         struct sockaddr_in peer;
         socklen_t peer_length = sizeof(peer);
         int c = accept(s, (struct sockaddr *)&peer, &peer_length);
-        if (c < 0) { usleep(100000); continue; }
+        if (c < 0) {
+            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
+            LOG("webui: accept failed errno=%d\n", errno);
+            continue;
+        }
         if (peer_length < sizeof(peer) || peer.sin_family != AF_INET ||
             !webui_peer_ipv4_is_lan(peer.sin_addr.s_addr)) {
             LOG("webui: rejected peer outside local IPv4 ranges\n");
@@ -447,21 +471,29 @@ static void *server_thread(void *arg) {
         struct timeval tv = { 2, 0 };
         setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
         setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-        handle(c);
+        if (!runtime_is_stopping()) handle(c);
         close(c);
     }
+    close(s);
     return NULL;
 }
 
 void webui_start(void) {
-    pthread_t t;
     if (initialize_webui_auth() != 0) {
         LOG("webui: disabled; cannot create/read a private token at %s\n", WEBUI_TOKEN_PATH);
         return;
     }
     LOG("webui: private bearer token ready; retrieve %s through local console file access\n",
         WEBUI_TOKEN_PATH);
-    int r = pthread_create(&t, NULL, server_thread, NULL);
-    if (r == 0) pthread_detach(t);
+    int r = pthread_create(&g_webui_thread, NULL, server_thread, NULL);
+    if (r == 0) g_webui_thread_started = 1;
     else LOG("webui: failed to start server thread (%d)\n", r);
+}
+
+int webui_stop(void) {
+    if (!g_webui_thread_started) return 0;
+    int result = pthread_join(g_webui_thread, NULL);
+    if (result != 0) return -1;
+    g_webui_thread_started = 0;
+    return 0;
 }

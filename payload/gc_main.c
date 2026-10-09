@@ -26,6 +26,7 @@
 #include <sys/socket.h>
 #include <sys/stat.h>
 #include <sys/time.h>
+#include <sys/select.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -61,6 +62,7 @@
 #include "slot_lifecycle.h"
 #include "usb_session.h"
 #include "diag_once.h"
+#include "runtime_control.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -117,6 +119,25 @@ static gc_diag_once_t g_vdi_error_log = GC_DIAG_ONCE_INIT;
  * DEVICE_ADDED event is not an ownership receipt. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
 static int32_t         g_inject_uid = 0x10000000;
+static volatile sig_atomic_t g_signal_stop;
+static pthread_t g_klog_tid, g_manager_tid;
+static int g_klog_started, g_manager_started, g_runtime_shutdown_done;
+
+typedef struct {
+    pthread_t thread;
+    slot_registry_token_t token;
+    int started;
+    int done;
+} usb_worker_record_t;
+
+static pthread_mutex_t g_usb_workers_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_usb_workers_changed = PTHREAD_COND_INITIALIZER;
+static usb_worker_record_t g_usb_workers[MAX_SLOTS];
+
+static void signal_stop_handler(int signal_number) {
+    (void)signal_number;
+    g_signal_stop = 1;
+}
 
 /* ── Notification ─────────────────────────────────────────────────────── */
 typedef struct { char _unk[45]; char message[3075]; } NotifyRequest;
@@ -170,16 +191,31 @@ static void *klog_capture_thread(void *arg) {
         if (sock < 0) return NULL;
         memset(&sin,0,sizeof(sin)); sin.sin_family=AF_INET;
         sin.sin_addr.s_addr=inet_addr("127.0.0.1"); sin.sin_port=htons(3232);
-        for (int r=0; r<10; r++) {
+        for (int r=0; r<10 && !runtime_is_stopping(); r++) {
             if (connect(sock,(struct sockaddr*)&sin,sizeof(sin))==0){fd=sock;gp_log("klog: connected\n");break;}
-            usleep(500000);
+            runtime_sleep_ms(500);
         }
         if (fd<0){close(sock);return NULL;}
     }
-    while (1) {
+    while (!runtime_is_stopping()) {
+        if (fd >= FD_SETSIZE) {
+            gp_log("klog: descriptor exceeds select capacity; capture stopped\n");
+            break;
+        }
+        fd_set readable;
+        FD_ZERO(&readable);
+        FD_SET(fd, &readable);
+        struct timeval wait = { 0, 250000 };
+        int ready = select(fd + 1, &readable, NULL, NULL, &wait);
+        if (ready == 0) continue;
+        if (ready < 0) {
+            if (errno == EINTR) continue;
+            gp_log("klog: select failed errno=%d\n", errno);
+            break;
+        }
         ssize_t len = read(fd, buf, sizeof(buf));
-        if (len < 0) { if (errno==EINTR) continue; break; }
-        if (len == 0) { usleep(10000); continue; }
+        if (len < 0) { if (errno==EINTR || errno==EAGAIN || errno==EWOULDBLOCK) continue; break; }
+        if (len == 0) continue;
         for (ssize_t i=0; i<len; i++) {
             char c = buf[i];
             if (c=='\n'||line_len>=sizeof(line)-1){line[line_len]='\0';parse_klog_line(line);line_len=0;}
@@ -219,6 +255,25 @@ static void inject_pad(slot_registry_token_t token, int slot,
         gp_log("slot[%d] VDI #%u ret=0x%08x\n", slot, n, (uint32_t)vr);
     if (vr != 0 && gc_diag_once_claim(&g_vdi_error_log))
         gp_log("VDI error 0x%08x\n", (uint32_t)vr);
+}
+
+static int neutralize_vda_handle(int32_t handle) {
+    ScePadData neutral;
+    memset(&neutral, 0, sizeof(neutral));
+    neutral.leftStick.x = neutral.leftStick.y = 128;
+    neutral.rightStick.x = neutral.rightStick.y = 128;
+    neutral.connected = 1;
+    neutral.quat.w = 1.0f;
+    int result = scePadVirtualDeviceInsertData(handle, &neutral);
+    if (result != 0)
+        gp_log("VDA neutral report failed handle=0x%x ret=0x%08x; delete remains the final neutralization step\n",
+               (uint32_t)handle, (uint32_t)result);
+    return result;
+}
+
+static int runtime_cancel_requested(void *context) {
+    (void)context;
+    return runtime_is_stopping();
 }
 
 /* ── ugen detection ───────────────────────────────────────────────────── */
@@ -453,6 +508,7 @@ typedef struct {
 
 static int delete_vda_handle(int32_t handle, void *opaque) {
     vda_delete_context_t *context = (vda_delete_context_t *)opaque;
+    (void)neutralize_vda_handle(handle);
     int result = scePadVirtualDeviceDeleteDevice(handle);
     if (result != 0)
         gp_log("slot[%d] VDA delete handle=0x%x failed (%s), ret=0x%08x\n",
@@ -520,13 +576,14 @@ static void sc2_vda_detach(slot_registry_token_t token, int slot,
     gp_log("slot[%d] SC2 virtual pad removed (%s)\n", slot, why);
 }
 
-static void slot_release(slot_registry_token_t token, const char *why) {
+static int slot_release(slot_registry_token_t token, const char *why) {
     vda_delete_context_t context = { (int)token.index, why };
     int result = slot_lifecycle_release(&g_slots, token, delete_vda_handle,
                                         &context);
     if (result != SLOT_REGISTRY_OK && result != SLOT_REGISTRY_STALE)
         gp_log("slot[%u] release failed (%s), registry result=%d\n",
                token.index, why, result);
+    return result;
 }
 
 static void retry_releasing_slots(void) {
@@ -547,6 +604,91 @@ typedef struct {
     sc2_assignment_token_t assignment_token;
     int bind_ok;
 } usb_thread_arg_t;
+
+static void usb_worker_mark_done(slot_registry_token_t token) {
+    if (token.index >= MAX_SLOTS) return;
+    pthread_mutex_lock(&g_usb_workers_lock);
+    usb_worker_record_t *record = &g_usb_workers[token.index];
+    if (record->started &&
+        record->token.generation == token.generation) {
+        record->done = 1;
+        pthread_cond_broadcast(&g_usb_workers_changed);
+    }
+    pthread_mutex_unlock(&g_usb_workers_lock);
+}
+
+static void reap_finished_usb_workers(void) {
+    for (uint32_t i = 0; i < MAX_SLOTS; i++) {
+        pthread_t thread;
+        slot_registry_token_t token;
+        pthread_mutex_lock(&g_usb_workers_lock);
+        usb_worker_record_t *record = &g_usb_workers[i];
+        int ready = record->started && record->done;
+        if (ready) { thread = record->thread; token = record->token; }
+        pthread_mutex_unlock(&g_usb_workers_lock);
+        if (!ready) continue;
+        int result = pthread_join(thread, NULL);
+        if (result != 0) {
+            gp_log("manager: completed USB worker join failed slot[%u] error=%d\n",
+                   i, result);
+            continue;
+        }
+        pthread_mutex_lock(&g_usb_workers_lock);
+        record = &g_usb_workers[i];
+        if (record->started && record->done &&
+            record->token.generation == token.generation) {
+            record->started = 0;
+            record->done = 0;
+        }
+        pthread_mutex_unlock(&g_usb_workers_lock);
+    }
+}
+
+static int join_all_usb_workers(void) {
+    for (;;) {
+        pthread_t threads[MAX_SLOTS];
+        slot_registry_token_t tokens[MAX_SLOTS];
+        uint32_t indices[MAX_SLOTS];
+        uint32_t count = 0;
+
+        pthread_mutex_lock(&g_usb_workers_lock);
+        for (;;) {
+            int pending = 0;
+            for (uint32_t i = 0; i < MAX_SLOTS; i++)
+                if (g_usb_workers[i].started && !g_usb_workers[i].done)
+                    pending = 1;
+            if (!pending) break;
+            pthread_cond_wait(&g_usb_workers_changed, &g_usb_workers_lock);
+        }
+        for (uint32_t i = 0; i < MAX_SLOTS; i++) {
+            if (!g_usb_workers[i].started) continue;
+            threads[count] = g_usb_workers[i].thread;
+            tokens[count] = g_usb_workers[i].token;
+            indices[count++] = i;
+        }
+        pthread_mutex_unlock(&g_usb_workers_lock);
+
+        if (count == 0) return 0;
+        for (uint32_t i = 0; i < count; i++) {
+            int result = pthread_join(threads[i], NULL);
+            if (result != 0) {
+                gp_log("shutdown: USB worker join failed slot[%u] generation=%u error=%d\n",
+                       indices[i], tokens[i].generation, result);
+                return -1;
+            }
+        }
+        pthread_mutex_lock(&g_usb_workers_lock);
+        for (uint32_t i = 0; i < count; i++) {
+            usb_worker_record_t *record = &g_usb_workers[indices[i]];
+            if (record->started &&
+                record->token.generation == tokens[i].generation) {
+                record->started = 0;
+                record->done = 0;
+            }
+        }
+        pthread_mutex_unlock(&g_usb_workers_lock);
+    }
+}
 
 static int usb_platform_open(const char *path, int flags, void *context) {
     (void)context;
@@ -644,6 +786,7 @@ static void *usb_hid_thread(void *arg) {
     if (slot_registry_snapshot(&g_slots, slot_token, &slot_entry) != SLOT_REGISTRY_OK) {
         sc2_haptic_session_abandon(slot_token);
         sc2_assignment_release(assignment_token);
+        usb_worker_mark_done(slot_token);
         return NULL;
     }
     int slot = (int)slot_token.index;
@@ -765,7 +908,9 @@ static void *usb_hid_thread(void *arg) {
         while ((active = sc2_find_active_ep(fd, &usb_resources,
                                              &g_usb_session_ops, NULL,
                                              sc2_eps, addrs, n_eps,
-                                             2000)) == 0) {
+                                             2000, runtime_cancel_requested,
+                                             NULL)) == 0 &&
+               !runtime_is_stopping()) {
             if (!told) { gp_log("slot[%d] Puck idle — waiting for the controller to turn on\n", slot); told = 1; }
         }
         if (usb_resources.opened_endpoints != 0 ||
@@ -788,6 +933,7 @@ static void *usb_hid_thread(void *arg) {
                        active);
             goto exit_slot;
         }
+        if (runtime_is_stopping()) goto exit_slot;
         if (!sc2_pause_is_active()) sc2_vda_attach(slot_token, slot, &session);
         ds_handoff_sc2_session(!sc2_pause_is_active());
 
@@ -806,7 +952,7 @@ static void *usb_hid_thread(void *arg) {
         }
         buffers[0]=buf; lengths[0]=64;
         eps[0].ppBuffer=buffers; eps[0].pLength=lengths; eps[0].nFrames=1;
-        eps[0].timeout=0;   /* wireless: idle gaps are normal, don't time out */
+        eps[0].timeout=200; /* finite timeout lets this USB owner observe shutdown */
         eps[0].flags=USB_FS_FLAG_SINGLE_SHORT_OK|USB_FS_FLAG_MULTI_SHORT_OK;
 
         /* Haptics: use the OUT endpoint that belongs to the SAME interface as
@@ -1000,7 +1146,7 @@ main_loop: ;
     uint32_t steam_pkts = 0;
     uint8_t nintendo_seq = 1;
 
-    while (1) {
+    while (!runtime_is_stopping()) {
         memset(buf,0,64);
         buffers[0]=buf; lengths[0]=64;
         eps[0].ppBuffer=buffers; eps[0].pLength=lengths;
@@ -1022,7 +1168,7 @@ main_loop: ;
         }
 
         int ok=0, cerr=0, cw=0;
-        for(cw=0;cw<60;cw++){
+        for(cw=0;cw<60 && !runtime_is_stopping();cw++){
             memset(&complete,0,sizeof(complete));
             uint8_t completed_endpoint = UINT8_MAX;
             int complete_result = usb_session_complete_transfer(
@@ -1037,6 +1183,7 @@ main_loop: ;
             if(cerr!=EBUSY) break;
             usleep(500);
         }
+        if (runtime_is_stopping()) goto reinit;
         if(!ok){
             (void)usb_session_stop_transfer(&usb_resources,
                 &g_usb_session_ops, 0, NULL);
@@ -1196,6 +1343,7 @@ exit_slot:
     sc2_assignment_release(assignment_token);
     sc2_input_state_reset(&session.sc2_input);
     slot_release(slot_token, "USB reader exit");
+    usb_worker_mark_done(slot_token);
     return NULL;
 }
 
@@ -1229,13 +1377,52 @@ static int manager_start_usb_worker(slot_registry_token_t token,
     arg->assignment_token = context->assignment_token;
     arg->bind_ok = bind_ok;
 
-    pthread_t tid;
-    if (pthread_create(&tid, NULL, usb_hid_thread, arg) != 0) {
-        gp_log("manager: pthread_create fail slot[%u]\n", token.index);
+    if (token.index >= MAX_SLOTS || runtime_is_stopping()) {
         free(arg);
         return -1;
     }
-    pthread_detach(tid);
+
+    pthread_mutex_lock(&g_usb_workers_lock);
+    usb_worker_record_t *record = &g_usb_workers[token.index];
+    if (record->started) {
+        if (!record->done) {
+            pthread_mutex_unlock(&g_usb_workers_lock);
+            gp_log("manager: prior USB worker still owns slot[%u]\n", token.index);
+            free(arg);
+            return -1;
+        }
+        pthread_t previous = record->thread;
+        record->started = 0;
+        pthread_mutex_unlock(&g_usb_workers_lock);
+        int join_result = pthread_join(previous, NULL);
+        if (join_result != 0) {
+            gp_log("manager: completed USB worker join failed slot[%u] error=%d\n",
+                   token.index, join_result);
+            free(arg);
+            return -1;
+        }
+        pthread_mutex_lock(&g_usb_workers_lock);
+        record = &g_usb_workers[token.index];
+    }
+    if (runtime_is_stopping()) {
+        pthread_mutex_unlock(&g_usb_workers_lock);
+        free(arg);
+        return -1;
+    }
+    record->token = token;
+    record->started = 1;
+    record->done = 0;
+    int create_result = pthread_create(&record->thread, NULL, usb_hid_thread, arg);
+    if (create_result != 0) {
+        record->started = 0;
+        record->done = 0;
+        pthread_mutex_unlock(&g_usb_workers_lock);
+        gp_log("manager: pthread_create fail slot[%u] error=%d\n",
+               token.index, create_result);
+        free(arg);
+        return -1;
+    }
+    pthread_mutex_unlock(&g_usb_workers_lock);
     gp_log("manager: slot[%u] USB thread started handle=0x%x\n",
            token.index, (uint32_t)virtual_handle);
     notify("Puckbridge: slot[%u] ready — press a button to assign", token.index);
@@ -1248,12 +1435,15 @@ static void *controller_manager_thread(void *arg) {
     int scan = 0;
     gp_log("Manager thread started (MAX_SLOTS=%d)\n", MAX_SLOTS);
 
-    while (1) {
+    while (!runtime_is_stopping()) {
+        reap_finished_usb_workers();
+        if (runtime_is_stopping()) break;
         static char devs[MAX_UGEN_DEVS][32];
         int n_devs = scan_ugen_devices(devs, MAX_UGEN_DEVS);
         retry_releasing_slots();
 
         for (int i = 0; i < n_devs; i++) {
+            if (runtime_is_stopping()) break;
             const char *path = devs[i];
 
             /* Serialize assignment: if a controller is still awaiting the user's
@@ -1380,8 +1570,11 @@ static void *controller_manager_thread(void *arg) {
             if (active == 0 && (scan % 10) == 0)
                 gp_log("manager: scan #%d — no controllers\n", scan);
         }
-        usleep(2000000);
+        runtime_sleep_ms(2000);
     }
+    gp_log("manager: stopping scan; waiting for USB owners to clean up\n");
+    if (join_all_usb_workers() != 0)
+        gp_log("manager: one or more USB workers could not be joined\n");
     return NULL;
 }
 
@@ -1393,13 +1586,128 @@ static void elevate_credentials(void) {
     kernel_set_ucred_caps(p, caps);
 }
 
+static int release_owned_slots(void) {
+    for (int attempt = 0; attempt < 5; attempt++) {
+        for (uint32_t i = 0; i < MAX_SLOTS; i++) {
+            slot_registry_entry_t entry;
+            if (slot_registry_snapshot_index(&g_slots, i, &entry) !=
+                SLOT_REGISTRY_OK)
+                continue;
+            int result = slot_release(entry.token, "central runtime shutdown");
+            if (result != SLOT_REGISTRY_OK && result != SLOT_REGISTRY_STALE)
+                gp_log("shutdown: owned slot[%u] rollback retry %d returned %d\n",
+                       i, attempt + 1, result);
+        }
+        if (slot_registry_count_claimed(&g_slots) == 0) return 0;
+        usleep(250000);
+    }
+    return -1;
+}
+
+static void remove_pid_file_if_owned(void) {
+    char contents[32] = {0};
+    int fd = open(PID_PATH, O_RDONLY);
+    if (fd < 0) return;
+    ssize_t length = read(fd, contents, sizeof(contents) - 1);
+    close(fd);
+    if (length > 0 && (pid_t)atoi(contents) == getpid())
+        (void)unlink(PID_PATH);
+}
+
+static int runtime_shutdown(void) {
+    int safe_to_release = 1;
+    if (g_runtime_shutdown_done) return 0;
+
+    /* Close the only worker that can disconnect a physical DualSense before
+     * the shared stop request. The module gate prevents new hand-off calls. */
+    if (ds_handoff_stop() != 0) {
+        gp_log("shutdown: DualSense hand-off worker join failed\n");
+        safe_to_release = 0;
+    }
+    runtime_request_stop();
+
+    /* Stop request producers and one-shot system workers before USB teardown. */
+    if (webui_stop() != 0) {
+        gp_log("shutdown: WebUI listener join failed\n");
+        safe_to_release = 0;
+    }
+    if (bridge_probe_stop() != 0) {
+        gp_log("shutdown: read-only bridge probe join failed\n");
+        safe_to_release = 0;
+    }
+
+    /* The manager joins each reader only after its owner stopped USB transfers,
+     * released haptics, closed endpoints and file descriptors, and neutralized
+     * / deleted its registered virtual device. */
+    if (g_manager_started) {
+        int result = pthread_join(g_manager_tid, NULL);
+        if (result == 0) g_manager_started = 0;
+        else {
+            gp_log("shutdown: manager join failed error=%d\n", result);
+            safe_to_release = 0;
+        }
+    }
+    if (!g_manager_started && join_all_usb_workers() != 0)
+        safe_to_release = 0;
+
+    /* Game hooks own remote import changes and must complete their rollback
+     * before their status or shared state is allowed to go away. */
+    if (game_hooks_stop() != 0) {
+        gp_log("shutdown: game-hook worker join / rollback failed\n");
+        safe_to_release = 0;
+    }
+    if (sc2_select_stop() != 0) {
+        gp_log("shutdown: profile watcher join failed\n");
+        safe_to_release = 0;
+    }
+    if (g_klog_started) {
+        int result = pthread_join(g_klog_tid, NULL);
+        if (result == 0) g_klog_started = 0;
+        else {
+            gp_log("shutdown: klog capture join failed error=%d\n", result);
+            safe_to_release = 0;
+        }
+    }
+
+    if (!safe_to_release) {
+        gp_log("shutdown: retaining shared state and registry until all owners join\n");
+        return -1;
+    }
+    if (release_owned_slots() != 0) {
+        gp_log("shutdown: virtual-device rollback still pending; registry retained\n");
+        return -1;
+    }
+
+    slot_registry_destroy(&g_slots);
+    remove_pid_file_if_owned();
+    gp_log("shutdown: all owned devices removed and workers joined\n");
+    pthread_mutex_lock(&g_log_lock);
+    if (g_log_fd >= 0) { close(g_log_fd); g_log_fd = -1; }
+    pthread_mutex_unlock(&g_log_lock);
+    g_runtime_shutdown_done = 1;
+    return 0;
+}
+
 /* ── main ─────────────────────────────────────────────────────────────── */
 int main(void) {
     int32_t userId=-1, fgUser=-1; int ret;
+    int startup_result = 0;
+    struct sigaction stop_action;
+
+    runtime_control_reset();
+    memset(&stop_action, 0, sizeof(stop_action));
+    stop_action.sa_handler = signal_stop_handler;
+    sigemptyset(&stop_action.sa_mask);
 
     ghostpad_status_log_reset();
     if (slot_registry_init(&g_slots) != SLOT_REGISTRY_OK) {
         gp_log("slot registry initialization failed\n");
+        return 1;
+    }
+    if (sigaction(SIGTERM, &stop_action, NULL) != 0 ||
+        sigaction(SIGINT, &stop_action, NULL) != 0) {
+        gp_log("signal handler installation failed errno=%d\n", errno);
+        slot_registry_destroy(&g_slots);
         return 1;
     }
     gp_log("Ghost-Control v5 starting — %d slots\n", MAX_SLOTS);
@@ -1429,43 +1737,51 @@ int main(void) {
     ret=scePadSetProcessPrivilege(1); gp_log("scePadSetProcessPrivilege: 0x%08x\n", ret);
 
     /* Start klog capture thread first — must be running before any VDA call */
-    pthread_t klog_tid;
-    if (pthread_create(&klog_tid, NULL, klog_capture_thread, NULL)==0) {
-        pthread_detach(klog_tid);
+    if (pthread_create(&g_klog_tid, NULL, klog_capture_thread, NULL)==0) {
+        g_klog_started = 1;
         gp_log("klog thread started\n");
     } else {
         gp_log("klog: failed to start capture thread; VDA identity binding is degraded\n");
     }
-    usleep(300000); /* let klog thread connect before first VDA */
+    runtime_sleep_ms(300); /* let klog thread connect before first VDA */
 
     /* Remap portal + per-game profile switching */
     sc2_notify_fn = notify_str;
-    sc2_select_start();
-    bridge_probe_start(g_inject_uid);
-    game_hooks_start();
-    ds_handoff_start();
-    webui_start();
-    notify("Puckbridge: remap portal on port %d", WEBUI_PORT);
-
-    /* Start controller manager — handles all detection, VDA creation, USB threads */
-    pthread_t mgr_tid;
-    if (pthread_create(&mgr_tid, NULL, controller_manager_thread, NULL)==0) {
-        pthread_detach(mgr_tid);
-        gp_log("Manager thread started\n");
-    } else {
-        gp_log("manager: failed to start; no USB controllers will be managed\n");
-        return 1;
+    if (!g_signal_stop && !runtime_is_stopping()) sc2_select_start();
+    if (!g_signal_stop && !runtime_is_stopping()) bridge_probe_start(g_inject_uid);
+    if (!g_signal_stop && !runtime_is_stopping()) game_hooks_start();
+    if (!g_signal_stop && !runtime_is_stopping()) ds_handoff_start();
+    if (!g_signal_stop && !runtime_is_stopping()) {
+        webui_start();
+        notify("Puckbridge: remap portal on port %d", WEBUI_PORT);
     }
 
-    /* Keep-alive */
+    /* Start controller manager — handles all detection, VDA creation, USB threads */
+    if (!g_signal_stop && !runtime_is_stopping() &&
+        pthread_create(&g_manager_tid, NULL, controller_manager_thread, NULL)==0) {
+        g_manager_started = 1;
+        gp_log("Manager thread started\n");
+    } else {
+        if (!g_signal_stop && !runtime_is_stopping()) {
+            gp_log("manager: failed to start; no USB controllers will be managed\n");
+            startup_result = 1;
+        }
+    }
+
+    /* Keep-alive until SIGINT/SIGTERM; handlers only set this signal-safe flag. */
     uint32_t tick = 0;
-    while (1) {
+    while (g_manager_started && !g_signal_stop && !runtime_is_stopping()) {
         usleep(1000000);
+        if (g_signal_stop || runtime_is_stopping()) break;
         tick++;
         if (tick % 10 == 0) {
             uint32_t active = slot_registry_count_claimed(&g_slots);
             gp_log("alive tick=%u active_slots=%u\n", tick, active);
         }
     }
-    return 0;
+    while (runtime_shutdown() != 0) {
+        gp_log("shutdown: waiting before retrying owner cleanup\n");
+        sleep(1);
+    }
+    return startup_result;
 }

@@ -650,3 +650,19 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - Re-fetched GitHub main and recursive tree: commit/ref match `ab69c02d...`, parent and tree match the expected values, 210 tree entries, `truncated=false`, all 11 changed blobs match, and critical core paths `gc_main.c`, `controller_sc2.c`, `sc2_haptics.c`, `slot_registry.c`, and `steam_protocol.c` are present.
 - New Host tests run `37893512422` and PS5 cross-build run `37893512335` target this commit and are queued. No remote CI result is claimed yet.
 - Next: wait for both runs, record actual outcomes, then continue P0-2 shutdown design. The separate queued M1-199 Actions `37888347135`/`37888347062` still need final outcomes recorded.
+
+### M1-200 memory synchronization — 2026-10-09 06:27 UTC
+
+- Published the post-source-commit evidence and latest snapshot as memory-sync commit `feaf320018625295d48909b3531c8e567f2ff8a6`, parent `ab69c02d502238a4956e37d1f611f8382c486f43`, tree `761fa26ff18f01f7d93537a47a3c09a5099e3eaf`; expected-head ref update succeeded with `force=false`.
+- Five memory blobs match the local Git object hashes. The complete tree remains 210 entries and non-truncated. Actions on this documentation commit are queued: Host `37893626574`, PS5 cross-build `37893626605`.
+- Current observed status check: M1-199 `37888347135`/`37888347062`, source commit `37893512422`/`37893512335`, and memory commit `37893626574`/`37893626605` are all queued. No remote CI pass is claimed.
+
+### M1-201 — P0-2 coordinated shutdown and CI follow-up — 2026-10-09 06:50 UTC
+
+- Confirmed GitHub `main` already contains the requested strict-C11 fix in `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`: `payload/webui_auth.c` defines `_POSIX_C_SOURCE=200809L` before all includes when `__linux__` is set and the macro is otherwise unset. This preserves the Darwin/PS5 SDK feature environment. No change to this already-published fix was needed.
+- Rechecked Actions for M1-199 `37888347135`/`37888347062`, M1-200 source `37893512422`/`37893512335`, and M1-200 memory sync `37893626574`/`37893626605`; all six jobs remained `queued` at 06:50 UTC. No GitHub CI pass is claimed.
+- `make -C tests clean test` — PASS, exit 0, Darwin 27.0.1 arm64 / Apple clang 21.0.0. Includes 12-worker stop signaling, four shutdown contract guards, SC2 scan cancellation with owner STOP/CLOSE cleanup, existing parser properties and concurrency/stress tests.
+- `make -C tests sanitize` — PASS, exit 0, AddressSanitizer + UndefinedBehaviorSanitizer on the same host; the same targets pass.
+- First SDK invocation without `LLVM_CONFIG` failed before compiler startup because the SDK wrapper tried `/llvm-clang` (`No such file or directory`). Rerun with the installed toolchain succeeded: `PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk" LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config make -C payload clean` — PASS; the corresponding `make -C payload` — PASS, exit 0. SDK v0.43 pin `d9c9519116944a7f1c22d262012c53b80b3520b7`, LLVM 18.1.8; produced ELF SHA-256 `5b3a7df02d4e845f56eb351134e562cc65ec5b296b80187b49a4daed157f85fc`. This is compile/link evidence, not a PS5 runtime claim.
+- `git diff --check` — PASS. The SDK failure was invocation configuration and is retained here; the explicit toolchain rerun resolved it.
+- No physical PS5, DualSense, Steam Controller, Puck, USB ioctl, Bluetooth/HCI/radio, firmware/system write, or binary release was used. Shutdown signal delivery, real USB transfer cancellation, VDA neutralization/deletion, and target rollback remain hardware/ABI gates.

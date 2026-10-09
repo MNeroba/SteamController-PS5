@@ -1,5 +1,6 @@
 /* bridge_probe.c — runs PoorDS4's game-side validation in read-only mode */
 #include "bridge_probe.h"
+#include "runtime_control.h"
 #include "bridge/wireless_ds4.h"
 #include "sc2_profile.h"
 #include <stdio.h>
@@ -23,6 +24,8 @@ void poords4_log(const char *format, ...) {
 #define REPORT "/data/poords4/game-pad-bridge-last.txt"
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t g_thread;
+static int g_thread_started;
 static int32_t g_user = -1;
 static int g_force = 0;
 static struct {
@@ -100,7 +103,7 @@ static void run_probe(const char *title) {
 static void *probe_thread(void *arg) {
     (void)arg;
     char last[SC2_ID_MAX + 1] = "";
-    for (;;) {
+    while (!runtime_is_stopping()) {
         char t[SC2_ID_MAX + 1], a[SC2_ID_MAX + 1], o[SC2_ID_MAX + 1];
         sc2_select_status(t, a, o);
         pthread_mutex_lock(&g_lock);
@@ -112,24 +115,33 @@ static void *probe_thread(void *arg) {
             pthread_mutex_lock(&g_lock);
             snprintf(g.title, sizeof(g.title), "%s", t); g.state = 1;
             pthread_mutex_unlock(&g_lock);
-            if (!force) sleep(8);                         /* launch grace */
+            if (!force) runtime_sleep_ms(8000);            /* launch grace */
             char t2[SC2_ID_MAX + 1];
-            sc2_select_status(t2, a, o);
-            if (!strcmp(t, t2)) { run_probe(t); strcpy(last, t); }
+            if (!runtime_is_stopping()) {
+                sc2_select_status(t2, a, o);
+                if (!strcmp(t, t2)) { run_probe(t); strcpy(last, t); }
+            }
         } else if (!t[0]) {
             last[0] = 0;
         }
-        sleep(2);
+        runtime_sleep_ms(2000);
     }
     return NULL;
 }
 
 void bridge_probe_start(int32_t user_id) {
     g_user = user_id;
-    pthread_t th;
-    int r = pthread_create(&th, NULL, probe_thread, NULL);
-    if (r == 0) pthread_detach(th);
+    int r = pthread_create(&g_thread, NULL, probe_thread, NULL);
+    if (r == 0) g_thread_started = 1;
     else LOG("bridge probe: worker thread failed (%d)\n", r);
+}
+
+int bridge_probe_stop(void) {
+    if (!g_thread_started) return 0;
+    int result = pthread_join(g_thread, NULL);
+    if (result != 0) return -1;
+    g_thread_started = 0;
+    return 0;
 }
 
 void bridge_probe_request(void) {

@@ -6,6 +6,7 @@
  * over 0x..0300): only an id the system log named is ever disconnected. */
 
 #include "ds_handoff.h"
+#include "runtime_control.h"
 #include <sys/types.h>
 #include "shellui_pad.h"
 #include "sc2_profile.h"
@@ -33,6 +34,12 @@ enum { ST_IDLE, ST_NO_ID, ST_WORKING, ST_OFF, ST_BACK, ST_FAILED };
 static const char *k_state[] = { "idle", "no_id", "working", "off", "back", "failed" };
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_worker_changed = PTHREAD_COND_INITIALIZER;
+static pthread_t g_worker_thread;
+static int g_worker_started;
+static int g_worker_done;
+static int g_worker_reaping;
+static int g_stopping;
 static int      g_enabled = 0;
 static int      g_armed = 0;              /* this Steam Controller session may still act */
 static int      g_session = 0;            /* Steam Controller is on and in control */
@@ -262,6 +269,18 @@ void ds_handoff_sc2_session(int on) {
 
 static void *worker(void *arg) {
     uint64_t id = (uint64_t)(uintptr_t)arg;
+    pthread_mutex_lock(&g_lock);
+    int cancelled = g_stopping || runtime_is_stopping();
+    if (cancelled) {
+        g_busy = 0;
+        g_state = ST_IDLE;
+        g_worker_done = 1;
+        pthread_cond_broadcast(&g_worker_changed);
+        pthread_mutex_unlock(&g_lock);
+        return NULL;
+    }
+    pthread_mutex_unlock(&g_lock);
+
     LOG("dualsense hand-off: disconnecting 0x%llx\n", (unsigned long long)id);
     pb_kernel_lock();                         /* kernel memory is shared with the game hooks */
     int r = shellui_pad_disconnect_device(id);
@@ -273,15 +292,45 @@ static void *worker(void *arg) {
     if (r == 0) { g_state = ST_OFF; g_off_id = id; g_off_ms = now_ms(); pad_remove(id); }
     else          g_state = ST_FAILED;
     g_busy = 0;
+    g_worker_done = 1;
+    pthread_cond_broadcast(&g_worker_changed);
     pthread_mutex_unlock(&g_lock);
     if (r == 0) notify("Puckbridge: DualSense turned off. Press its PS button to bring it back.");
     else        notify("Puckbridge: couldn't turn the DualSense off (see the log)");
     return NULL;
 }
 
-void ds_handoff_sc2_used(void) {
+static int reap_completed_worker(void) {
+    pthread_t finished;
     pthread_mutex_lock(&g_lock);
-    if (!g_enabled || !g_armed || g_busy) { pthread_mutex_unlock(&g_lock); return; }
+    if (!g_worker_started || !g_worker_done || g_worker_reaping) {
+        pthread_mutex_unlock(&g_lock);
+        return 0;
+    }
+    g_worker_reaping = 1;
+    finished = g_worker_thread;
+    pthread_mutex_unlock(&g_lock);
+
+    int result = pthread_join(finished, NULL);
+    pthread_mutex_lock(&g_lock);
+    if (result == 0) {
+        g_worker_started = 0;
+        g_worker_done = 0;
+    }
+    g_worker_reaping = 0;
+    pthread_cond_broadcast(&g_worker_changed);
+    pthread_mutex_unlock(&g_lock);
+    return result == 0 ? 0 : -1;
+}
+
+void ds_handoff_sc2_used(void) {
+    if (runtime_is_stopping() || reap_completed_worker() != 0) return;
+    pthread_mutex_lock(&g_lock);
+    if (g_stopping || runtime_is_stopping() || g_worker_started ||
+        !g_enabled || !g_armed || g_busy) {
+        pthread_mutex_unlock(&g_lock);
+        return;
+    }
     int dropped = 0;
     uint64_t id = pad_newest(&dropped);
     if (id) { g_armed = 0; g_busy = 1; g_state = ST_WORKING; }   /* one try per session */
@@ -297,9 +346,49 @@ void ds_handoff_sc2_used(void) {
     if (dropped)
         LOG("dualsense hand-off: %d older id(s) dropped, using the newest 0x%llx\n",
             dropped, (unsigned long long)id);
-    pthread_t t;
-    if (pthread_create(&t, NULL, worker, (void *)(uintptr_t)id) == 0) pthread_detach(t);
-    else { pthread_mutex_lock(&g_lock); g_busy = 0; g_state = ST_FAILED; pthread_mutex_unlock(&g_lock); }
+    pthread_mutex_lock(&g_lock);
+    if (g_stopping || runtime_is_stopping()) {
+        g_busy = 0;
+        g_state = ST_IDLE;
+        pthread_mutex_unlock(&g_lock);
+        return;
+    }
+    int result = pthread_create(&g_worker_thread, NULL, worker,
+                                (void *)(uintptr_t)id);
+    if (result == 0) {
+        g_worker_started = 1;
+        g_worker_done = 0;
+    } else {
+        g_busy = 0;
+        g_state = ST_FAILED;
+    }
+    pthread_mutex_unlock(&g_lock);
+}
+
+int ds_handoff_stop(void) {
+    pthread_t worker_to_join;
+    pthread_mutex_lock(&g_lock);
+    g_stopping = 1;
+    while (g_worker_reaping)
+        pthread_cond_wait(&g_worker_changed, &g_lock);
+    if (!g_worker_started) {
+        pthread_mutex_unlock(&g_lock);
+        return 0;
+    }
+    g_worker_reaping = 1;
+    worker_to_join = g_worker_thread;
+    pthread_mutex_unlock(&g_lock);
+
+    int result = pthread_join(worker_to_join, NULL);
+    pthread_mutex_lock(&g_lock);
+    if (result == 0) {
+        g_worker_started = 0;
+        g_worker_done = 0;
+    }
+    g_worker_reaping = 0;
+    pthread_cond_broadcast(&g_worker_changed);
+    pthread_mutex_unlock(&g_lock);
+    return result == 0 ? 0 : -1;
 }
 
 int ds_handoff_json(char *out, size_t n) {

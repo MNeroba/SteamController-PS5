@@ -1,6 +1,7 @@
 /* sc2_profile.c — button profiles, storage, and per-game auto-switching */
 
 #include "sc2_profile.h"
+#include "runtime_control.h"
 #include "gc_types.h"
 #include "game_list.h"
 #include <stdio.h>
@@ -408,6 +409,8 @@ static void notifyf(const char *fmt, ...) {
 }
 
 static pthread_mutex_t g_sel_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t g_watch_thread;
+static int g_watch_thread_started;
 static char g_title_name[GC_GAME_NAME_MAX] = "";
 static char g_active_name[48] = "Default";
 static char g_title[SC2_ID_MAX + 1]    = "";
@@ -576,7 +579,7 @@ void sc2_select_status(char *title, char *active, char *ovr) {
 
 static void *watch_thread(void *arg) {
     (void)arg;
-    for (;;) {
+    while (!runtime_is_stopping()) {
         char t[SC2_ID_MAX + 1];
         current_title(t);
         pthread_mutex_lock(&g_sel_lock);
@@ -596,7 +599,7 @@ static void *watch_thread(void *arg) {
             LOG("sc2: running title '%s' (%s)\n", t[0] ? t : "(none)", nm);
         }
         apply_selection(changed && t[0] ? 2 : 0);
-        sleep(2);
+        runtime_sleep_ms(2000);
     }
     return NULL;
 }
@@ -609,8 +612,15 @@ void sc2_select_start(void) {
         sc2_store_save("default", &p);
     }
     apply_selection(1);
-    pthread_t t;
-    int r = pthread_create(&t, NULL, watch_thread, NULL);
-    if (r == 0) pthread_detach(t);
+    int r = pthread_create(&g_watch_thread, NULL, watch_thread, NULL);
+    if (r == 0) g_watch_thread_started = 1;
     else LOG("sc2: profile watcher thread failed (%d)\n", r);
+}
+
+int sc2_select_stop(void) {
+    if (!g_watch_thread_started) return 0;
+    int result = pthread_join(g_watch_thread, NULL);
+    if (result != 0) return -1;
+    g_watch_thread_started = 0;
+    return 0;
 }

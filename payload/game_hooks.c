@@ -7,6 +7,7 @@
 #include "sc2_status.h"
 #include "sc2_gyro.h"
 #include "sc2_trigfx.h"
+#include "runtime_control.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -18,8 +19,6 @@
 #ifdef GAME_HOOKS_TEST
 #include <stdatomic.h>
 static atomic_int g_test_stop;
-static pthread_t g_test_thread;
-static int g_test_thread_started;
 #endif
 
 void ghostpad_status_log(const char *fmt, ...);
@@ -30,6 +29,8 @@ void ghostpad_status_log(const char *fmt, ...);
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_settings_io_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t g_hooks_thread;
+static int g_hooks_thread_started;
 typedef struct {
     int input_on, vibe_on, mode, audio_on;
 } GameHookSettings;
@@ -192,6 +193,7 @@ static void *hooks_thread(void *arg) {
     int last_in = -1, last_vib = -1, rollback_pending = 0;
 
     for (;;) {
+        if (runtime_is_stopping()) break;
 #ifdef GAME_HOOKS_TEST
         if (atomic_load_explicit(&g_test_stop, memory_order_relaxed)) break;
 #endif
@@ -354,35 +356,47 @@ static void *hooks_thread(void *arg) {
         if (now >= next_stat) next_stat = now + 500;
         usleep(8000);
     }
-#ifdef GAME_HOOKS_TEST
-    if (g.state == 2) (void)unhook("host test shutdown");
-#endif
+    if (rumbling) sc2_haptic_rumble_set(0, 0);
+    sc2_trigfx_clear();
+    sc2_trigfx_enable(0);
+    if (g.state == 2 && g.pid > 0)
+        (void)pb_hooks_set_silence(g.pid, g.args, 0);
+    while (unhook("runtime shutdown") != 0) {
+        set_state(2, "hook rollback pending; retaining target ownership");
+        usleep(100000);
+    }
+    active_set(0);
+    set_state(0, "stopped");
     return NULL;
 }
 
 void game_hooks_start(void) {
     load_settings();
     g.pid = -1;
-    pthread_t th;
-    int r = pthread_create(&th, NULL, hooks_thread, NULL);
+    int r = pthread_create(&g_hooks_thread, NULL, hooks_thread, NULL);
     if (r == 0) {
 #ifdef GAME_HOOKS_TEST
-        g_test_thread = th;
-        g_test_thread_started = 1;
-#else
-        pthread_detach(th);
+        atomic_store_explicit(&g_test_stop, 0, memory_order_relaxed);
 #endif
+        g_hooks_thread_started = 1;
     }
     else LOG("game hooks: worker thread failed (%d)\n", r);
 }
 
+int game_hooks_stop(void) {
+#ifdef GAME_HOOKS_TEST
+    atomic_store_explicit(&g_test_stop, 1, memory_order_relaxed);
+#endif
+    if (!g_hooks_thread_started) return 0;
+    int result = pthread_join(g_hooks_thread, NULL);
+    if (result != 0) return -1;
+    g_hooks_thread_started = 0;
+    return 0;
+}
+
 #ifdef GAME_HOOKS_TEST
 void game_hooks_test_stop(void) {
-    atomic_store_explicit(&g_test_stop, 1, memory_order_relaxed);
-    if (g_test_thread_started) {
-        (void)pthread_join(g_test_thread, NULL);
-        g_test_thread_started = 0;
-    }
+    (void)game_hooks_stop();
 }
 #endif
 

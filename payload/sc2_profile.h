@@ -97,6 +97,7 @@ void sc2_select_override(const char *id);     /* "" = automatic */
 void sc2_select_reload(void);                 /* re-read active file after a save */
 void sc2_select_status(char *title, char *active, char *override_id); /* each SC2_ID_MAX+1 */
 void sc2_select_start(void);                  /* starts title-watch thread */
+int  sc2_select_stop(void);                   /* joins title-watch thread */
 /* Display name of the running game ("" if none). out >= 128 bytes. */
 void sc2_select_title_name(char *out, size_t n);
 /* Name of the active profile. */

@@ -16,6 +16,7 @@
  * one turned off. */
 
 void ds_handoff_start(void);                  /* load setting */
+int  ds_handoff_stop(void);                   /* prevents new hand-offs and joins any worker */
 void ds_handoff_klog_line(const char *line);  /* every system log line */
 void ds_handoff_note_virtual(uint64_t dev_id);/* our own virtual pads: never touched */
 

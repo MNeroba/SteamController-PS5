@@ -752,3 +752,18 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Re-fetched ref, commit and recursive tree after update: parent `aefa832...`, tree `448d610603c7dfb095841899f67db9158fa55dd8`, 210 entries, non-truncated. All 11 changed blob SHAs match local content and required payload files remain. No PR or history rewrite.
 - Actions for the source commit: PS5 cross-build `37893512335` queued; Host tests `37893512422` queued. Previous fix CI `37888347135`/`37888347062` also still need outcome checks. No workflow is called passed while queued.
 - Next work, in required order: check Actions, then implement centralized stop/USB cancellation/neutral input/registry rollback; only after review and tests begin the privilege audit.
+
+### M1-200 memory synchronization — 2026-10-09 06:27 UTC
+
+- Re-fetched main at source commit `ab69c02d502238a4956e37d1f611f8382c486f43`, tree `448d610603c7dfb095841899f67db9158fa55dd8`; published five updated project-memory files in `feaf320018625295d48909b3531c8e567f2ff8a6`, tree `761fa26ff18f01f7d93537a47a3c09a5099e3eaf`, guarded expected-head and `force=false`.
+- Re-fetched main/tree after update: current main `feaf320...`, 210 entries, `truncated=false`, 5 expected memory blob SHAs matched. Host run `37893626574` and SDK run `37893626605` are queued on the sync commit.
+- Checked Actions for M1-199, source M1-200, and memory-sync M1-200: all six observed workflows are queued. Do not claim CI completion until runners finish.
+
+### M1-201 — P0-2 coordinated shutdown and CI follow-up — 2026-10-09 06:50 UTC
+
+- Reconciled the reported `webui_auth.c` Ubuntu strict-C11 failure against GitHub `main`: the Linux-scoped `_POSIX_C_SOURCE=200809L` definition already precedes every include in commit `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`. Kept this scoped fix unchanged to preserve Darwin and PS5 SDK feature declarations.
+- Continued P0-2 in the prescribed order. The central shutdown path gates and joins the DualSense hand-off worker, signals all stop-aware loops, joins the listener/probe/manager/game-hook/profile/klog workers, lets each USB reader clean its own operations, neutralizes owned virtual input before deletion, retries registry rollback, and retains shared state if any join or cleanup fails. SC2 active-endpoint scan now accepts cancellation and performs STOP/CLOSE through the reader's existing resource owner.
+- Added 12-worker stop signaling coverage, four static contract guards, and an injected cancel-after-START regression that requires STOP/CLOSE, zero active transfer/endpoint state, and `-ECANCELED`. Added T-P49/F073/P0-SHUTDOWN-01/ADR-038. No detached native service threads or cross-thread USB cancellation were introduced.
+- Verification: `make -C tests clean test` PASS; `make -C tests sanitize` PASS; SDK v0.43/LLVM 18.1.8 clean build PASS with explicit `LLVM_CONFIG`; ELF SHA-256 `5b3a7df02d4e845f56eb351134e562cc65ec5b296b80187b49a4daed157f85fc`; `git diff --check` PASS. The first SDK attempt without `LLVM_CONFIG` failed because its wrapper resolved the compiler to nonexistent `/llvm-clang`; the explicit SDK toolchain variable fixed that invocation. Detailed test evidence is in `TEST_LOG.md`.
+- Actions on the previous source/fix commits remain queued as of 06:50 UTC: `37888347135`, `37888347062`, `37893512422`, `37893512335`, `37893626574`, `37893626605`. No CI pass is claimed. Current P0-2 source/test/doc/memory change set is ready for direct-main publication under the owner's standing instruction, after rechecking main and its exact base tree.
+- No PS5, DualSense, Steam Controller, official Puck, USB ioctl, Bluetooth/HCI/radio, firmware/system write, PR, or binary release was used. Physical signal, USB and VDA cleanup gates remain open.

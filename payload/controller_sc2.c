@@ -116,7 +116,9 @@ static int sc2_scan_operation_error(int result) {
 int sc2_find_active_ep(int fd, usb_resources_t *resources,
                        const usb_session_ops_t *ops, void *ops_context,
                        struct usb_fs_endpoint *eps,
-                       const uint8_t *addrs, int n, int timeout_ms) {
+                       const uint8_t *addrs, int n, int timeout_ms,
+                       sc2_scan_cancel_fn should_cancel,
+                       void *cancel_context) {
     uint8_t bufs[SC2_MAX_EPS][64];
     void    *bp[SC2_MAX_EPS][1];
     uint32_t bl[SC2_MAX_EPS][1];
@@ -161,12 +163,14 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
         opened[i] = 1;
         bp[i][0] = bufs[i]; bl[i][0] = 64;
         eps[i].ppBuffer = bp[i]; eps[i].pLength = bl[i]; eps[i].nFrames = 1;
-        eps[i].timeout = 0;
+        eps[i].timeout = 100;
         eps[i].flags = USB_FS_FLAG_SINGLE_SHORT_OK | USB_FS_FLAG_MULTI_SHORT_OK;
     }
 
-    for (int t = 0; t < timeout_ms && !found; t += 5) {
+    for (int t = 0; t < timeout_ms && !found &&
+         !(should_cancel && should_cancel(cancel_context)); t += 5) {
         for (int i = 0; i < n && !found; i++) {
+            if (should_cancel && should_cancel(cancel_context)) break;
             if (!opened[i]) continue;
             if (!started[i]) {
                 bl[i][0] = 64; eps[i].aFrames = 0; eps[i].status = 0;
@@ -186,6 +190,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
         uint8_t completed_endpoint = UINT8_MAX;
         int complete_result = USB_SESSION_OK;
         while (!found && complete_result == USB_SESSION_OK &&
+               !(should_cancel && should_cancel(cancel_context)) &&
                resources->active_transfers != 0) {
             errno = 0;
             complete_result = usb_session_complete_any_transfer(resources,
@@ -212,6 +217,9 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
         if (!found && errno == ENXIO) found = -ENXIO;
         if (!found) usleep(5000);
     }
+
+    if (!found && should_cancel && should_cancel(cancel_context))
+        found = -ECANCELED;
 
     for (int i = 0; i < n; i++) {
         if (!opened[i]) continue;

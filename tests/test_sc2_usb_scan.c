@@ -37,6 +37,8 @@ struct scan_call {
     int result;
     int fail_close_once;
     int fail_stop_once;
+    int cancel_after_start;
+    int cancel_requested;
     int open_calls;
     int start_calls;
     int complete_calls;
@@ -169,8 +171,16 @@ static int scan_open_endpoint(int fd, void *configuration, void *context) {
 }
 
 static int scan_start_transfer(int fd, void *configuration, void *context) {
-    (void)context;
-    return ioctl(fd, USB_FS_START, configuration);
+    struct scan_call *call = context;
+    int result = ioctl(fd, USB_FS_START, configuration);
+    if (result == 0 && call && call->cancel_after_start)
+        call->cancel_requested = 1;
+    return result;
+}
+
+static int scan_should_cancel(void *context) {
+    const struct scan_call *call = context;
+    return call && call->cancel_requested;
 }
 
 static int scan_complete_transfer(int fd, void *configuration,
@@ -228,7 +238,7 @@ static void *scan_worker(void *opaque) {
     if (call->timeout_ms == 0) call->timeout_ms = 5;
     call->result = sc2_find_active_ep(call->fd, &call->resources, &scan_ops,
             call, endpoints, call->addresses, call->endpoint_count,
-            call->timeout_ms);
+            call->timeout_ms, scan_should_cancel, call);
     return NULL;
 }
 
@@ -471,6 +481,26 @@ int main(void) {
                 multiplexed.stop_calls, multiplexed.close_calls,
                 multiplexed.resources.opened_endpoints,
                 multiplexed.resources.active_transfers);
+        return 1;
+    }
+
+    struct scan_call cancelled = {
+        .fd = 7, .endpoint_count = 1, .timeout_ms = 10,
+        .cancel_after_start = 1
+    };
+    cancelled.addresses[0] = 0x87;
+    init_scan_resources(&cancelled.resources, cancelled.fd);
+    (void)scan_worker(&cancelled);
+    if (cancelled.result != -ECANCELED || cancelled.start_calls != 1 ||
+        cancelled.complete_calls != 0 || cancelled.stop_calls != 1 ||
+        cancelled.close_calls != 1 || cancelled.resources.active_transfers != 0 ||
+        cancelled.resources.opened_endpoints != 0) {
+        fprintf(stderr,
+                "cancelled SC2 scan did not stop/close through its owner: result=%d start=%d complete=%d stop=%d close=%d state=0x%x/0x%x\n",
+                cancelled.result, cancelled.start_calls,
+                cancelled.complete_calls, cancelled.stop_calls,
+                cancelled.close_calls, cancelled.resources.opened_endpoints,
+                cancelled.resources.active_transfers);
         return 1;
     }
 

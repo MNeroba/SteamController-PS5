@@ -58,10 +58,13 @@ int  sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep);
  * operations use the reader's session table and resource tracker. COMPLETE
  * may return any active endpoint; that endpoint is accounted before decoding.
  * Failed stop/close operations remain owned by session cleanup. */
+typedef int (*sc2_scan_cancel_fn)(void *context);
 int  sc2_find_active_ep(int fd, usb_resources_t *resources,
                         const usb_session_ops_t *ops, void *ops_context,
                         struct usb_fs_endpoint *eps,
-                        const uint8_t *addrs, int n, int timeout_ms);
+                        const uint8_t *addrs, int n, int timeout_ms,
+                        sc2_scan_cancel_fn should_cancel,
+                        void *cancel_context);
 
 /* Per-controller input state. No packet history is shared between USB/Puck
  * sessions; the USB reader owns one instance for its lifetime. */
