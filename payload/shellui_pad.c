@@ -49,6 +49,7 @@
 #endif
 
 #include "shellui_pad.h"
+#include "credential_kernel.h"
 
 /* Route shellui_pad diagnostics through the persistent status logger as well
  * as klog. main.c owns ghostpad_status_log(), which keeps klog_printf behavior
@@ -110,30 +111,110 @@ ghostpad_all_byte(const uint8_t *buf, size_t len, uint8_t value)
 
 /* PT_IO fallback for shellui_pad_update — always enabled */
 
-/* sys_ptrace — elevate credentials for ptrace, then restore */
+typedef struct shellui_ptrace_call {
+    int request;
+    pid_t pid;
+    caddr_t addr;
+    int data;
+} shellui_ptrace_call_t;
+
+static int
+shellui_call_ptrace(void *context)
+{
+    shellui_ptrace_call_t *call = context;
+    return (int)__syscall(SYS_ptrace, call->request, call->pid,
+                          call->addr, call->data);
+}
+
+/* sys_ptrace — elevate only for the syscall and restore capabilities first. */
 static int
 sys_ptrace(int request, pid_t pid, caddr_t addr, int data)
 {
-    uint8_t privcaps[16] = {
+    static const uint8_t privcaps[CREDENTIAL_GUARD_CAPS_SIZE] = {
         0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
         0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
     };
-    pid_t   mypid = getpid();
-    uint8_t caps[16];
-    uint64_t authid;
-    int ret;
-
-    if (!(authid = kernel_get_ucred_authid(mypid))) return -1;
-    if (kernel_get_ucred_caps(mypid, caps))          return -1;
-    if (kernel_set_ucred_authid(mypid, 0x4800000000010003l)) return -1;
-    if (kernel_set_ucred_caps(mypid, privcaps))      return -1;
-
-    ret = (int)__syscall(SYS_ptrace, request, pid, addr, data);
-
-    kernel_set_ucred_authid(mypid, authid);
-    kernel_set_ucred_caps(mypid, caps);
-    return ret;
+    shellui_ptrace_call_t call = { request, pid, addr, data };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), privcaps,
+        shellui_call_ptrace, &call, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("[Ghostpad] ptrace credential guard failed: %s\n",
+                    credential_guard_result_name(guard));
+        return -1;
+    }
+    return result;
 }
+
+typedef struct shellui_mdbg_copy {
+    pid_t pid;
+    intptr_t address;
+    void *buffer;
+    size_t length;
+    int write_to_target;
+} shellui_mdbg_copy_t;
+
+static int
+shellui_call_mdbg_copy(void *context)
+{
+    shellui_mdbg_copy_t *copy = context;
+    if (copy->write_to_target)
+        return mdbg_copyin(copy->pid, copy->buffer, copy->address,
+                           copy->length);
+    return mdbg_copyout(copy->pid, copy->address, copy->buffer,
+                        copy->length);
+}
+
+static int
+shellui_scoped_mdbg_copy(pid_t pid, int write_to_target, intptr_t address,
+                         void *buffer, size_t length)
+{
+    shellui_mdbg_copy_t copy = {
+        .pid = pid,
+        .address = address,
+        .buffer = buffer,
+        .length = length,
+        .write_to_target = write_to_target
+    };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), NULL,
+        shellui_call_mdbg_copy, &copy, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("[Ghostpad] mdbg credential guard failed: %s pid=%d\n",
+                    credential_guard_result_name(guard), pid);
+        return -1;
+    }
+    return result;
+}
+
+#if defined(__ORBIS__)
+typedef struct shellui_mbus_disconnect_call {
+    int (*function)(uint64_t);
+    uint64_t device_id;
+} shellui_mbus_disconnect_call_t;
+
+static int
+shellui_call_mbus_disconnect(void *context)
+{
+    shellui_mbus_disconnect_call_t *call = context;
+    return call->function(call->device_id);
+}
+
+typedef struct shellui_mbus_bind_call {
+    int (*function)(uint64_t, uint32_t);
+    uint64_t device_id;
+    uint32_t user_id;
+} shellui_mbus_bind_call_t;
+
+static int
+shellui_call_mbus_bind(void *context)
+{
+    shellui_mbus_bind_call_t *call = context;
+    return call->function(call->device_id, call->user_id);
+}
+#endif
 
 /* find_pids — locate processes by thread name via sysctl (ki_pid@72, ki_tdname@447) */
 static size_t
@@ -1432,8 +1513,8 @@ shellui_pad_inject(int32_t userId,
             continue;
         }
         waitpid(target_pid, NULL, 0);
-        klog_printf("[Ghostpad] attached to %s (pid=%d)  authid=0x%016lx\n",
-                    target_name, target_pid, kernel_get_ucred_authid(target_pid));
+        klog_printf("[Ghostpad] attached to %s (pid=%d)\n",
+                    target_name, target_pid);
 
         if (get_lib(target_pid, "libScePad", &libpad_h) ||
             get_lib(target_pid, "libkernel_sys", &libkernel_h)) {
@@ -1868,13 +1949,8 @@ shellui_pad_update(pid_t shellui_pid, intptr_t args_kaddr,
     uint32_t new_seq = cached_seq + 1;
     intptr_t data_field = args_kaddr + (intptr_t)offsetof(ShellUiPadArgs, pad_data);
 
-    /* Elevate to ptrace authid for mdbg_copyin; restore game authid immediately after */
-    pid_t    _mypid    = getpid();
-    uint64_t _saved_au = kernel_get_ucred_authid(_mypid);
-    if (_saved_au) kernel_set_ucred_authid(_mypid, 0x4800000000010003l);
-
-    int copy_ret = mdbg_copyin(shellui_pid, pad_data, data_field, pad_data_len);
-    if (_saved_au) kernel_set_ucred_authid(_mypid, _saved_au);
+    int copy_ret = shellui_scoped_mdbg_copy(
+        shellui_pid, 1, data_field, (void *)pad_data, pad_data_len);
 
     if (copy_ret) {
         if (!logged_data_copy_failure) {
@@ -1916,10 +1992,8 @@ shellui_pad_update(pid_t shellui_pid, intptr_t args_kaddr,
     }
 
     intptr_t seq_field = args_kaddr + (intptr_t)offsetof(ShellUiPadArgs, seq);
-    _saved_au = kernel_get_ucred_authid(_mypid);
-    if (_saved_au) kernel_set_ucred_authid(_mypid, 0x4800000000010003l);
-    copy_ret = mdbg_copyin(shellui_pid, &new_seq, seq_field, 4);
-    if (_saved_au) kernel_set_ucred_authid(_mypid, _saved_au);
+    copy_ret = shellui_scoped_mdbg_copy(
+        shellui_pid, 1, seq_field, &new_seq, sizeof(new_seq));
     if (copy_ret) {
         if (!logged_seq_copy_failure) {
             klog_printf("[Ghostpad] shellui_pad_update seq copy failed ret=%d errno=%d pid=%d args=0x%lx seq=0x%lx old=%u new=%u\n",
@@ -2687,7 +2761,7 @@ shellcore_pad_test_vdi_neutral(int32_t pad_handle)
  */
 
 static int
-shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_only)
+shellui_pad_patch_vda_target_impl(pid_t target, const char *target_name, int dump_only)
 {
 #if !GHOSTPAD_ENABLE_KNOWN_VDA_PATCH
     (void)dump_only;
@@ -2716,21 +2790,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
         0x75,0x07,0x48,0x8d,0x65,0xf8,0x5b,0x5d,0xc3
     };
 
-    pid_t mypid = getpid();
-    uint8_t privcaps[16] = {
-        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
-        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
-    };
-    uint8_t saved_caps[16];
-    uint64_t saved_authid = kernel_get_ucred_authid(mypid);
-    int have_saved_caps = 0;
-
-    if (saved_authid && kernel_get_ucred_caps(mypid, saved_caps) == 0) {
-        have_saved_caps = 1;
-        kernel_set_ucred_authid(mypid, 0x4800000000010003l);
-        kernel_set_ucred_caps(mypid, privcaps);
-    }
-
     if (!target_name) target_name = "target";
     klog_printf("[Ghostpad] patch_vda: %s pid=%d dump_only=%d manifest=PS4-libScePad-vda-0xbb22d8acd843d81e\n", target_name,
                 target, dump_only);
@@ -2738,10 +2797,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
     uint32_t libpad_h = 0;
     if (get_lib(target, "libScePad", &libpad_h)) {
         klog_printf("[Ghostpad] patch_vda: libScePad not found\n");
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return -1;
     }
 
@@ -2749,10 +2804,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
     intptr_t fn_vda = resolve_sym(target, libpad_h, "scePadVirtualDeviceAddDevice");
     if (!fn_vda) {
         klog_printf("[Ghostpad] patch_vda: scePadVirtualDeviceAddDevice not found\n");
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return -1;
     }
 
@@ -2765,10 +2816,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
         klog_printf("[Ghostpad] patch_vda: manifest reject: VDA offset 0x%lx != 0x%x\n",
                     (unsigned long)(fn_vda - libpad_init),
                     (unsigned)GHOSTPAD_VDA_PS4_LIBSCEPAD_VDA_OFF);
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return 0;
     }
 
@@ -2776,10 +2823,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
     memset(buf, 0, sizeof(buf));
     if (mdbg_copyout(target, fn_vda, buf, sizeof(buf)) != 0) {
         klog_printf("[Ghostpad] patch_vda: mdbg_copyout failed len=%zu errno=%d\n", sizeof(buf), errno);
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return -1;
     }
 
@@ -2804,20 +2847,12 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
     if (!already_patched) {
         if (memcmp(buf, expected_prologue32, sizeof(expected_prologue32)) != 0) {
             klog_printf("[Ghostpad] patch_vda: manifest reject: prologue32 mismatch\n");
-            if (have_saved_caps) {
-                kernel_set_ucred_authid(mypid, saved_authid);
-                kernel_set_ucred_caps(mypid, saved_caps);
-            }
             return 0;
         }
         if (hash256 != GHOSTPAD_VDA_PS4_HASH256 || hash4k != GHOSTPAD_VDA_PS4_HASH4K) {
             klog_printf("[Ghostpad] patch_vda: manifest reject: hash256=0x%016llx hash4k=0x%016llx\n",
                         (unsigned long long)hash256,
                         (unsigned long long)hash4k);
-            if (have_saved_caps) {
-                kernel_set_ucred_authid(mypid, saved_authid);
-                kernel_set_ucred_caps(mypid, saved_caps);
-            }
             return 0;
         }
 
@@ -2825,10 +2860,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
             memcmp(buf + GHOSTPAD_VDA_PS4_AFTER_CALL_OFF, expected_after_call, sizeof(expected_after_call)) != 0 ||
             buf[GHOSTPAD_VDA_PS4_BRANCH_OFF] != 0x75) {
             klog_printf("[Ghostpad] patch_vda: manifest reject: call/canary bytes mismatch\n");
-            if (have_saved_caps) {
-                kernel_set_ucred_authid(mypid, saved_authid);
-                kernel_set_ucred_caps(mypid, saved_caps);
-            }
             return 0;
         }
 
@@ -2836,10 +2867,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
                                GHOSTPAD_VDA_PS4_CAVE_LEN, 0x90)) {
             klog_printf("[Ghostpad] patch_vda: manifest reject: cave +0x%x is not the expected NOP run\n",
                         (unsigned)GHOSTPAD_VDA_PS4_CAVE_OFF);
-            if (have_saved_caps) {
-                kernel_set_ucred_authid(mypid, saved_authid);
-                kernel_set_ucred_caps(mypid, saved_caps);
-            }
             return 0;
         }
     }
@@ -2852,10 +2879,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
                 already_patched ? " already_patched=1" : "");
 
     if (dump_only || already_patched) {
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return 1;
     }
 
@@ -2945,10 +2968,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
 
 
         klog_printf("[Ghostpad] patch_vda: cave write failed errno=%d\n", errno);
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return -1;
     }
 
@@ -2957,10 +2976,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
         memset(nop_restore, 0x90, sizeof(nop_restore));
         (void)mdbg_copyin(target, nop_restore, cave_addr, sizeof(nop_restore));
         klog_printf("[Ghostpad] patch_vda: call-site write failed errno=%d; cave restored\n", errno);
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return -1;
     }
 
@@ -2973,10 +2988,6 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
         memcmp(verify_cave, cave_patch, sizeof(cave_patch)) != 0 ||
         memcmp(verify_call, call_patch, sizeof(call_patch)) != 0) {
         klog_printf("[Ghostpad] patch_vda: write verification failed; patch not trusted\n");
-        if (have_saved_caps) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-            kernel_set_ucred_caps(mypid, saved_caps);
-        }
         return -1;
     }
 
@@ -2992,12 +3003,49 @@ shellui_pad_patch_vda_target(pid_t target, const char *target_name, int dump_onl
                 (unsigned)GHOSTPAD_VDA_PS4_CALL_OFF,
                 (unsigned)GHOSTPAD_VDA_PS4_CAVE_OFF,
                 (uint32_t)cave_call_rel32, protect_call_ok, protect_cave_ok);
-
-    if (have_saved_caps) {
-        kernel_set_ucred_authid(mypid, saved_authid);
-        kernel_set_ucred_caps(mypid, saved_caps);
-    }
     return 1;
+#endif
+}
+
+
+#if GHOSTPAD_ENABLE_KNOWN_VDA_PATCH && defined(__ORBIS__)
+typedef struct shellui_patch_vda_call {
+    pid_t target;
+    const char *target_name;
+    int dump_only;
+} shellui_patch_vda_call_t;
+
+static int
+shellui_call_patch_vda_target(void *context)
+{
+    shellui_patch_vda_call_t *call = context;
+    return shellui_pad_patch_vda_target_impl(
+        call->target, call->target_name, call->dump_only);
+}
+#endif
+
+static int
+shellui_pad_patch_vda_target(pid_t target, const char *target_name,
+                             int dump_only)
+{
+#if GHOSTPAD_ENABLE_KNOWN_VDA_PATCH && defined(__ORBIS__)
+    static const uint8_t all_caps[CREDENTIAL_GUARD_CAPS_SIZE] = {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    };
+    shellui_patch_vda_call_t call = { target, target_name, dump_only };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), all_caps,
+        shellui_call_patch_vda_target, &call, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("[Ghostpad] patch_vda credential guard failed: %s\n",
+                    credential_guard_result_name(guard));
+        return -1;
+    }
+    return result;
+#else
+    return shellui_pad_patch_vda_target_impl(target, target_name, dump_only);
 #endif
 }
 
@@ -3225,25 +3273,25 @@ fallback:
             klog_printf("[Ghostpad] disconnect: direct fallback failed to dlopen libSceMbus.sprx\n");
             return -1;
         }
-        typedef int (*fn_disconnect)(uint64_t);
-        fn_disconnect f = (fn_disconnect)dlsym(h, "sceMbusDisconnectDevice");
+        int (*f)(uint64_t) = (int (*)(uint64_t))dlsym(h, "sceMbusDisconnectDevice");
         if (!f) {
             klog_printf("[Ghostpad] disconnect: direct fallback failed to dlsym sceMbusDisconnectDevice\n");
             dlclose(h);
             return -1;
         }
-        /* Elevate to SceShellCore credentials for direct system service call */
-        pid_t mypid = getpid();
-        uint64_t saved_authid = kernel_get_ucred_authid(mypid);
-        if (saved_authid) {
-            kernel_set_ucred_authid(mypid, 0x4800000000000010l);
+        shellui_mbus_disconnect_call_t call = { f, physicalDeviceId };
+        int r = -1;
+        credential_guard_result_t guard = credential_kernel_run(
+            getpid(), UINT64_C(0x4800000000000010), NULL,
+            shellui_call_mbus_disconnect, &call, &r);
+        if (guard != CREDENTIAL_GUARD_OK) {
+            klog_printf("[Ghostpad] disconnect: credential guard failed: %s\n",
+                        credential_guard_result_name(guard));
+            dlclose(h);
+            return -1;
         }
-        int r = f(physicalDeviceId);
         klog_printf("[Ghostpad] disconnect: direct sceMbusDisconnectDevice(0x%llx) returned %d\n",
                     (unsigned long long)physicalDeviceId, r);
-        if (saved_authid) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-        }
         dlclose(h);
         return r;
     }
@@ -3323,25 +3371,28 @@ fallback:
             klog_printf("[Ghostpad] force_bind: direct fallback failed to dlopen libSceMbus.sprx\n");
             return -1;
         }
-        typedef int (*fn_bind)(uint64_t, uint32_t);
-        fn_bind f = (fn_bind)dlsym(h, "sceMbusBindDeviceWithUserId");
+        int (*f)(uint64_t, uint32_t) =
+            (int (*)(uint64_t, uint32_t))dlsym(h, "sceMbusBindDeviceWithUserId");
         if (!f) {
             klog_printf("[Ghostpad] force_bind: direct fallback failed to dlsym sceMbusBindDeviceWithUserId\n");
             dlclose(h);
             return -1;
         }
-        /* Elevate to SceShellCore credentials for direct system service call */
-        pid_t mypid = getpid();
-        uint64_t saved_authid = kernel_get_ucred_authid(mypid);
-        if (saved_authid) {
-            kernel_set_ucred_authid(mypid, 0x4800000000000010l);
+        shellui_mbus_bind_call_t call = {
+            f, virtualDeviceId, (uint32_t)userId
+        };
+        int r = -1;
+        credential_guard_result_t guard = credential_kernel_run(
+            getpid(), UINT64_C(0x4800000000000010), NULL,
+            shellui_call_mbus_bind, &call, &r);
+        if (guard != CREDENTIAL_GUARD_OK) {
+            klog_printf("[Ghostpad] force_bind: credential guard failed: %s\n",
+                        credential_guard_result_name(guard));
+            dlclose(h);
+            return -1;
         }
-        int r = f(virtualDeviceId, (uint32_t)userId);
         klog_printf("[Ghostpad] force_bind: direct sceMbusBindDeviceWithUserId(0x%llx, 0x%x) returned %d\n",
                     (unsigned long long)virtualDeviceId, (uint32_t)userId, r);
-        if (saved_authid) {
-            kernel_set_ucred_authid(mypid, saved_authid);
-        }
         dlclose(h);
         return r;
     }
@@ -3460,15 +3511,9 @@ shellui_pad_hook_gethandle(void)
     }
     pid_t target = pids[0];
 
-    pid_t mypid = getpid();
-    uint64_t saved_authid = kernel_get_ucred_authid(mypid);
-    if (saved_authid) {
-        kernel_set_ucred_authid(mypid, 0x4800000000010003l);
-    }
 
     uint32_t libpad_h = 0;
     if (get_lib(target, "libScePad", &libpad_h)) {
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
@@ -3479,21 +3524,19 @@ shellui_pad_hook_gethandle(void)
     if (!fn_gethandle || !fn_vdi || !fn_vda) {
         klog_printf("[Ghostpad] hook_gh: symbols not found (gh=%p, vdi=%p, vda=%p)\n",
                     (void *)fn_gethandle, (void *)fn_vdi, (void *)fn_vda);
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
     /* Read original 5 bytes of scePadGetHandle */
-    if (mdbg_copyout(target, fn_gethandle, g_orig_gethandle, 5) != 0) {
+    if (shellui_scoped_mdbg_copy(target, 0, fn_gethandle, g_orig_gethandle, 5) != 0) {
         klog_printf("[Ghostpad] hook_gh: failed to read original 5 bytes of gethandle\n");
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
     g_gethandle_hooked = 1;
 
     /* Read original 128 bytes of scePadVirtualDeviceInsertData if not already done */
     if (!g_vdi_hooked) {
-        if (mdbg_copyout(target, fn_vdi, g_orig_vdi_128, 128) == 0) {
+        if (shellui_scoped_mdbg_copy(target, 0, fn_vdi, g_orig_vdi_128, 128) == 0) {
             g_vdi_hooked = 1;
             klog_printf("[Ghostpad] hook_gh: captured original 128 bytes of vdi\n");
         } else {
@@ -3596,9 +3639,8 @@ shellui_pad_hook_gethandle(void)
     hook[119] = 0xFF; hook[120] = 0xE0;
 
     /* Write the hook block into SceShellCore's scePadVirtualDeviceInsertData */
-    if (mdbg_copyin(target, hook, fn_vdi, 128) != 0) {
+    if (shellui_scoped_mdbg_copy(target, 1, fn_vdi, hook, 128) != 0) {
         klog_printf("[Ghostpad] hook_gh: failed to write hook block to SceShellCore\n");
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
@@ -3608,15 +3650,12 @@ shellui_pad_hook_gethandle(void)
     int32_t jmp_rel32 = (int32_t)(fn_vdi - (fn_gethandle + 5));
     memcpy(&detour[1], &jmp_rel32, 4);
 
-    if (mdbg_copyin(target, detour, fn_gethandle, 5) != 0) {
+    if (shellui_scoped_mdbg_copy(target, 1, fn_gethandle, detour, 5) != 0) {
         klog_printf("[Ghostpad] hook_gh: failed to write detour jump to SceShellCore\n");
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
     klog_printf("[Ghostpad] hook_gh: scePadGetHandle HOOKED successfully (detour -> %p)\n", (void *)fn_vdi);
-
-    if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
     return 0;
 }
 
@@ -3639,15 +3678,9 @@ shellui_pad_hook_setpriv(void)
     }
     pid_t target = pids[0];
 
-    pid_t mypid = getpid();
-    uint64_t saved_authid = kernel_get_ucred_authid(mypid);
-    if (saved_authid) {
-        kernel_set_ucred_authid(mypid, 0x4800000000010003l);
-    }
 
     uint32_t libpad_h = 0;
     if (get_lib(target, "libScePad", &libpad_h)) {
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
@@ -3658,21 +3691,19 @@ shellui_pad_hook_setpriv(void)
     if (!fn_setpriv || !fn_vdi || !fn_vda) {
         klog_printf("[Ghostpad] hook_sp: symbols not found (sp=%p, vdi=%p, vda=%p)\n",
                     (void *)fn_setpriv, (void *)fn_vdi, (void *)fn_vda);
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
     /* Read original 5 bytes of scePadSetProcessPrivilege */
-    if (mdbg_copyout(target, fn_setpriv, g_orig_setpriv, 5) != 0) {
+    if (shellui_scoped_mdbg_copy(target, 0, fn_setpriv, g_orig_setpriv, 5) != 0) {
         klog_printf("[Ghostpad] hook_sp: failed to read original 5 bytes of setpriv\n");
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
     g_setpriv_hooked = 1;
 
     /* Read original 128 bytes of scePadVirtualDeviceInsertData if not already done */
     if (!g_vdi_hooked) {
-        if (mdbg_copyout(target, fn_vdi, g_orig_vdi_128, 128) == 0) {
+        if (shellui_scoped_mdbg_copy(target, 0, fn_vdi, g_orig_vdi_128, 128) == 0) {
             g_vdi_hooked = 1;
             klog_printf("[Ghostpad] hook_sp: captured original 128 bytes of vdi\n");
         } else {
@@ -3782,9 +3813,8 @@ shellui_pad_hook_setpriv(void)
     hook[tramp_off + 15] = 0xFF; hook[tramp_off + 16] = 0xE0;
 
     /* Write hook block to scePadVirtualDeviceInsertData in SceShellCore */
-    if (mdbg_copyin(target, hook, fn_vdi, 128) != 0) {
+    if (shellui_scoped_mdbg_copy(target, 1, fn_vdi, hook, 128) != 0) {
         klog_printf("[Ghostpad] hook_sp: failed to write hook block to SceShellCore\n");
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
@@ -3794,15 +3824,12 @@ shellui_pad_hook_setpriv(void)
     int32_t jmp_rel32 = (int32_t)(fn_vdi - (fn_setpriv + 5));
     memcpy(&detour[1], &jmp_rel32, 4);
 
-    if (mdbg_copyin(target, detour, fn_setpriv, 5) != 0) {
+    if (shellui_scoped_mdbg_copy(target, 1, fn_setpriv, detour, 5) != 0) {
         klog_printf("[Ghostpad] hook_sp: failed to write detour jump to SceShellCore\n");
-        if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
         return -1;
     }
 
     klog_printf("[Ghostpad] hook_sp: scePadSetProcessPrivilege HOOKED successfully (detour -> %p)\n", (void *)fn_vdi);
-
-    if (saved_authid) kernel_set_ucred_authid(mypid, saved_authid);
     return 0;
 #endif /* GHOSTPAD_ALLOW_UNSAFE_SETPRIV_HOOK */
 }
@@ -3833,22 +3860,10 @@ static void safe_mdbg_restore(pid_t target, void *orig_bytes, intptr_t addr, siz
     }
 }
 
-int
-shellui_pad_unpatch(void)
+static int
+shellui_pad_unpatch_impl(void)
 {
     pid_t mypid = getpid();
-    uint64_t saved_authid = kernel_get_ucred_authid(mypid);
-    uint8_t privcaps[16];
-    memset(privcaps, 0xff, sizeof(privcaps));
-    uint8_t saved_caps[16];
-    int have_saved_caps = 0;
-
-    if (saved_authid && kernel_get_ucred_caps(mypid, saved_caps) == 0) {
-        have_saved_caps = 1;
-        kernel_set_ucred_authid(mypid, 0x4800000000010003l);
-        kernel_set_ucred_caps(mypid, privcaps);
-    }
-
     klog_printf("[Ghostpad] shellui_pad_unpatch: starting unpatching sequence...\n");
 
     /* 1. Stop SceShellUI/SceShellCore stub thread if it is running */
@@ -3935,9 +3950,32 @@ shellui_pad_unpatch(void)
 
     klog_printf("[Ghostpad] shellui_pad_unpatch: unpatching sequence complete.\n");
 
-    if (have_saved_caps) {
-        kernel_set_ucred_authid(mypid, saved_authid);
-        kernel_set_ucred_caps(mypid, saved_caps);
-    }
     return 0;
+}
+
+
+static int
+shellui_call_unpatch(void *context)
+{
+    (void)context;
+    return shellui_pad_unpatch_impl();
+}
+
+int
+shellui_pad_unpatch(void)
+{
+    static const uint8_t all_caps[CREDENTIAL_GUARD_CAPS_SIZE] = {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), all_caps,
+        shellui_call_unpatch, NULL, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("[Ghostpad] shellui_pad_unpatch credential guard failed: %s\n",
+                    credential_guard_result_name(guard));
+        return -1;
+    }
+    return result;
 }

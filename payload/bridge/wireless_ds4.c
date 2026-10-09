@@ -35,6 +35,7 @@
 
 #include "wireless_ds4.h"
 #include "../game_hook_safety.h"
+#include "../credential_kernel.h"
 
 #ifndef POORDS4_RC_VERSION
 #define POORDS4_RC_VERSION 0
@@ -221,32 +222,51 @@ poords4_fnv1a64(const uint8_t *buf, size_t len)
     return h;
 }
 
-/* sys_ptrace - elevate credentials for ptrace, then restore */
+typedef struct wireless_ptrace_call {
+    int request;
+    pid_t pid;
+    caddr_t addr;
+    int data;
+} wireless_ptrace_call_t;
+
+static int
+wireless_call_ptrace(void *context)
+{
+    wireless_ptrace_call_t *call = context;
+    return (int)__syscall(SYS_ptrace, call->request, call->pid,
+                          call->addr, call->data);
+}
+
 static int
 sys_ptrace(int request, pid_t pid, caddr_t addr, int data)
 {
-    uint8_t privcaps[16] = {
+    static const uint8_t privcaps[CREDENTIAL_GUARD_CAPS_SIZE] = {
         0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
         0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
     };
-    pid_t   mypid = getpid();
-    uint8_t caps[16];
-    uint64_t authid;
-    int ret;
-
-    if (!(authid = kernel_get_ucred_authid(mypid))) return -1;
-    if (kernel_get_ucred_caps(mypid, caps))          return -1;
-    if (kernel_set_ucred_authid(mypid, 0x4800000000010003l)) return -1;
-    if (kernel_set_ucred_caps(mypid, privcaps)) {
-        (void)kernel_set_ucred_authid(mypid, authid);
+    wireless_ptrace_call_t call = { request, pid, addr, data };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), privcaps,
+        wireless_call_ptrace, &call, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("sys_ptrace credential guard failed: %s\n",
+                    credential_guard_result_name(guard));
         return -1;
     }
+    return result;
+}
 
-    ret = (int)__syscall(SYS_ptrace, request, pid, addr, data);
+typedef struct wireless_kill_call {
+    pid_t pid;
+    int signal_number;
+} wireless_kill_call_t;
 
-    (void)kernel_set_ucred_caps(mypid, caps);
-    (void)kernel_set_ucred_authid(mypid, authid);
-    return ret;
+static int
+wireless_call_kill(void *context)
+{
+    wireless_kill_call_t *call = context;
+    return (int)__syscall(SYS_kill, call->pid, call->signal_number);
 }
 
 /* A timed-out RemotePlay call may still be executing. Restoring registers or
@@ -255,27 +275,20 @@ sys_ptrace(int request, pid_t pid, caddr_t addr, int data)
 static int
 sys_kill_elevated(pid_t pid, int signal_number)
 {
-    uint8_t privcaps[16] = {
+    static const uint8_t privcaps[CREDENTIAL_GUARD_CAPS_SIZE] = {
         0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
         0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
     };
-    pid_t mypid = getpid();
-    uint8_t caps[16];
-    uint64_t authid = kernel_get_ucred_authid(mypid);
-    if (!authid || kernel_get_ucred_caps(mypid, caps) != 0)
-        return -1;
-    if (kernel_set_ucred_authid(
-            mypid, UINT64_C(0x4800000000010003)) != 0)
-        return -1;
-    if (kernel_set_ucred_caps(mypid, privcaps) != 0) {
-        (void)kernel_set_ucred_authid(mypid, authid);
+    wireless_kill_call_t call = { pid, signal_number };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), privcaps,
+        wireless_call_kill, &call, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("sys_kill credential guard failed: %s\n",
+                    credential_guard_result_name(guard));
         return -1;
     }
-    int result = (int)__syscall(SYS_kill, pid, signal_number);
-    int saved_errno = errno;
-    (void)kernel_set_ucred_caps(mypid, caps);
-    (void)kernel_set_ucred_authid(mypid, authid);
-    errno = saved_errno;
     return result;
 }
 
@@ -2119,6 +2132,40 @@ game_pad_bridge_stub_end(void)
 {
 }
 
+typedef struct wireless_mdbg_copy {
+    pid_t pid;
+    intptr_t addr;
+    void *buffer;
+    size_t len;
+    int write_to_target;
+} wireless_mdbg_copy_t;
+
+static int
+wireless_call_mdbg_copy(void *context)
+{
+    wireless_mdbg_copy_t *copy = context;
+    if (copy->write_to_target)
+        return mdbg_copyin(copy->pid, copy->buffer, copy->addr, copy->len);
+    return mdbg_copyout(copy->pid, copy->addr, copy->buffer, copy->len);
+}
+
+static int
+wireless_scoped_mdbg_copy(pid_t pid, int write_to_target, intptr_t addr,
+                          void *buffer, size_t len)
+{
+    wireless_mdbg_copy_t copy = { pid, addr, buffer, len, write_to_target };
+    int result = -1;
+    credential_guard_result_t guard = credential_kernel_run(
+        getpid(), UINT64_C(0x4800000000010003), NULL,
+        wireless_call_mdbg_copy, &copy, &result);
+    if (guard != CREDENTIAL_GUARD_OK) {
+        klog_printf("remote_reader credential guard failed: %s pid=%d\n",
+                    credential_guard_result_name(guard), pid);
+        return -1;
+    }
+    return result;
+}
+
 static int
 remote_reader_copyout(pid_t pid, intptr_t addr, void *buf, size_t len)
 {
@@ -2126,15 +2173,7 @@ remote_reader_copyout(pid_t pid, intptr_t addr, void *buf, size_t len)
     (void)pid; (void)addr; (void)buf; (void)len;
     return -1;
 #else
-    pid_t self = getpid();
-    uint64_t saved_authid = kernel_get_ucred_authid(self);
-    if (saved_authid &&
-        kernel_set_ucred_authid(self, 0x4800000000010003l) != 0)
-        return -1;
-    int result = mdbg_copyout(pid, addr, buf, len);
-    if (saved_authid)
-        kernel_set_ucred_authid(self, saved_authid);
-    return result;
+    return wireless_scoped_mdbg_copy(pid, 0, addr, buf, len);
 #endif
 }
 
@@ -2145,15 +2184,7 @@ remote_reader_copyin(pid_t pid, const void *buf, intptr_t addr, size_t len)
     (void)pid; (void)buf; (void)addr; (void)len;
     return -1;
 #else
-    pid_t self = getpid();
-    uint64_t saved_authid = kernel_get_ucred_authid(self);
-    if (saved_authid &&
-        kernel_set_ucred_authid(self, 0x4800000000010003l) != 0)
-        return -1;
-    int result = mdbg_copyin(pid, buf, addr, len);
-    if (saved_authid)
-        kernel_set_ucred_authid(self, saved_authid);
-    return result;
+    return wireless_scoped_mdbg_copy(pid, 1, addr, (void *)buf, len);
 #endif
 }
 

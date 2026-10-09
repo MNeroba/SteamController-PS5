@@ -63,6 +63,7 @@
 #include "usb_session.h"
 #include "diag_once.h"
 #include "runtime_control.h"
+#include "credential_kernel.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -114,6 +115,8 @@ extern int32_t sceKernelSendNotificationRequest(int unk0, void *req, size_t size
 #define MAX_SLOTS SLOT_REGISTRY_MAX_SLOTS
 
 static slot_registry_t g_slots;
+static credential_kernel_scope_t g_runtime_credentials =
+    CREDENTIAL_KERNEL_SCOPE_INITIALIZER;
 static gc_diag_once_t g_vdi_error_log = GC_DIAG_ONCE_INIT;
 /* Serialize AddDevice calls from concurrent controller sessions. A klog
  * DEVICE_ADDED event is not an ownership receipt. */
@@ -1579,11 +1582,40 @@ static void *controller_manager_thread(void *arg) {
 }
 
 /* ── Credential elevation ─────────────────────────────────────────────── */
-static void elevate_credentials(void) {
-    pid_t p = getpid();
-    uint8_t caps[16]; memset(caps,0xff,sizeof(caps));
-    kernel_set_ucred_authid(p, 0x3800000000010003l);
-    kernel_set_ucred_caps(p, caps);
+static void remove_pid_file_if_owned(void);
+
+static credential_guard_result_t elevate_credentials(void) {
+    static const uint8_t caps[CREDENTIAL_GUARD_CAPS_SIZE] = {
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff,
+        0xff,0xff,0xff,0xff,0xff,0xff,0xff,0xff
+    };
+    return credential_kernel_begin(
+        getpid(), UINT64_C(0x3800000000010003), caps,
+        &g_runtime_credentials);
+}
+
+static int restore_runtime_credentials(void) {
+    for (int attempt = 0; attempt < 3; ++attempt) {
+        credential_guard_result_t result =
+            credential_kernel_restore(&g_runtime_credentials);
+        if (result == CREDENTIAL_GUARD_OK) return 0;
+        gp_log("credential restore attempt %d failed: %s\n", attempt + 1,
+               credential_guard_result_name(result));
+        usleep(100000);
+    }
+    return -1;
+}
+
+static int fail_startup(const char *reason) {
+    gp_log("startup aborted: %s\n", reason);
+    if (restore_runtime_credentials() != 0)
+        gp_log("startup abort: credentials remain elevated until process exit\n");
+    remove_pid_file_if_owned();
+    slot_registry_destroy(&g_slots);
+    pthread_mutex_lock(&g_log_lock);
+    if (g_log_fd >= 0) { close(g_log_fd); g_log_fd = -1; }
+    pthread_mutex_unlock(&g_log_lock);
+    return 1;
 }
 
 static int release_owned_slots(void) {
@@ -1678,6 +1710,10 @@ static int runtime_shutdown(void) {
         return -1;
     }
 
+    int credentials_restored = restore_runtime_credentials() == 0;
+    if (!credentials_restored)
+        gp_log("shutdown: credentials could not be restored; process exit is the final rollback boundary\n");
+
     slot_registry_destroy(&g_slots);
     remove_pid_file_if_owned();
     gp_log("shutdown: all owned devices removed and workers joined\n");
@@ -1685,7 +1721,7 @@ static int runtime_shutdown(void) {
     if (g_log_fd >= 0) { close(g_log_fd); g_log_fd = -1; }
     pthread_mutex_unlock(&g_log_lock);
     g_runtime_shutdown_done = 1;
-    return 0;
+    return credentials_restored ? 0 : -2;
 }
 
 /* ── main ─────────────────────────────────────────────────────────────── */
@@ -1731,10 +1767,14 @@ int main(void) {
     if ((uint32_t)userId<0x10000000u||(uint32_t)userId>0x1000000Fu) userId=0x10000000;
     gp_log("inject_uid=0x%08x\n", (uint32_t)g_inject_uid);
 
-    elevate_credentials();
+    credential_guard_result_t credential_result = elevate_credentials();
+    if (credential_result != CREDENTIAL_GUARD_OK)
+        return fail_startup(credential_guard_result_name(credential_result));
 
     ret=scePadInit(); gp_log("scePadInit: 0x%08x\n", ret);
+    if (ret != 0) return fail_startup("scePadInit failed");
     ret=scePadSetProcessPrivilege(1); gp_log("scePadSetProcessPrivilege: 0x%08x\n", ret);
+    if (ret != 0) return fail_startup("scePadSetProcessPrivilege(1) failed");
 
     /* Start klog capture thread first — must be running before any VDA call */
     if (pthread_create(&g_klog_tid, NULL, klog_capture_thread, NULL)==0) {
@@ -1779,9 +1819,11 @@ int main(void) {
             gp_log("alive tick=%u active_slots=%u\n", tick, active);
         }
     }
-    while (runtime_shutdown() != 0) {
+    int shutdown_result;
+    while ((shutdown_result = runtime_shutdown()) == -1) {
         gp_log("shutdown: waiting before retrying owner cleanup\n");
         sleep(1);
     }
+    if (shutdown_result == -2) startup_result = 1;
     return startup_result;
 }
