@@ -675,3 +675,33 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - Re-fetched ref, commit and recursive tree: `main` is `115341056...`, parent and tree match, 214 entries/201 blobs, `truncated=false`; no base blobs were removed, all 26 changed blobs match, and the critical payload files remain present.
 - GitHub Actions started on this commit: Host tests `37896053365`, PS5 cross-build `37896053373`; both are queued. No CI pass, PS5 runtime, or hardware compatibility is claimed. The six earlier M1-199/M1-200 jobs were also queued in the 06:50 UTC check.
 - Exact next action: wait for/inspect the eight pending workflows, record actual outcomes, then begin P0-3 privilege-path audit. The POSIX strict-C11 fix remains unchanged on main from commit `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`; this publication did not modify `webui_auth.c`.
+
+### M1-202 — P0-3 credential guard local verification — 2026-10-09 07:21 UTC
+
+- Regression-first: the new injectable credential contract covers authid/caps read failures, authid setter failure, caps setter failure after authid elevation, caps-before-authid rollback, operation failure result, errno preservation, retryable restoration, and one transient automatic restore retry. Static contract prevents raw ucred APIs outside credential_kernel.c and requires main startup/shutdown checks and runtime stop on persistent temporary-scope restore failure.
+- make -C tests clean test — PASS; all current host tests, including test_credential_guard and test_privilege_contract.py.
+- make -C tests sanitize — PASS; full ASan/UBSan suite including new credential regressions.
+- PS5 cross-build with SDK v0.43 (d9c9519116944a7f1c22d262012c53b80b3520b7) and LLVM 18.1.8 — PASS, ELF SHA-256 2c5e38031289c5e44f3e805ea59c5a9679a101c90f963a68568bd581091d440d.
+- git diff --check and standalone python3 tests/test_privilege_contract.py — PASS. Build is compile/link evidence only; no PS5 runtime or hardware claim.
+- Direct-main source publication is pending final tree/blob verification. Exact intended source paths: payload/gc_main.c, payload/shellui_pad.c, payload/bridge/wireless_ds4.c, payload/Makefile, four payload/credential_{guard,kernel}.* files, tests/Makefile, tests/test_credential_guard.c, tests/test_privilege_contract.py, docs/TEST_PLAN.md. Do not include unrelated dirty overlay. T-P50, F074-F078 and ADR-039 added.
+
+### M1-202 direct-main publication confirmation — 2026-10-09 07:24 UTC
+
+- Published the 12 reviewed P0-3 source/test/docs files directly to main as 3d0a6e69738f551f54a1c175b180a0716fc417ab, parent 18ef42e0371973eabbae80d1392be8ef79eabba9, tree 16ceb9d230ed404a4746d6011a26f3b2ae3e57c2. GitHub acknowledged the expected-head force=false update.
+- Re-fetched main, commit and recursive tree: 220 entries/207 blobs, truncated=false; zero of 201 base blobs removed; all 12 changed blob hashes exactly match local files. Changed paths are the credential guard/adapter integrations, tests and T-P50 only.
+- Actions for the published commit: 37898795378 Host tests and 37898795346 PS5 cross-build; both were queued at the 07:24 UTC check. No remote pass claimed.
+
+### M1-203 — P0-4 safe-mode policy local verification — 2026-10-09 07:27 UTC
+
+- Added a bounded, strict runtime policy parser/loader. Missing, malformed, duplicate, unknown, oversized, embedded-NUL, symlink, non-regular, or unreadable policy fails closed with all optional flags disabled. Optional bridge probe, game hooks, DualSense hand-off and WebUI now require distinct local opt-ins. Legacy endpoint-guessing returns before USBFS init or interface detach unless explicitly enabled. DualSense WebUI mutation is rejected unless hand-off was separately allowed.
+- Regression-first: the initial new target failed because the policy module did not yet exist. Final runtime-policy tests cover defaults, individual/combined opt-ins, whitespace/comments, malformed values, duplicates, unknown keys, missing file, symlink, directory and oversized file; source contract covers startup gates and early USB path exit.
+- make -C tests clean test — PASS; make -C tests sanitize — PASS (ASan/UBSan); SDK v0.43/LLVM 18.1.8 compile/link — PASS; git diff --check — PASS; standalone privilege and safe-mode source contracts — PASS.
+- Produced payload ELF SHA-256 a70050eb64f42971c0480b46230957769f9ee6a565c8c074be80418e159cc2ba. Compile/link only, not PS5 runtime evidence.
+- Safe-mode source publication is pending final tree/blob review. Exact-device Steam detach/interface proof remains P0-5; do not recommend hardware deployment yet.
+
+### M1-203 direct-main publication confirmation — 2026-10-09 07:29 UTC
+
+- Published the safe-mode implementation, README instructions, T-P51 and tests directly to main as a366f2d6ca3923a3645f52500d9000cd89a9c9dd, parent 3d0a6e69738f551f54a1c175b180a0716fc417ab, tree 4833da3c35d8debcb08984d98e8a3688b5f6c450.
+- Exact 13 paths: README.md, docs/TEST_PLAN.md, payload/Makefile, payload/ds_handoff.c, payload/ds_handoff.h, payload/gc_main.c, payload/runtime_policy.c, payload/runtime_policy.h, payload/webui.c, tests/Makefile, tests/test_ds_handoff.c, tests/test_runtime_policy.c, tests/test_safe_mode_contract.py. All 13 GitHub blob hashes matched local hashes before the expected-head update.
+- Re-fetched main/commit/tree and compared commits: 224 tree entries/211 blobs, truncated=false, zero deleted base files, one commit ahead, and the file diff matches exactly the 13 intended paths.
+- New Actions: 37900071213 Host tests and 37900071175 PS5 cross-build; both queued on the 07:29 UTC check. P0-3 Actions 37898795378 and 37898795346 were also still queued. No CI pass claimed.

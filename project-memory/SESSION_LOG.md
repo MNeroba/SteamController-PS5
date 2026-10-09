@@ -776,3 +776,30 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - New Actions runs `37896053365` (Host) and `37896053373` (PS5 cross-build) both target the published commit and are queued. M1-199/M1-200 Actions were still queued at 06:50 UTC.
 - Local gates remain: full normal host suite PASS; ASan/UBSan suite PASS; SDK v0.43/LLVM 18.1.8 cross-build PASS (ELF SHA-256 `5b3a7df02d4e845f56eb351134e562cc65ec5b296b80187b49a4daed157f85fc`); `git diff --check` PASS. No hardware, USB ioctl, Bluetooth, firmware/system write, PR, or release action occurred.
 - Continue with actual Actions outcomes, then P0-3 privilege audit. Physical-console shutdown and rollback tests remain gated on PS5/controller/Puck access.
+
+### M1-202 — P0-3 credential guard — 2026-10-09 07:21 UTC
+
+- Read current project task/memory and reconfirmed main at 18ef42e0371973eabbae80d1392be8ef79eabba9, tree bb9079f23bea6624686a32d8a156d4b1a3de6300. The workspace is a pre-existing broad overlay on fix/p0-safety; no branch reset/switch or blanket staging.
+- Implemented the shared injectable credential guard and kernel adapter; audited gc_main.c, shellui_pad.c, and wireless_ds4.c. Checked error results in runtime startup and persistent-scope restore after worker teardown. Added host tests and T-P50.
+- Full normal tests, ASan/UBSan, SDK v0.43 cross-build, static contract and git diff --check pass. ELF SHA-256: 2c5e38031289c5e44f3e805ea59c5a9679a101c90f963a68568bd581091d440d. No hardware or intrusive system operation.
+- Recorded next open items from the user audit: safe-mode startup gate (P0-SAFE-01), USB detach identity gate (P1-USB-DETACH-01), PID reuse (P1-PID-REUSE-01), and unbounded hook rollback (P1-HOOK-ROLLBACK-01). Source evidence in F075-F078.
+- Exact next actions: publish only the 12 P0-3 source/test/docs paths via GitHub tree/blob/commit APIs atop freshly re-read main with expected-SHA force=false; re-fetch and verify every changed blob and full tree. Then record returned commit/Actions and memory sync; continue with P0 safe mode.
+
+### M1-202 direct-main publication confirmation — 2026-10-09 07:24 UTC
+
+- P0-3 source commit 3d0a6e69738f551f54a1c175b180a0716fc417ab is verified on main, parent 18ef42e0371973eabbae80d1392be8ef79eabba9, tree 16ceb9d230ed404a4746d6011a26f3b2ae3e57c2. The recursive tree preserves all base blobs and all 12 expected source blobs match local Git hashes.
+- GitHub Host/PS5 Actions 37898795378/37898795346 target P0-3 and were queued. Previous P0-2-era workflows also remain queued; none are called green.
+
+### M1-203 — P0-4 default safe runtime policy — 2026-10-09 07:27 UTC
+
+- The policy reader is a separate portable module, uses a strict 1024-byte config bound and refuses symlinks/non-regular files. Missing/invalid input resets all optional features off. Exact Steam VID/PID discovery remains active; unknown Nintendo/Xbox endpoint guessing and associated detach path are off. ShellUI patch entrypoints have no startup callsite, bridge/game hooks and dualsense hand-off are policy-gated, and WebUI is off without opt-in.
+- Added parser/file tests and static startup-contract tests; tightened DS hand-off API so a WebUI request cannot bypass the policy gate.
+- Full normal host suite, full ASan/UBSan suite, SDK v0.43/LLVM 18.1.8 cross-build, static contracts and diff check pass; ELF SHA-256 a70050eb64f42971c0480b46230957769f9ee6a565c8c074be80418e159cc2ba.
+- No PS5/controller/Puck runtime, USB ioctl, Bluetooth, firmware write, PR or release. Exact Steam interface detach remains the next mandatory P0-5 review.
+- Next exact action: publish only the reviewed safe-mode files atop fresh main 3d0a6e69738f551f54a1c175b180a0716fc417ab with blob-hash/tree verification and expected-SHA force=false; then record commit/Actions and proceed to P0-5.
+
+### M1-203 direct-main publication confirmation — 2026-10-09 07:29 UTC
+
+- P0-4 safe-mode source/docs/test commit a366f2d6ca3923a3645f52500d9000cd89a9c9dd is on main with parent 3d0a6e69738f551f54a1c175b180a0716fc417ab. GitHub compare confirms exactly the 13 intended paths. Blob hashes match local source, complete tree is 224 entries/211 blobs, and no previous base blob was deleted.
+- Actions 37900071213 (Host) and 37900071175 (PS5 build) were queued; P0-3 runs 37898795378/37898795346 remained queued. Local normal and sanitizer suites and SDK v0.43 cross-build passed; no remote CI result is claimed.
+- P0-SAFE-01 has a host implementation on main. P0-5 still has to inspect and restrict all known-Steam interface detaches before any physical console recommendation.
