@@ -17,8 +17,7 @@ enum {
     POLICY_BRIDGE = 1u << 0,
     POLICY_HOOKS = 1u << 1,
     POLICY_HANDOFF = 1u << 2,
-    POLICY_WEBUI = 1u << 3,
-    POLICY_LEGACY_USB = 1u << 4
+    POLICY_WEBUI = 1u << 3
 };
 
 void
@@ -51,8 +50,6 @@ policy_key(runtime_policy_t *policy, const char *key, int value)
         policy->enable_ds_handoff = value;
     else if (strcmp(key, "ENABLE_WEBUI") == 0)
         policy->enable_webui = value;
-    else if (strcmp(key, "ENABLE_LEGACY_USB_PROBE") == 0)
-        policy->enable_legacy_usb_probe = value;
     else
         return -1;
     return 0;
@@ -105,8 +102,6 @@ runtime_policy_parse(const char *text, size_t length,
             bit = POLICY_HANDOFF;
         else if (strcmp(key, "ENABLE_WEBUI") == 0)
             bit = POLICY_WEBUI;
-        else if (strcmp(key, "ENABLE_LEGACY_USB_PROBE") == 0)
-            bit = POLICY_LEGACY_USB;
         else
             goto invalid;
         if (seen & bit)

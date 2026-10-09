@@ -1,6 +1,10 @@
 /* controller_sc2.c — Steam Controller (2026) via Puck / USB for Ghost-Control
  * Raw report → physical inputs → active profile (sc2_profile.c) → ScePadData */
 
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+
 #include "controller_sc2.h"
 #include "sc2_status.h"
 #include "sc2_profile.h"
@@ -32,6 +36,15 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 
 #define RID_INPUT     0x42
 #define RID_INPUT2    0x45
+
+static void sc2_sleep_us(long microseconds) {
+    if (microseconds <= 0) return;
+    struct timespec remaining = {
+        .tv_sec = microseconds / 1000000,
+        .tv_nsec = (microseconds % 1000000) * 1000
+    };
+    while (nanosleep(&remaining, &remaining) != 0 && errno == EINTR) {}
+}
 
 /* ── endpoint discovery ───────────────────────────────────────────────── */
 
@@ -215,7 +228,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             found = first_error;
         }
         if (!found && errno == ENXIO) found = -ENXIO;
-        if (!found) usleep(5000);
+        if (!found) sc2_sleep_us(5000);
     }
 
     if (!found && should_cancel && should_cancel(cancel_context))
@@ -288,7 +301,7 @@ int sc2_power_off(int fd, int iface) {
         USETW(req.ucr_request.wLength, sizeof(buf));
         r = ioctl(fd, USB_DO_REQUEST, &req) == 0 ? 0 : -errno;
         if (r != -EPIPE) break;                          /* wireless sometimes stalls once */
-        usleep(20000);
+        sc2_sleep_us(20000);
     }
     LOG("sc2: power-off request (iface %d) -> %d\n", iface, r);
     return r;

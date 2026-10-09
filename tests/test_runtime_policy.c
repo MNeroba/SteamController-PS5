@@ -16,8 +16,7 @@
 static int all_disabled(const runtime_policy_t *p)
 {
     return !p->enable_bridge_probe && !p->enable_game_hooks &&
-           !p->enable_ds_handoff && !p->enable_webui &&
-           !p->enable_legacy_usb_probe;
+           !p->enable_ds_handoff && !p->enable_webui;
 }
 
 static void test_defaults_are_safe(void)
@@ -35,13 +34,11 @@ static void test_explicit_opt_ins(void)
         "ENABLE_BRIDGE_PROBE=1\n"
         "ENABLE_GAME_HOOKS=1\n"
         "ENABLE_DUALSENSE_HANDOFF=1\n"
-        "ENABLE_WEBUI=1\n"
-        "ENABLE_LEGACY_USB_PROBE=1\n";
+        "ENABLE_WEBUI=1\n";
     runtime_policy_t p;
     assert(runtime_policy_parse(config, sizeof(config) - 1, &p) == 0);
     assert(p.enable_bridge_probe && p.enable_game_hooks &&
-           p.enable_ds_handoff && p.enable_webui &&
-           p.enable_legacy_usb_probe);
+           p.enable_ds_handoff && p.enable_webui);
 }
 
 static void test_partial_opt_in_and_whitespace(void)
@@ -53,8 +50,7 @@ static void test_partial_opt_in_and_whitespace(void)
     runtime_policy_t p;
     assert(runtime_policy_parse(config, sizeof(config) - 1, &p) == 0);
     assert(p.enable_webui && !p.enable_game_hooks);
-    assert(!p.enable_bridge_probe && !p.enable_ds_handoff &&
-           !p.enable_legacy_usb_probe);
+    assert(!p.enable_bridge_probe && !p.enable_ds_handoff);
 }
 
 static void test_invalid_policy_fails_closed(void)

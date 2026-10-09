@@ -1,12 +1,26 @@
 # Hardware and firmware compatibility matrix
 
-No real PS5 hardware tests were performed during preparation of this pack. A source author's claimed test must not be recorded as ours.
+No real PS5 hardware tests have been performed for this development tree. These rows are release gates, not claims. Record each transport, console model, firmware, controller firmware, tested payload commit, exact steps, result, and a corresponding `project-memory/TEST_LOG.md` entry. A source author's claim or a cross-build is not our hardware evidence.
 
-| Test | PS5 model | FW | Steam Controller model / firmware | Transport | SDK/payload commit | Result | Evidence |
-|---|---|---|---|---|---|---|---|
-| Baseline USB-C | NOT_TESTED | 13.60 target | SC 2026 / UNKNOWN | USB-C | SDK v0.43 cross-build M1-15; runtime not tested | NOT_RUN / BLOCKED_HARDWARE | No physical PS5 or Steam Controller; ELF compile does not verify device support |
-| Official Puck | NOT_TESTED | 13.60 target | SC 2026 / UNKNOWN | Valve Puck | SDK v0.43 cross-build M1-15; runtime not tested | NOT_RUN / BLOCKED_HARDWARE | No physical PS5 or Puck; ELF compile does not verify device support |
-| Native BT coexistence | NOT_TESTED | 13.60 target | SC 2026 / UNKNOWN | Internal BLE | NOT_BUILT | BLOCKED | B0–B6 not passed |
-| Edge emulation | NOT_TESTED | 13.60 target | SC 2026 / UNKNOWN | Backend | NOT_BUILT | NOT_RUN | Research only |
+| ID | Test | PS5 model | FW | Controller model / firmware | Transport | Payload commit / SDK | Result | Evidence |
+|---|---|---|---|---|---|---|---|---|
+| H-01 | Baseline console and stock DualSense before payload | NOT_TESTED | 13.60 target | DualSense / UNKNOWN | Native | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5 or DualSense available |
+| H-02 | Steam Controller input in system UI and a named game | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | USB-C | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5 or Steam Controller available |
+| H-03 | Steam Controller input through official Valve receiver | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | Official Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, Steam Controller, or Puck available |
+| H-04 | Correct user assignment, no duplicate virtual pad, stock DualSense still works | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN; DualSense / UNKNOWN | USB-C and Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, controller, or Puck available |
+| H-05 | Disconnect, reconnect, standby, stop/restart, and no stuck input | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | USB-C and Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, controller, or Puck available |
+| H-06 | Motion direction and gyro aiming in a named game/profile | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | USB-C or Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, controller, or Puck available |
+| H-07 | Touchpad coordinates, contact, and clicks in a named game/screen | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | USB-C or Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, controller, or Puck available |
+| H-08 | Rumble/haptics and trigger translation in a named game | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | USB-C or Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, controller, or Puck available |
+| H-09 | Unauthenticated remote portal calls cannot mutate state; authenticated portal behavior | NOT_TESTED | 13.60 target | Not applicable | Local network | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5/network integration available |
+| H-10 | Native BLE capability gates B1–B6; stock DualSense unaffected | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN | Internal BLE | NOT_RUN | BLOCKED | No active radio experiment authorized or performed |
+| H-11 | Two physical Steam Controllers/Pucks do not interfere | NOT_TESTED | 13.60 target | Two Steam Controller 2026 / UNKNOWN | USB-C/Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | Multi-controller SC2 support is not implemented or claimed |
+| H-12 | Stop payload in-game; neutral input, cleanup, and no foreign hook overwrite | NOT_TESTED | 13.60 target | Steam Controller 2026 / UNKNOWN; DualSense / UNKNOWN | USB-C and Puck | NOT_RUN | NOT_RUN / BLOCKED_HARDWARE | No physical PS5, controller, or Puck available |
 
-Add rows per actual tested firmware, PS5 hardware revision, title ID, expected behavior, pass/fail and evidence link. Do not collapse Fat/Slim/Pro, cable/Puck, game and system UI into one blanket compatibility claim.
+## Required for a first release
+
+The automatic release workflow requires `VERIFIED_HARDWARE` for H-01, H-02, H-03, H-04, H-05, H-09, and H-12, with a real payload commit, actual model/firmware values, and a test-log reference for each row. Host tests and the PS5 cross-build must also pass on the release tag. The check is intentionally fail-closed; editing a status without the required recorded evidence is not a substitute for performing the test.
+
+For each required gate, the evidence cell must link to a matching heading such as `project-memory/TEST_LOG.md#h-01`. That heading must record the same PS5 model, exact firmware, controller model/firmware, transport, full payload commit SHA, and `Result: VERIFIED_HARDWARE`. The release checker rejects generic links or test-log mentions that do not match that row.
+
+H-06 through H-08 are feature-specific: do not claim motion, touch, or feedback as hardware-verified unless their rows pass. H-10 remains a separate, explicitly approved research track. H-11 is outside the first release scope until multi-controller sessions are implemented.

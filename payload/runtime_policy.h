@@ -12,7 +12,6 @@ typedef struct runtime_policy {
     int enable_game_hooks;
     int enable_ds_handoff;
     int enable_webui;
-    int enable_legacy_usb_probe;
 } runtime_policy_t;
 
 /* All optional/system-facing features are off unless explicitly allowed. */

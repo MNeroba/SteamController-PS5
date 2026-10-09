@@ -82,3 +82,71 @@ int steam_usb_parse_config(const uint8_t *data, unsigned length,
     if (interface_count != data[4]) return -1;
     return out->n;
 }
+
+int steam_usb_is_sc2_device(uint16_t vendor_id, uint16_t product_id) {
+    return vendor_id == STEAM_USB_VENDOR_VALVE &&
+           (product_id == STEAM_USB_PID_SC2_WIRED ||
+            product_id == STEAM_USB_PID_SC2_PUCK);
+}
+
+static int usb_endpoint_address_valid(uint8_t address, int input) {
+    return (address & 0x0fu) != 0 && (address & 0x70u) == 0 &&
+           (((address & 0x80u) != 0) == (input != 0));
+}
+
+static int detach_map_is_well_formed(const steam_usb_map_t *map) {
+    if (!map || map->n <= 0 || map->n > STEAM_USB_MAX_INTERFACES)
+        return 0;
+    for (int i = 0; i < map->n; ++i) {
+        if (map->it[i].in_ep &&
+            !usb_endpoint_address_valid(map->it[i].in_ep, 1))
+            return 0;
+        if (map->it[i].out_ep &&
+            !usb_endpoint_address_valid(map->it[i].out_ep, 0))
+            return 0;
+        for (int j = i + 1; j < map->n; ++j)
+            if (map->it[i].iface == map->it[j].iface)
+                return 0;
+    }
+    return 1;
+}
+
+int steam_usb_detach_interface_allowed(uint16_t vendor_id, uint16_t product_id,
+                                       const steam_usb_map_t *map,
+                                       uint8_t interface_number) {
+    if (!steam_usb_is_sc2_device(vendor_id, product_id) ||
+        !detach_map_is_well_formed(map) ||
+        (product_id == STEAM_USB_PID_SC2_PUCK &&
+         (interface_number < 2 || interface_number > 5)))
+        return 0;
+    for (int i = 0; i < map->n; ++i) {
+        if (map->it[i].iface == interface_number &&
+            map->it[i].iclass == 0x03 &&
+            map->it[i].in_ep != 0)
+            return 1;
+    }
+    return 0;
+}
+
+int steam_usb_collect_detach_interfaces(uint16_t vendor_id, uint16_t product_id,
+                                        const steam_usb_map_t *map,
+                                        uint8_t *out, int capacity) {
+    if (!steam_usb_is_sc2_device(vendor_id, product_id))
+        return 0;
+    if (!map || !out || capacity <= 0 || !detach_map_is_well_formed(map))
+        return -1;
+
+    uint8_t selected[STEAM_USB_MAX_INTERFACES];
+    int count = 0;
+    for (int i = 0; i < map->n; ++i) {
+        uint8_t iface = map->it[i].iface;
+        if (!steam_usb_detach_interface_allowed(vendor_id, product_id,
+                                                map, iface))
+            continue;
+        selected[count++] = iface;
+    }
+    if (count > capacity)
+        return -1;
+    memcpy(out, selected, (size_t)count);
+    return count;
+}

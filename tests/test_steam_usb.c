@@ -46,6 +46,53 @@ static void test_puck_interface_filter(void) {
     CHECK(map.it[1].iface == 3 && map.it[1].in_ep == 0x85);
 }
 
+static void test_sc2_detach_interface_policy(void) {
+    steam_usb_map_t map;
+    uint8_t interfaces[STEAM_USB_MAX_INTERFACES] = {0};
+    CHECK(steam_usb_parse_config(valid_config, sizeof(valid_config), 0, &map) == 4);
+    CHECK(steam_usb_collect_detach_interfaces(0x28de, 0x1302, &map,
+                                               interfaces,
+                                               STEAM_USB_MAX_INTERFACES) == 3);
+    CHECK(interfaces[0] == 2 && interfaces[1] == 3 && interfaces[2] == 6);
+    CHECK(steam_usb_detach_interface_allowed(0x28de, 0x1302, &map, 2));
+    CHECK(!steam_usb_detach_interface_allowed(0x28de, 0x1302, &map, 0));
+    CHECK(!steam_usb_detach_interface_allowed(0x045e, 0x02ea, &map, 2));
+    CHECK(!steam_usb_detach_interface_allowed(0x28de, 0x1102, &map, 2));
+    CHECK(steam_usb_collect_detach_interfaces(0x28de, 0x1102, &map,
+                                               interfaces,
+                                               STEAM_USB_MAX_INTERFACES) == 0);
+
+    CHECK(steam_usb_parse_config(valid_config, sizeof(valid_config), 1, &map) == 2);
+    CHECK(steam_usb_collect_detach_interfaces(0x28de, 0x1304, &map,
+                                               interfaces,
+                                               STEAM_USB_MAX_INTERFACES) == 2);
+    CHECK(interfaces[0] == 2 && interfaces[1] == 3);
+    CHECK(steam_usb_collect_detach_interfaces(0x28de, 0x1304, &map,
+                                               interfaces, 1) == -1);
+
+    map.it[0].iclass = 0xff;
+    CHECK(!steam_usb_detach_interface_allowed(0x28de, 0x1304, &map, 2));
+    map.n = STEAM_USB_MAX_INTERFACES + 1;
+    CHECK(steam_usb_collect_detach_interfaces(0x28de, 0x1304, &map,
+                                               interfaces,
+                                               STEAM_USB_MAX_INTERFACES) == -1);
+
+    memset(&map, 0, sizeof(map));
+    map.n = 2;
+    map.it[0].iface = 2; map.it[0].iclass = 0x03; map.it[0].in_ep = 0x81;
+    map.it[1] = map.it[0];
+    CHECK(!steam_usb_detach_interface_allowed(0x28de, 0x1302, &map, 2));
+    CHECK(steam_usb_collect_detach_interfaces(0x28de, 0x1302, &map,
+                                               interfaces,
+                                               STEAM_USB_MAX_INTERFACES) == -1);
+    map.it[1].iface = 3;
+    map.it[1].iclass = 0x02;
+    CHECK(!steam_usb_detach_interface_allowed(0x28de, 0x1302, &map, 3));
+    map.it[1].iclass = 0x03;
+    map.it[1].in_ep = 0;
+    CHECK(!steam_usb_detach_interface_allowed(0x28de, 0x1302, &map, 3));
+}
+
 static void test_invalid_descriptors(void) {
     uint8_t bad_total[] = { 9, 2, 20, 0, 0, 1, 0, 0x80, 50 };
     uint8_t zero_length[] = { 9, 2, 11, 0, 0, 1, 0, 0x80, 50, 0, 4 };
@@ -148,6 +195,7 @@ static void test_fixed_standard_descriptor_lengths(void) {
 int main(void) {
     test_complete_configuration_map();
     test_puck_interface_filter();
+    test_sc2_detach_interface_policy();
     test_invalid_descriptors();
     test_declared_descriptor_counts();
     test_interface_map_capacity();

@@ -22,7 +22,7 @@ SteamController-PS5 is a focused payload project for carrying Steam Controller i
 |---|---|---|
 | **M0 · foundation and licensing** | Complete | PuckbridgePS5 was selected after a pinned source comparison with OmniPad-PS5. See [ADR-001](docs/BASE_SELECTION_ADR.md) and [provenance](docs/PROVENANCE.md). |
 | **P0 · safety and architecture** | In progress | Host-tested input parsing, exact authenticated portal routes, bounded requests, local IPv4 peer filtering, session/slot lifecycle, and concurrency fixes are present. PS5 adapter and runtime behavior still need target testing. |
-| **M1 · USB-C and official Puck** | Partial | Steam report and USB descriptor code cross-builds and has portable tests. Discovery now falls back to bounded endpoint probes only when `USB_GET_FULL_DESC` is unavailable; malformed or valid-but-ineligible maps fail closed. Live USB/Puck enumeration and reconnect behavior remain unverified. |
+| **M1 · USB-C and official Puck** | Partial | Discovery admits only Valve's Steam Controller 2026 wired/Puck VID:PID pairs. USBFS is initialized only after a valid configuration map identifies HID interrupt-IN interfaces; unavailable or malformed descriptors fail closed. Live USB/Puck enumeration and reconnect behavior remain unverified. |
 | **M2 · Steam controls and motion** | Partial | Input, mapping, motion, touch, profiles, and extra-control paths exist in source; end-to-end behavior on a console and controller is unverified. |
 | **M3 · haptics and feedback** | Partial | A generation-tagged lease admits one active SC2 USB/Puck reader, rejects a second SC2 reader, and gates queue service and teardown by owner token. Host tests cover the policy; `gc_main.c`, USB output and physical haptics remain target-unverified. Multi-SC2 use is not supported. |
 | **M4 · native PS5 Bluetooth LE** | Research only | No native PS5 GAP/GATT path is proven. No HCI or radio operation has been run. See [BLE decision](docs/BLE_DECISION.md). |
@@ -37,8 +37,18 @@ At startup, the payload reads the optional local file
 `/data/ghostpad/runtime-policy.ini`. If it is missing, malformed, oversized,
 or a symlink, every optional service stays disabled. Safe defaults disable
 game-memory bridge probing, game hooks, DualSense hand-off, and the WebUI.
-USB discovery still accepts exact Steam Controller/Puck VID:PID matches; the
-Nintendo/Xbox endpoint-guessing path and its interface detaches are disabled.
+USB discovery accepts only the Steam Controller 2026 wired/Puck VID:PID pairs.
+Unknown devices never enter USBFS or have interfaces detached. For a recognized
+device, only unique, descriptor-mapped HID interfaces with a valid interrupt-IN
+endpoint can be detached; an unavailable or malformed configuration map fails
+closed. This code-level gate does not prove PS5 driver behavior or a real device
+descriptor, and target hardware testing is still required.
+
+Tag builds run the host/sanitizer suite and PS5 cross-build. GitHub Releases are
+published only after the required hardware rows H-01, H-02, H-03, H-04, H-05,
+H-09, and H-12 are recorded as `VERIFIED_HARDWARE` with concrete test-log
+evidence. The current matrix is blocked, so this repository has no verified
+release binary.
 
 Optional services require explicit local configuration, one setting per line:
 
@@ -49,10 +59,8 @@ ENABLE_WEBUI=1
 # ENABLE_DUALSENSE_HANDOFF=1
 ```
 
-Only uncomment a setting after reviewing its effects. The legacy USB probe
-setting is intentionally omitted: enabling it reopens heuristic probing and
-is not recommended. A WebUI request cannot enable DualSense hand-off unless
-that separate policy opt-in is present.
+Only uncomment a setting after reviewing its effects. A WebUI request cannot
+enable DualSense hand-off unless that separate policy opt-in is present.
 
 ## What it is designed to do
 
@@ -93,7 +101,7 @@ make -C tests clean test
 make -C tests clean sanitize
 ```
 
-The latest full normal and AddressSanitizer/UndefinedBehaviorSanitizer runs pass 1148 counted checks, including injected USB scanner operations, multiplexed endpoint completion, cleanup retries, and SC2 descriptor-policy cases for unavailable, malformed, disconnected, and valid interface maps. The suite also exercises 100,000 deterministic Steam reports and 100,000 USB descriptor inputs. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, rejection of empty or incorrectly declared profile bodies, and IPv4 peer-scope policy. Targeted ThreadSanitizer runs pass for recorded concurrency tests, including the SC2 scanner. These host tests use production portable modules and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
+The latest full normal and AddressSanitizer/UndefinedBehaviorSanitizer suites pass. Coverage includes injected USB scanner operations, multiplexed endpoint completion, cleanup retries, strict SC2 interface authorization, credential rollback, process-instance locking, safe-mode defaults, and release evidence validation. The suite also exercises 100,000 deterministic Steam reports and 100,000 USB descriptor inputs. Portal coverage includes bearer-token policy, exact routes, bounded request/response deadlines, same-host `Origin` checks when browsers send that header, rejection of empty or incorrectly declared profile bodies, and IPv4 peer-scope policy. Targeted ThreadSanitizer runs pass for recorded concurrency tests, including the SC2 scanner. These host tests use production portable modules and fakes; they do not emulate PS5 USB ioctls or prove console behavior. Exact commands and limits are in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md).
 
 ### PS5 payload cross-build
 

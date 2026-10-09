@@ -20,13 +20,14 @@ class SafeModeContract(unittest.TestCase):
             self.assertIn(f"if (g_runtime_policy.{flag}", MAIN)
             self.assertIn(start, MAIN)
 
-    def test_legacy_endpoint_guessing_stops_before_usbfs_or_detach(self):
+    def test_controller_probe_never_guesses_or_detaches_unknown_usb(self):
         start = MAIN.index("static int probe_one_path(")
-        gate = MAIN.index("if (!g_runtime_policy.enable_legacy_usb_probe)", start)
-        end = MAIN.index("/* ──", gate)
+        end = MAIN.index("/* ── Create VDA", start)
         body = MAIN[start:end]
-        self.assertLess(gate, start + body.index("USB_FS_INIT"))
-        self.assertLess(gate, start + body.index("USB_IFACE_DRIVER_DETACH"))
+        self.assertNotIn("enable_legacy_usb_probe", MAIN)
+        self.assertNotIn("USB_FS_", body)
+        self.assertNotIn("USB_IFACE_DRIVER_DETACH", body)
+        self.assertIn("steam_usb_is_sc2_device(vid, pid)", body)
 
     def test_dualsense_web_control_cannot_bypass_policy(self):
         self.assertIn("if (enabled && (!g_allowed || g_stopping", 

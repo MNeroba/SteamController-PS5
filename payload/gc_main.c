@@ -47,6 +47,7 @@
 #include "controller_xbox.h"
 #include "controller_steam.h"
 #include "controller_sc2.h"
+#include "steam_usb.h"
 #include "sc2_profile.h"
 #include "sc2_control.h"
 #include "sc2_status.h"
@@ -63,6 +64,7 @@
 #include "usb_session.h"
 #include "diag_once.h"
 #include "runtime_control.h"
+#include "runtime_instance.h"
 #include "credential_kernel.h"
 #include "runtime_policy.h"
 
@@ -75,6 +77,7 @@
 static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_log_fd = -1;
 static runtime_policy_t g_runtime_policy;
+static int g_pid_lock_fd = -1;
 
 void ghostpad_status_log_reset(void) {
     pthread_mutex_lock(&g_log_lock);
@@ -288,10 +291,9 @@ static void load_runtime_policy(runtime_policy_t *policy) {
                RUNTIME_POLICY_PATH);
     }
 
-    gp_log("runtime policy: opt-ins bridge=%d hooks=%d dualsense=%d webui=%d legacy-usb=%d\n",
+    gp_log("runtime policy: opt-ins bridge=%d hooks=%d dualsense=%d webui=%d\n",
            policy->enable_bridge_probe, policy->enable_game_hooks,
-           policy->enable_ds_handoff, policy->enable_webui,
-           policy->enable_legacy_usb_probe);
+           policy->enable_ds_handoff, policy->enable_webui);
 }
 
 /* ── ugen detection ───────────────────────────────────────────────────── */
@@ -404,14 +406,8 @@ static int get_vid_pid(int fd, const char *path, uint16_t *vid, uint16_t *pid) {
     return 0;
 }
 
-/* Probe one /dev/ugen* path to identify controller type.
- * Returns 1 with vid/pid set, 0 if not a known controller.
- *
- * USB_GET_DEVICEINFO is read right after open(), before USB_FS_INIT, so we
- * can identify (and log) a Valve device on ANY bus without needing the
- * endpoint-init dance. The endpoint-guessing fallback (Nintendo/Xbox) stays
- * restricted to ugen2.* — the external bus — so it can never misidentify
- * one of the PS5's own internal USB devices. */
+/* Probe only the read-only device identity. Unknown devices never enter USBFS,
+ * trigger endpoint guesses, or have an interface driver detached. */
 static int probe_one_path(const char *path, uint16_t *out_vid, uint16_t *out_pid) {
     int fd = open(path, O_RDWR|O_NONBLOCK);
     if (fd < 0) {
@@ -430,69 +426,15 @@ static int probe_one_path(const char *path, uint16_t *out_vid, uint16_t *out_pid
                how == 1 ? "deviceinfo" : how == 2 ? "device_desc" : "ctrl_req");
     }
 
-    /* Exact VID:PID match first, any bus — endpoint heuristics below would
-     * misread the Steam Controller's mouse endpoint (0x82) as an Xbox pad. */
-    if (have_di && vid==VID_STEAM &&
-        (pid==PID_STEAM_WIRED || pid==PID_SC2_PUCK ||
-         pid==PID_SC2_WIRED)) {
+    if (have_di && steam_usb_is_sc2_device(vid, pid)) {
         gp_log("probe: %s VID=%04x PID=%04x → Steam Controller\n",
                path,vid,pid);
-        *out_vid=VID_STEAM; *out_pid=pid;
+        *out_vid=vid; *out_pid=pid;
         close(fd);
         return 1;
     }
-
-    /* Safe mode enumerates exact Steam IDs only. Do not initialize USBFS or
-     * detach any interface to guess whether an unknown device is a controller. */
-    if (!g_runtime_policy.enable_legacy_usb_probe) {
-        close(fd);
-        return 0;
-    }
-
-    /* Everything below only ever touches the external bus. */
-    if (strncmp(path, "/dev/ugen2.", 11) != 0) { close(fd); return 0; }
-
-    struct usb_fs_endpoint ep;
-    struct usb_fs_init ini;
-    struct usb_fs_uninit u;
-    memset(&ep,0,sizeof(ep)); memset(&ini,0,sizeof(ini));
-    ini.pEndpoints=&ep; ini.ep_index_max=1;
-    if (ioctl(fd,USB_FS_INIT,&ini)!=0) { close(fd); return 0; }
-
-    int ii=0; ioctl(fd,USB_IFACE_DRIVER_DETACH,&ii);
-    ii=1;     ioctl(fd,USB_IFACE_DRIVER_DETACH,&ii);
-    ii=2;     ioctl(fd,USB_IFACE_DRIVER_DETACH,&ii);
-
-    struct usb_fs_open po;
-    memset(&po,0,sizeof(po)); po.ep_index=0; po.max_bufsize=64; po.max_frames=1;
-
-    int found = 0;
-
-    /* Nintendo: ep=0x81, maxpkt=64 */
-    po.ep_no=0x81;
-    if (ioctl(fd,USB_FS_OPEN,&po)==0 && po.max_packet_length==64) {
-        gp_log("probe: %s ep=0x81 mpkt=%u → Nintendo\n", path,(unsigned)po.max_packet_length);
-        struct usb_fs_close pc; memset(&pc,0,sizeof(pc)); pc.ep_index=0; ioctl(fd,USB_FS_CLOSE,&pc);
-        *out_vid=VID_SWITCH; *out_pid=PID_SWITCH;
-        found = 1;
-        goto done;
-    }
-
-    /* Xbox One: ep=0x82, maxpkt in (0,64] */
-    memset(&po,0,sizeof(po)); po.ep_index=0; po.max_bufsize=64; po.max_frames=1;
-    po.ep_no=0x82;
-    if (ioctl(fd,USB_FS_OPEN,&po)==0 && po.max_packet_length>0 && po.max_packet_length<=64) {
-        gp_log("probe: %s ep=0x82 mpkt=%u → Xbox One\n", path,(unsigned)po.max_packet_length);
-        struct usb_fs_close pc; memset(&pc,0,sizeof(pc)); pc.ep_index=0; ioctl(fd,USB_FS_CLOSE,&pc);
-        *out_vid=VID_XBOX; *out_pid=PID_XBOX;
-        found = 1;
-        goto done;
-    }
-
-done:
-    memset(&u,0,sizeof(u)); ioctl(fd,USB_FS_UNINIT,&u);
     close(fd);
-    return found;
+    return 0;
 }
 
 /* ── Create VDA for a slot ────────────────────────────────────────────── */
@@ -796,6 +738,39 @@ static const usb_session_ops_t g_usb_session_ops = {
     }
 };
 
+static int detach_sc2_interface_checked(int fd, uint16_t vid, uint16_t pid,
+                                        const sc2_ep_map_t *map,
+                                        uint8_t interface_number) {
+    if (fd < 0 || !steam_usb_detach_interface_allowed(
+                      vid, pid, map, interface_number)) {
+        errno = EPERM;
+        return -1;
+    }
+    int interface_arg = (int)interface_number;
+    return ioctl(fd, USB_IFACE_DRIVER_DETACH, &interface_arg);
+}
+
+static int detach_sc2_map_interfaces(int fd, uint16_t vid, uint16_t pid,
+                                     const sc2_ep_map_t *map) {
+    uint8_t interfaces[STEAM_USB_MAX_INTERFACES];
+    int count = steam_usb_collect_detach_interfaces(
+        vid, pid, map, interfaces, STEAM_USB_MAX_INTERFACES);
+    if (count <= 0) {
+        errno = EPERM;
+        return -1;
+    }
+    for (int i = 0; i < count; ++i) {
+        if (detach_sc2_interface_checked(fd, vid, pid, map, interfaces[i]) != 0) {
+            int error = errno;
+            gp_log("USB detach refused/failed for Steam interface %u (errno=%d)\n",
+                   interfaces[i], error);
+            errno = error;
+            return -1;
+        }
+    }
+    return count;
+}
+
 static void *usb_hid_thread(void *arg) {
     usb_thread_arg_t *targ = (usb_thread_arg_t *)arg;
     slot_registry_token_t slot_token = targ->slot_token;
@@ -837,49 +812,12 @@ static void *usb_hid_thread(void *arg) {
     gp_log("slot[%d] USB thread: %s VID=0x%04x PID=0x%04x\n",
            slot, dev_path, vid, pid);
 
-    /* ── Xbox One: single-pass ─────────────────────────────────────────── */
-    if (pid == PID_XBOX) {
-        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
-                             O_RDWR, NULL) != 0) {
-            gp_log("slot[%d] Xbox open fail errno=%d\n", slot, errno);
-            goto exit_slot;
-        }
-        fd = usb_resources.fd;
-
-        { int ii; for(ii=0;ii<4;ii++){int i2=ii; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2);} }
-        usleep(120000); /* hub settle: give USB hub time to propagate detach */
-        memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
-        init.pEndpoints=eps; init.ep_index_max=4;
-        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
-                                &init, NULL)!=0){
-            gp_log("slot[%d] Xbox FS_INIT fail errno=%d\n",slot,errno);
-            goto exit_slot;
-        }
-
-        memset(&fs_open,0,sizeof(fs_open));
-        fs_open.ep_index=0; fs_open.ep_no=XBOX_EP_IN;
-        fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
-                                      0, &fs_open, NULL)!=0){
-            gp_log("slot[%d] Xbox IN fail errno=%d\n",slot,errno);
-            goto uninit_exit;
-        }
-        gp_log("slot[%d] Xbox IN ep=0x%02x ok maxpkt=%u\n",
-               slot, XBOX_EP_IN, (unsigned)fs_open.max_packet_length);
-
-        buffers[0]=buf; lengths[0]=64;
-        eps[0].ppBuffer=buffers; eps[0].pLength=lengths; eps[0].nFrames=1;
-        eps[0].timeout=50; eps[0].flags=USB_FS_FLAG_SINGLE_SHORT_OK|USB_FS_FLAG_MULTI_SHORT_OK;
-
-        memset(&fs_open,0,sizeof(fs_open));
-        fs_open.ep_index=1; fs_open.ep_no=XBOX_EP_OUT;
-        fs_open.max_bufsize=64; fs_open.max_frames=1;
-        out_opened = (usb_session_open_endpoint(&usb_resources,
-            &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
-        gp_log("slot[%d] Xbox OUT ep=0x%02x opened=%d\n", slot, XBOX_EP_OUT, out_opened);
-
-        xbox_gip_handshake(&usb_resources, &g_usb_session_ops, eps);
-        goto main_loop;
+    /* The registry is not a trust boundary: reject stale/corrupt identities
+     * before opening a device or issuing any USB ioctl. */
+    if (!steam_usb_is_sc2_device(vid, pid)) {
+        gp_log("slot[%d] refusing unsupported USB identity VID=0x%04x PID=0x%04x\n",
+               slot, vid, pid);
+        goto exit_slot;
     }
 
     /* ── Steam Controller 2026 (Puck / cable) ──────────────────────────── */
@@ -896,12 +834,8 @@ static void *usb_hid_thread(void *arg) {
         int map_status = sc2_ep_map(fd, is_puck, &sc2_map);
         int n_eps = 0;
         if (map_status == SC2_USB_MAP_UNAVAILABLE) {
-            /* Preserve the known-device compatibility path only when the
-             * kernel refuses GET_FULL_DESC. A parsed-but-empty or malformed
-             * map must not be treated as permission to probe guessed endpoints. */
-            gp_log("slot[%d] SC2 config descriptor unavailable, trying bounded IN eps 0x81-0x88\n", slot);
-            for (int k = 0; k < SC2_MAX_EPS; k++) addrs[k] = (uint8_t)(0x81 + k);
-            n_eps = SC2_MAX_EPS;
+            gp_log("slot[%d] SC2 config descriptor unavailable; refusing endpoint scan\n", slot);
+            goto exit_slot;
         } else if (map_status == SC2_USB_MAP_DEVICE_GONE) {
             gp_log("slot[%d] SC2 device disappeared during config read\n", slot);
             goto exit_slot;
@@ -916,7 +850,11 @@ static void *usb_hid_thread(void *arg) {
             }
         }
 
-        { int ii; for(ii=0;ii<8;ii++){int i2=ii; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2);} }
+        if (detach_sc2_map_interfaces(fd, vid, pid, &sc2_map) < 0) {
+            gp_log("slot[%d] SC2 descriptor-mapped interface detach failed errno=%d\n",
+                   slot, errno);
+            goto exit_slot;
+        }
         usleep(120000);
 
         struct usb_fs_endpoint sc2_eps[SC2_MAX_EPS];
@@ -986,8 +924,13 @@ static void *usb_hid_thread(void *arg) {
         {
             int k = sc2_iface_of_in(&sc2_map, (uint8_t)active);
             uint8_t own_out = 0;
-            if (k >= 0) { sc2_iface = sc2_map.it[k].iface; own_out = sc2_map.it[k].out_ep; }
-            else        { sc2_iface = active - 0x81; if (sc2_iface < 0) sc2_iface = 0; }
+            if (k < 0) {
+                gp_log("slot[%d] active endpoint 0x%02x is absent from the validated map\n",
+                       slot, active);
+                goto exit_slot;
+            }
+            sc2_iface = sc2_map.it[k].iface;
+            own_out = sc2_map.it[k].out_ep;
             out_opened = 0;
             if (own_out) {
                 memset(&fs_open,0,sizeof(fs_open));
@@ -1021,144 +964,8 @@ static void *usb_hid_thread(void *arg) {
         goto main_loop;
     }
 
-    /* ── Steam Controller: single-pass ─────────────────────────────────── */
-    if (pid == PID_STEAM_WIRED) {
-        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
-                             O_RDWR, NULL) != 0) {
-            gp_log("slot[%d] Steam open fail errno=%d\n", slot, errno);
-            goto exit_slot;
-        }
-        fd = usb_resources.fd;
-
-        /* Detach PS5 HID from keyboard(0) / mouse(1) / gamepad(2) interfaces */
-        { int ii; for(ii=0;ii<3;ii++){int i2=ii; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2);} }
-        usleep(120000);
-
-        /* Control transfers before FS mode takes over */
-        if (steam_init(fd) != 0)
-            notify("Puckbridge: Steam Controller init failed — see klog");
-
-        memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
-        init.pEndpoints=eps; init.ep_index_max=1;
-        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
-                                &init, NULL)!=0){
-            gp_log("slot[%d] Steam FS_INIT fail errno=%d\n",slot,errno);
-            goto exit_slot;
-        }
-        memset(&fs_open,0,sizeof(fs_open));
-        fs_open.ep_index=0; fs_open.ep_no=STEAM_EP_IN;
-        fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
-                                      0, &fs_open, NULL)!=0){
-            gp_log("slot[%d] Steam IN ep=0x%02x fail errno=%d\n",slot,STEAM_EP_IN,errno);
-            goto uninit_exit;
-        }
-        gp_log("slot[%d] Steam IN ep=0x%02x ok maxpkt=%u\n",
-               slot, STEAM_EP_IN, (unsigned)fs_open.max_packet_length);
-
-        buffers[0]=buf; lengths[0]=64;
-        eps[0].ppBuffer=buffers; eps[0].pLength=lengths; eps[0].nFrames=1;
-        eps[0].timeout=50; eps[0].flags=USB_FS_FLAG_SINGLE_SHORT_OK|USB_FS_FLAG_MULTI_SHORT_OK;
-        out_opened = 0;   /* no interrupt OUT; config goes over ep0 */
-        goto main_loop;
-    }
-
-    /* ── Nintendo: two-pass ────────────────────────────────────────────── */
-    if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
-                         O_RDWR, NULL) != 0) {
-        gp_log("slot[%d] open fail errno=%d\n", slot, errno);
-        goto exit_slot;
-    }
-    fd = usb_resources.fd;
-
-    memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
-    init.pEndpoints=eps; init.ep_index_max=1;
-    if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
-                            &init, NULL)!=0){
-        gp_log("slot[%d] Nintendo FS_INIT p1 fail\n",slot); goto exit_slot;
-    }
-    { int i0=0,i1=1; ioctl(fd,USB_IFACE_DRIVER_DETACH,&i0); ioctl(fd,USB_IFACE_DRIVER_DETACH,&i1); }
-    memset(&fs_open,0,sizeof(fs_open));
-    fs_open.ep_index=0; fs_open.ep_no=0x81; fs_open.max_bufsize=64; fs_open.max_frames=1;
-    if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
-                                  0, &fs_open, NULL)!=0){
-        gp_log("slot[%d] Nintendo IN p1 fail errno=%d\n",slot,errno); goto uninit_exit;
-    }
-    gp_log("slot[%d] Nintendo p1 IN ok maxpkt=%u\n",slot,(unsigned)fs_open.max_packet_length);
-    {
-        int cleanup_result = usb_session_cleanup(&usb_resources,
-            &g_usb_session_ops, NULL);
-        fd = -1;
-        if (cleanup_result != 0) {
-            gp_log("slot[%d] Nintendo p1 cleanup reported an error\n", slot);
-            goto exit_slot;
-        }
-    }
-
-    /* Pass 2: retry DETACH+OPEN up to 5 times to beat usb_hid0 re-attach
-     * (real Switch Pro is claimed by PS5 native HID driver after probe releases it) */
-    { int detach_try;
-      for (detach_try = 0; detach_try < 5; detach_try++) {
-        if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
-                             O_RDWR, NULL) != 0) {
-            gp_log("slot[%d] reopen fail attempt %d\n",slot,detach_try);
-            goto exit_slot;
-        }
-        fd = usb_resources.fd;
-        { int i0=0,i1=1,i2=2;
-          ioctl(fd,USB_IFACE_DRIVER_DETACH,&i0);
-          ioctl(fd,USB_IFACE_DRIVER_DETACH,&i1);
-          ioctl(fd,USB_IFACE_DRIVER_DETACH,&i2); }
-        memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
-        init.pEndpoints=eps; init.ep_index_max=2;
-        if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
-                                &init, NULL)!=0){
-            int cleanup_result = usb_session_cleanup(&usb_resources,
-                &g_usb_session_ops, NULL);
-            fd = -1;
-            if (cleanup_result != 0) goto exit_slot;
-            usleep(50000); continue;
-        }
-        memset(&fs_open,0,sizeof(fs_open));
-        fs_open.ep_index=0; fs_open.ep_no=0x81; fs_open.max_bufsize=64; fs_open.max_frames=1;
-        if (usb_session_open_endpoint(&usb_resources, &g_usb_session_ops,
-                                      0, &fs_open, NULL)==0) break; /* claimed it */
-        int cleanup_result = usb_session_cleanup(&usb_resources,
-            &g_usb_session_ops, NULL);
-        fd = -1;
-        if (cleanup_result != 0) goto exit_slot;
-        gp_log("slot[%d] Nintendo p2 OPEN retry %d errno=%d\n",slot,detach_try,errno);
-        usleep(50000);
-      }
-      if (fd < 0) { gp_log("slot[%d] Nintendo p2 give up\n",slot); goto exit_slot; }
-    }
-    gp_log("slot[%d] Nintendo p2 IN ok maxpkt=%u\n",slot,(unsigned)fs_open.max_packet_length);
-    if (fs_open.max_packet_length != 64){ gp_log("slot[%d] wrong maxpkt, reinit\n",slot); goto reinit; }
-
-    buffers[0]=buf; lengths[0]=64;
-    eps[0].ppBuffer=buffers; eps[0].pLength=lengths; eps[0].nFrames=1;
-    eps[0].timeout=200; eps[0].flags=USB_FS_FLAG_SINGLE_SHORT_OK|USB_FS_FLAG_MULTI_SHORT_OK;
-
-    /* 8BitDo uses ep=0x02; real Nintendo Switch Pro Controller uses ep=0x01 */
-    memset(&fs_open,0,sizeof(fs_open));
-    fs_open.ep_index=1; fs_open.ep_no=0x02; fs_open.max_bufsize=64; fs_open.max_frames=1;
-    out_opened = (usb_session_open_endpoint(&usb_resources,
-        &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
-    if (!out_opened) {
-        memset(&fs_open,0,sizeof(fs_open));
-        fs_open.ep_index=1; fs_open.ep_no=0x01; fs_open.max_bufsize=64; fs_open.max_frames=1;
-        out_opened = (usb_session_open_endpoint(&usb_resources,
-            &g_usb_session_ops, 1, &fs_open, NULL)==0) ? 1 : 0;
-        if (out_opened) gp_log("slot[%d] Nintendo OUT ep=0x01 (real Switch Pro)\n", slot);
-    }
-    gp_log("slot[%d] Nintendo OUT opened=%d\n", slot, out_opened);
-    if (out_opened) {
-        (void)usb_send_cmd(&usb_resources, &g_usb_session_ops, &eps[1], 1,
-                           0x80, 0x02, 50000, 20, NULL); usleep(30000);
-        (void)usb_send_cmd(&usb_resources, &g_usb_session_ops, &eps[1], 1,
-                           0x80, 0x04, 50000, 20, NULL); usleep(50000);
-        gp_log("slot[%d] Nintendo [80 02]+[80 04] sent\n", slot);
-    }
+    /* The SC2 branch above is the only supported USB runtime path. */
+    goto exit_slot;
 
 main_loop: ;
     int hs_state = (pid==PID_XBOX || pid==PID_STEAM_WIRED || pid==PID_SC2_PUCK || pid==PID_SC2_WIRED) ? HS_STREAMING : HS_WAIT_81_01;
@@ -1604,7 +1411,7 @@ static void *controller_manager_thread(void *arg) {
 }
 
 /* ── Credential elevation ─────────────────────────────────────────────── */
-static void remove_pid_file_if_owned(void);
+static int remove_pid_file_if_owned(void);
 
 static credential_guard_result_t elevate_credentials(void) {
     static const uint8_t caps[CREDENTIAL_GUARD_CAPS_SIZE] = {
@@ -1632,7 +1439,8 @@ static int fail_startup(const char *reason) {
     gp_log("startup aborted: %s\n", reason);
     if (restore_runtime_credentials() != 0)
         gp_log("startup abort: credentials remain elevated until process exit\n");
-    remove_pid_file_if_owned();
+    if (remove_pid_file_if_owned() != 0)
+        gp_log("startup abort: PID lock cleanup failed errno=%d\n", errno);
     slot_registry_destroy(&g_slots);
     pthread_mutex_lock(&g_log_lock);
     if (g_log_fd >= 0) { close(g_log_fd); g_log_fd = -1; }
@@ -1658,14 +1466,11 @@ static int release_owned_slots(void) {
     return -1;
 }
 
-static void remove_pid_file_if_owned(void) {
-    char contents[32] = {0};
-    int fd = open(PID_PATH, O_RDONLY);
-    if (fd < 0) return;
-    ssize_t length = read(fd, contents, sizeof(contents) - 1);
-    close(fd);
-    if (length > 0 && (pid_t)atoi(contents) == getpid())
-        (void)unlink(PID_PATH);
+static int remove_pid_file_if_owned(void) {
+    if (g_pid_lock_fd < 0) return 0;
+    int fd = g_pid_lock_fd;
+    g_pid_lock_fd = -1;
+    return runtime_instance_release(PID_PATH, fd);
 }
 
 static int runtime_shutdown(void) {
@@ -1737,7 +1542,8 @@ static int runtime_shutdown(void) {
         gp_log("shutdown: credentials could not be restored; process exit is the final rollback boundary\n");
 
     slot_registry_destroy(&g_slots);
-    remove_pid_file_if_owned();
+    if (remove_pid_file_if_owned() != 0)
+        gp_log("shutdown: PID lock cleanup failed errno=%d\n", errno);
     gp_log("shutdown: all owned devices removed and workers joined\n");
     pthread_mutex_lock(&g_log_lock);
     if (g_log_fd >= 0) { close(g_log_fd); g_log_fd = -1; }
@@ -1773,14 +1579,10 @@ int main(void) {
 
     load_runtime_policy(&g_runtime_policy);
 
-    /* Kill previous instance */
-    { int pfd=open(PID_PATH,O_RDONLY);
-      if(pfd>=0){char pb[16]={0};read(pfd,pb,15);close(pfd);
-        pid_t old=(pid_t)atoi(pb);
-        if(old>0&&old!=getpid()){gp_log("Killing prev pid=%d\n",old);kill(old,SIGTERM);usleep(600000);}
-      }
-      int pfd2=open(PID_PATH,O_WRONLY|O_CREAT|O_TRUNC,0600);
-      if(pfd2>=0){char pb[16];snprintf(pb,sizeof(pb),"%d",getpid());write(pfd2,pb,strlen(pb));close(pfd2);}
+    if (runtime_instance_acquire(PID_PATH, &g_pid_lock_fd) != 0) {
+        gp_log("refusing startup: runtime PID lock unavailable or another recorded process is alive (errno=%d)\n",
+               errno);
+        return fail_startup("runtime PID lock unavailable");
     }
 
     sceUserServiceInitialize(NULL);
@@ -1826,8 +1628,7 @@ int main(void) {
         webui_start();
         notify("Puckbridge: remap portal on port %d", WEBUI_PORT);
     }
-    gp_log("safe mode defaults: game-memory probe/hooks, DualSense hand-off and WebUI require explicit runtime-policy opt-in; non-Steam USB endpoint probing is %s\n",
-           g_runtime_policy.enable_legacy_usb_probe ? "enabled by config" : "disabled");
+    gp_log("safe mode defaults: game-memory probe/hooks, DualSense hand-off and WebUI require explicit runtime-policy opt-in; USB accepts only Steam Controller 2026 identities\n");
 
     /* Start controller manager — handles all detection, VDA creation, USB threads */
     if (!g_signal_stop && !runtime_is_stopping() &&
