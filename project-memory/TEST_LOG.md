@@ -705,3 +705,49 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - Exact 13 paths: README.md, docs/TEST_PLAN.md, payload/Makefile, payload/ds_handoff.c, payload/ds_handoff.h, payload/gc_main.c, payload/runtime_policy.c, payload/runtime_policy.h, payload/webui.c, tests/Makefile, tests/test_ds_handoff.c, tests/test_runtime_policy.c, tests/test_safe_mode_contract.py. All 13 GitHub blob hashes matched local hashes before the expected-head update.
 - Re-fetched main/commit/tree and compared commits: 224 tree entries/211 blobs, truncated=false, zero deleted base files, one commit ahead, and the file diff matches exactly the 13 intended paths.
 - New Actions: 37900071213 Host tests and 37900071175 PS5 cross-build; both queued on the 07:29 UTC check. P0-3 Actions 37898795378 and 37898795346 were also still queued. No CI pass claimed.
+
+### M1-204 — P0-5 USB detach gate, PID ownership, and release evidence — 2026-10-09
+
+- The previous test introduced duplicate USB-interface entries and exercised unavailable, malformed, disconnected, empty, and valid maps; expected-red checks exposed an accepted duplicate before the parser/policy fix. Current policy allows the single raw `USB_IFACE_DRIVER_DETACH` site only after the exact Steam 2026 VID/PID allowlist and a unique parsed HID interface with a valid interrupt-IN endpoint. No guessed `0x81..0x88` endpoint or unknown-device detach remains. Puck detach is restricted to interfaces 2–5.
+- Repeat-start no longer reads a PID and sends `SIGTERM`. `runtime_instance` holds a no-follow exclusive lock, refuses a live/indeterminate recorded PID without signaling it, permits stale dead-PID takeover, rejects malformed/symlink paths, and removes only the same owned PID-file inode.
+- The first-release gate now requires a gate-specific `project-memory/TEST_LOG.md#h-xx` heading with matching model, exact FW, controller firmware, transport, full commit SHA, and `Result: VERIFIED_HARDWARE`. Seven synthetic checker tests pass. `python3 scripts/check_release_gate.py` exits 1 on the actual matrix as expected because no hardware entries are verified.
+- `make -C tests clean test` — PASS on Darwin 27.0.1 arm64 / Apple clang 21.0.0; includes SC2 USB (45 checks), runtime instance lock (41 checks), five USB source contracts, three PID source contracts, and seven release-gate tests.
+- `make -C tests sanitize` — PASS on the same host with ASan/UBSan.
+- PS5 cross-build — PASS with SDK v0.43 pin `d9c9519116944a7f1c22d262012c53b80b3520b7` and LLVM 18.1.8 (`LLVM_CONFIG=/opt/homebrew/Cellar/llvm@18/18.1.8/bin/llvm-config`, SDK under `/private/tmp/steamcontroller-ps5-sdk-v0.43/ps5-payload-sdk`). ELF SHA-256 `05d46cc3180317a197f2ef53f5c26665175c0724515177ff87a1cf54a18995b2`; `llvm-readobj` reports ELF64 x86-64 ET_DYN and imports `libSceLibcInternal.sprx`, `libSceNet.sprx`, `libScePad.sprx`, `libSceSystemService.sprx`, `libSceUserService.sprx`, and `libkernel_web.sprx`. This is SDK compile/link evidence only.
+- Ruby YAML parser accepts all three workflows; `git diff --check` and credential-pattern scan pass. No physical PS5, Steam Controller, DualSense, Puck, USB ioctl, BLE/HCI/radio, firmware/system write, or release was used.
+- Published 22 reviewed source/test/docs paths directly to main in `afc35de59206df8a479db031d320e0d31740dff2`, parent `2c372eeb5a9db7be77cdcd4079bf1b449c206225`. Full recursive tree: 232 entries / 218 blobs, not truncated; all 22 blob SHAs match, no prior path was deleted, and required payload files are present. Host Actions `37980962018` failed only at the Linux link step because it rejected `-Wl,-dead_strip`; PS5 cross-build Actions `37980961982` passed. The compiler failure caused a portability follow-up, recorded under M1-205; no Host CI pass is claimed here.
+
+### M1-205 — Linux host-linker portability follow-up — 2026-10-09
+
+- Main `afc35de...` Host run `37980962018` confirmed GNU `ld` rejects the Apple-only `-Wl,-dead_strip` flag for `test_sc2_usb_scan`. The source commit `afc35de...` PS5 cross-build run `37980961982` completed successfully.
+- `tests/Makefile` now selects Apple `-dead_strip` on Darwin and GNU `--gc-sections` on other host systems. `docs/TEST_PLAN.md` records T-P55. Targeted `make -C tests clean build/test_sc2_usb_scan && tests/build/test_sc2_usb_scan` — PASS on Darwin. Full `make -C tests clean test` and `make -C tests sanitize` — PASS after the change.
+- Follow-up published directly to main as `694c13a44af8f24c2172d1fef112287970d3dfd9`, parent `afc35de59206df8a479db031d320e0d31740dff2`, changing exactly `tests/Makefile` and `docs/TEST_PLAN.md`; full tree remains 232 entries / 218 blobs, all base paths and non-overlay blobs retained. GitHub Host Actions `37981319013` and PS5 cross-build Actions `37981319108` were `in_progress` at 19:36 UTC; check before claiming Linux CI is green.
+- A preceding baseline Host run `37900289677` on `2c372eeb...` failed earlier in the same job because strict C11 hid `usleep()` in `controller_sc2.c:218,291`. The payload source now uses guarded POSIX.1-2008 declarations and `nanosleep()` (`controller_sc2.c:4-7,40,231,304`); the candidate payload with this fix passed the SDK cross-build and local strict-C11 suites. New Ubuntu Actions still need to confirm the Linux host build.
+- The P1 game-hook rollback issue remains open: `hooks_thread()` retries `unhook()` indefinitely, while `shellui_pad_unpatch()` and ShellUI patch entry points have no production call sites outside `shellui_pad.c`. No timeout, arbitrary unpatch or memory patch experiment was added; target activation/rollback behavior remains a hardware/ABI blocker.
+
+### M1-206 — Second strict-C11 delay declaration in gyro test target — 2026-10-09
+
+- GitHub Host run `37981319013` on main commit `694c13a44af8f24c2172d1fef112287970d3dfd9` passed the scanner link step with GNU `--gc-sections`, then failed compiling `payload/sc2_gyro.c:340` because strict C11 hides `usleep()`. The paired PS5 cross-build run `37981319108` passed.
+- Reused the existing interruptible `runtime_sleep_ms()` helper in `controller_sc2.c` and `sc2_gyro.c` instead of adding another delay implementation; added its existing `runtime_control.c` owner to both standalone host targets. `sc2_gyro.c` requests POSIX.1-2008 declarations before system headers.
+- Targeted scanner and gyro targets — PASS; scanner injection/multiplexing/ownership checks pass, gyro state concurrency reports 75,000 coherent operations.
+- `make -C tests clean test` — PASS; `make -C tests sanitize` — PASS under ASan/UBSan on Darwin 27.0.1 arm64 / Apple clang 21.0.0.
+- SDK v0.43 / LLVM 18.1.8 `make -C payload clean` and `make -C payload` — PASS; updated ELF SHA-256 `c5d1a56605654ae9b5e8330b892dcec475f4d78c62de9adf0a07a3c3b8eea13a`. Compile/link only. The previous GitHub PS5 cross-build passed before this limited wait-helper refactor; a new run is required after publication.
+- `git diff --check`, workflow YAML syntax and secret-pattern checks must be rerun before publication. No PS5 hardware, Steam Controller, Puck, DualSense, USB ioctl, BLE/HCI/radio, firmware/system write, or release was used. Exact next action: publish the narrow delay-portability/test-link update to main with expected-head protection, then inspect the resulting Host and PS5 Actions logs; do not mark Host CI green until the Linux job passes.
+
+### M1-206 publication and Actions follow-up — 2026-10-09
+
+- Published `payload/controller_sc2.c`, `payload/sc2_gyro.c`, `tests/Makefile`, and `docs/TEST_PLAN.md` as `451b10f03200f7bf3b95806324286c33709bb498`, parent `694c13a44af8f24c2172d1fef112287970d3dfd9`, tree `2dfc464bc8f5626457dcd26ae6c9b9e0815dc11a`. Recursive tree: 232 entries / 218 blobs, complete; four target blobs match local hashes, all base paths and other base blobs remain unchanged, and core payload files are present.
+- Actions triggered on the commit: Host `37982325945`, PS5 cross-build `37982325957`; both were `in_progress` at 19:44:55 UTC. Check their final outcomes and append them before marking strict-C11 Host CI resolved.
+
+### M1-207 — POSIX test helper declaration — 2026-10-09
+
+- GitHub Host run `37982325945` compiled the SC2 scanner/gyro targets after M1-206, then failed at `tests/test_runtime_policy.c:105`: `mkdtemp()` was used without `<stdlib.h>`. The POSIX feature-test macro was already defined; this was a missing declaration include. PS5 cross-build run `37982325957` passed.
+- Added `<stdlib.h>` to `tests/test_runtime_policy.c`; targeted `make -C tests clean build/test_runtime_policy && tests/build/test_runtime_policy` passes. Full `make -C tests clean test` and `make -C tests sanitize` pass on Darwin 27.0.1 arm64 / Apple clang 21.0.0.
+- Published `tests/test_runtime_policy.c` and `docs/TEST_PLAN.md` directly to main as `d727f28af5f7e94452da2a017270db368266ac59`, parent `451b10f03200f7bf3b95806324286c33709bb498`, tree `9eb8c9877da5164c24fb1864572d780ea3ea99e6`. Full recursive tree: 232 entries / 218 blobs; two intended blobs match, all base paths and unrelated blobs remain unchanged.
+- New Host run `37982788726` and PS5 cross-build run `37982788729` were in progress at 19:48:57 UTC. Final Linux Actions outcome remains required before calling Host CI resolved.
+
+### M1-207 final Actions status — 2026-10-09
+
+- GitHub Host tests `37982788726` — PASS; PS5 cross-build `37982788729` — PASS. Both runs target main commit `d727f28af5f7e94452da2a017270db368266ac59`. Host compile, full ASan/UBSan suite, and payload cross-build now pass in Actions.
+- This closes the strict-C11 POSIX declarations and host linker portability issues recorded under P1-CI-01/P1-CI-02. Earlier failing Actions and exact diagnostics remain documented above; no failure record was removed.
+- CI/build success remains separate from PS5 runtime proof. USB ownership, PID lock, shutdown, system hook rollback, controller/Puck compatibility and the release evidence matrix still require their documented hardware/ABI gates.

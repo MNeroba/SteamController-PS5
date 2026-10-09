@@ -292,3 +292,35 @@ For any new significant design decision: date, status `PROPOSED/ACCEPTED/SUPERSE
 - Evidence: payload/runtime_policy.c/.h; guarded startup and Steam-only probe fallback in payload/gc_main.c; DualSense setter gate in payload/ds_handoff.c/.h and payload/webui.c; tests/test_runtime_policy.c and tests/test_safe_mode_contract.py; T-P51/M1-203/F079.
 - Decision: a missing, malformed, oversized, non-regular, or symlink policy file resolves to all optional services off. The bounded file at /data/ghostpad/runtime-policy.ini accepts only unique, exact boolean opt-ins. Bridge probe, game hooks, DualSense hand-off and WebUI require separate keys. Legacy endpoint-guessing requires a separate opt-in and is disabled by default. A WebUI call cannot bypass the DualSense policy gate.
 - Limit: safe USB enumeration still identifies exact Steam Controller/Puck IDs and existing handlers contain fixed interface detach operations. Those interfaces are not yet validated; P0-5 remains required before recommending a physical console. Published directly to main as a366f2d6ca3923a3645f52500d9000cd89a9c9dd (tree 4833da3c35d8debcb08984d98e8a3688b5f6c450); all 13 local blob hashes matched, recursive tree has 224 entries/211 blobs with zero deleted base blobs. Actions 37900071213/37900071175 are queued. No target policy-file or USB runtime test occurred.
+
+## ADR-041 — Gate every Steam USB driver detach with an exact device and descriptor map
+
+- Date/status: 2026-10-09, ACCEPTED; HOST VERIFIED, TARGET UNVERIFIED.
+- Context: safe mode stopped unknown-device endpoint guessing, but recognized Steam paths still detached interfaces before validating exact device/interface ownership, and one fallback guessed interrupt endpoints.
+- Evidence: main implementation commit `afc35de59206df8a479db031d320e0d31740dff2`; `payload/gc_main.c:411,741-763,853`; `payload/steam_usb.c`; `tests/test_steam_usb.c`, `tests/test_usb_detach_contract.py`; T-P52/M1-204/F080.
+- Decision: permit detach only for the exact Steam Controller 2026 wired/Puck VID/PID allowlist and interfaces in a unique parsed map with HID class and a valid interrupt-IN endpoint; restrict Puck interfaces to 2–5. Missing, malformed, unavailable, or ineligible maps fail closed. Keep one raw ioctl behind the checked helper and never guess endpoints or detach unknown devices.
+- Verification/limit: expected-red duplicate-map checks, 45 USB policy/parser checks, five source contracts, full normal and ASan/UBSan suites, and SDK v0.43 cross-build pass. No PS5 USB ioctl, live descriptor, controller, or Puck was tested. Device IDs and driver-detach behavior remain hardware/ABI assumptions to verify on an isolated development console.
+
+## ADR-042 — Use an owned process lock; never signal a PID loaded from disk
+
+- Date/status: 2026-10-09, ACCEPTED; HOST VERIFIED, TARGET UNVERIFIED.
+- Context: a persisted PID can be reused for an unrelated process, so startup cannot safely send it a termination signal based only on the numeric value.
+- Evidence: `payload/runtime_instance.c:91-155`, `payload/gc_main.c:1469-1474,1582-1586`, `tests/test_runtime_instance.c`, `tests/test_pid_file_contract.py`; T-P54/M1-204/F081; published in `afc35de59206df8a479db031d320e0d31740dff2`.
+- Decision: acquire a no-follow regular PID file and an exclusive nonblocking lock before runtime setup. A live/indeterminate PID causes startup refusal; a dead PID may be replaced. Never signal the recorded PID. On release, remove only the file that still matches the locked inode and this process's PID.
+- Verification/limit: 41 module checks, three source contracts, full normal and ASan/UBSan suites and SDK v0.43 cross-build pass. Prospero `flock`, PID namespace, permission and shutdown semantics have not been tested on-console.
+
+## ADR-043 — Bind first-release hardware gates to matching test-log records
+
+- Date/status: 2026-10-09, ACCEPTED; HOST VERIFIED, RELEASE BLOCKED BY HARDWARE.
+- Context: a generic test-log mention of a gate ID is insufficient evidence for a hardware result, and no physical PS5 is available in this development environment.
+- Evidence: `scripts/check_release_gate.py`, `tests/test_release_gate.py`, `.github/workflows/release.yml`, `project-memory/HARDWARE_MATRIX.md`; T-P53/M1-204/F082; source commit `afc35de59206df8a479db031d320e0d31740dff2`.
+- Decision: a required hardware row must link to its own `#h-xx` heading whose log entry repeats the gate ID, PS5 model, exact firmware, controller model/firmware, transport, full payload commit SHA and `Result: VERIFIED_HARDWARE`. Release tags also require passing host/sanitizer and PS5 cross-build jobs. Keep the current matrix blocked; do not release a binary based on synthetic test fixtures or a successful cross-build alone.
+- Verification/limit: seven synthetic checker tests pass; the real matrix intentionally fails closed because all required hardware rows are unverified. The tag workflow and hardware gate have not yet run on a real release tag.
+
+## ADR-044 — Use portable POSIX delay calls and host linker flags in tests
+
+- Date/status: 2026-10-09, ACCEPTED; LOCAL HOST/SDK VERIFIED, LINUX ACTIONS PENDING.
+- Context: Ubuntu Host Actions found `usleep()` hidden under strict C11, Apple's `-Wl,-dead_strip` unsupported by GNU `ld`, and a missing `<stdlib.h>` declaration for test use of `mkdtemp()`; Darwin had masked these issues.
+- Evidence: runs `37900289677`, `37980962018`, `37981319013`, and `37982325945`; `payload/controller_sc2.c`, `payload/sc2_gyro.c`, `payload/runtime_control.c`, `tests/Makefile`, `tests/test_runtime_policy.c`; T-P55/T-P56/T-P57/M1-205/M1-207.
+- Decision: use shared `runtime_sleep_ms()` for SC2 scanner/gyro waits, linking `runtime_control.c` into the corresponding host targets. Select `-Wl,-dead_strip` on Darwin and GNU-compatible `-Wl,--gc-sections` elsewhere.
+- Verification/limit: targeted scanner, gyro and runtime-policy tests, full normal and ASan/UBSan suites, and SDK v0.43 cross-build pass locally. The POSIX wait/test-link fix is published as `451b10f03200f7bf3b95806324286c33709bb498`; the test header fix is published as `d727f28af5f7e94452da2a017270db368266ac59`. GitHub Host `37982788726` and PS5 cross-build `37982788729` both pass on `d727f28...`. No PS5 runtime or USB hardware behavior is proven.

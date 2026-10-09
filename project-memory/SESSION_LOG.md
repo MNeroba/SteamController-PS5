@@ -803,3 +803,45 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - P0-4 safe-mode source/docs/test commit a366f2d6ca3923a3645f52500d9000cd89a9c9dd is on main with parent 3d0a6e69738f551f54a1c175b180a0716fc417ab. GitHub compare confirms exactly the 13 intended paths. Blob hashes match local source, complete tree is 224 entries/211 blobs, and no previous base blob was deleted.
 - Actions 37900071213 (Host) and 37900071175 (PS5 build) were queued; P0-3 runs 37898795378/37898795346 remained queued. Local normal and sanitizer suites and SDK v0.43 cross-build passed; no remote CI result is claimed.
 - P0-SAFE-01 has a host implementation on main. P0-5 still has to inspect and restrict all known-Steam interface detaches before any physical console recommendation.
+
+### M1-204 — P0 USB ownership and release-safety completion — 2026-10-09
+
+- Completed source audit of every USB interface detach. Removed unknown-device probing/detach paths and endpoint guessing; routed the single detach ioctl through exact Steam 2026 VID/PID plus validated descriptor-map policy. Added expected-red map coverage and source contracts.
+- Replaced unsafe saved-PID `SIGTERM` startup with an exclusive file-lock/owner identity module. Added regression coverage for a live unrelated child, stale PID takeover, malformed files, symlink refusal, and owned-file cleanup.
+- Added fail-closed release hardware evidence checks, then strengthened them so each required matrix row must link to its own exact TEST_LOG heading and repeat matching hardware/firmware/transport/commit data plus `VERIFIED_HARDWARE`.
+- Local normal suite, ASan/UBSan suite, 7 release-gate synthetic tests, 41 PID-module checks, 45 USB policy/parser checks, Ruby workflow syntax parse, `git diff --check`, and SDK v0.43 / LLVM 18.1.8 payload cross-build pass. ELF SHA-256: `05d46cc3180317a197f2ef53f5c26665175c0724515177ff87a1cf54a18995b2`.
+- Published 22 paths to GitHub `main` as `afc35de59206df8a479db031d320e0d31740dff2` with expected-head protection. Re-fetched tree: 232 entries / 218 blobs, no base paths lost, all changed blob SHAs match, core payload paths intact.
+- GitHub PS5 cross-build run `37980961982` passed. Host run `37980962018` failed on the test-only Darwin linker flag; follow-up portability fix was published in `694c13a44af8f24c2172d1fef112287970d3dfd9`. New Host/PS5 Actions `37981319013`/`37981319108` were in progress at the latest check.
+- No hardware gates were run; hardware matrix and release gate remain blocked. P1 hook rollback remains open because the source call graph does not prove active ShellUI patch ownership and the game-hook worker retries rollback indefinitely. No speculative target patch/unpatch change was made.
+
+### M1-205 — Host CI portability correction — 2026-10-09
+
+- Inspected the new Host Actions log and reproduced the mechanism: Ubuntu GNU `ld` rejected `-Wl,-dead_strip`. Selected linker garbage-collection flags by host OS, preserving Darwin behavior and using GNU `--gc-sections` elsewhere.
+- Targeted SC2 scanner test, full normal host suite, and full ASan/UBSan suite pass locally. Published only `tests/Makefile` and `docs/TEST_PLAN.md` to main as `694c13a44af8f24c2172d1fef112287970d3dfd9` with expected-head protection; parent `afc35de...`; no base files or unmodified blobs were removed or changed.
+- Exact next action: check Actions runs `37981319013` and `37981319108`; if Host fails again, inspect the failing step before editing. Then publish a memory snapshot update with final run conclusions. Hardware/ABI gates remain unchanged.
+
+### M1-206 — Remove remaining strict-C11 `usleep()` from SC2 test builds — 2026-10-09
+
+- Inspected Host failure `37981319013`: the linker correction worked; the next compiler error was an undeclared `usleep()` in `sc2_gyro.c`. GitHub PS5 cross-build `37981319108` passed on the parent commit.
+- Reused `runtime_sleep_ms()` for SC2 scan and gyro retry waits. Added POSIX.1-2008 visibility to `sc2_gyro.c` and linked the shared runtime module into the scanner and gyro host test targets.
+- Targeted scanner/gyro tests, full normal suite, full ASan/UBSan suite, and local SDK v0.43/LLVM 18.1.8 cross-build pass. New ELF SHA-256: `c5d1a56605654ae9b5e8330b892dcec475f4d78c62de9adf0a07a3c3b8eea13a`.
+- Source change is local and not yet on main at this log entry. Exact next action: re-run diff/YAML/secrets checks, publish only `controller_sc2.c`, `sc2_gyro.c`, `tests/Makefile`, `docs/TEST_PLAN.md` with a fresh expected-head check, then inspect both triggered Actions runs. No target hardware tests were attempted.
+
+### M1-206 publication confirmation — 2026-10-09
+
+- Published the POSIX wait-helper and test-link changes directly to main as `451b10f03200f7bf3b95806324286c33709bb498`, parent `694c13a44af8f24c2172d1fef112287970d3dfd9`. Exactly four intended blobs changed; full tree has 232 entries / 218 blobs, no base path or non-overlay blob was lost or altered, and required payload modules remain present.
+- Local targeted scanner/gyro tests, full normal suite, full ASan/UBSan suite, and SDK v0.43/LLVM 18.1.8 cross-build pass. Updated ELF SHA-256 `c5d1a56605654ae9b5e8330b892dcec475f4d78c62de9adf0a07a3c3b8eea13a`.
+- Actions `37982325945` (Host) and `37982325957` (PS5 cross-build) were in progress at the time of publication. Exact next action: poll both runs, inspect logs for any failure, and update persistent memory with final outcomes. P0 hardware gates and P1 hook rollback remain unchanged.
+
+### M1-207 — Add the missing standard declaration for `mkdtemp()` — 2026-10-09
+
+- Inspected Host failure `37982325945`; POSIX strict-C11 compilation found `test_runtime_policy.c` used `mkdtemp()` without including `<stdlib.h>`. The paired SDK build `37982325957` passed.
+- Added the standard header and a T-P57 entry. Targeted runtime-policy build, full normal test suite and full ASan/UBSan suite pass locally.
+- Published only `tests/test_runtime_policy.c` and `docs/TEST_PLAN.md` to main as `d727f28af5f7e94452da2a017270db368266ac59`; exact parent `451b10f...`, complete 232-entry tree preserved, zero unrelated blob changes.
+- GitHub Actions `37982788726` (Host) and `37982788729` (PS5 cross-build) were in progress at 19:48:57 UTC. Next: inspect both jobs, update persistent memory with the outcome, and correct further failures if present. Hardware evidence remains blocked and hook rollback remains open.
+
+### M1-207 final CI confirmation — 2026-10-09
+
+- GitHub Actions on `d727f28af5f7e94452da2a017270db368266ac59`: Host tests `37982788726` PASS; PS5 cross-build `37982788729` PASS. The full strict-C11 sanitizer host suite, including the SC2 scanner/gyro and runtime policy tests, now compiles and completes on Ubuntu.
+- P1-CI-01 (POSIX declarations in `webui_auth.c`) and P1-CI-02 (POSIX waits, GNU/Darwin linker flag, and `mkdtemp` header) are resolved at the host/build level; this does not verify the target runtime.
+- Source commits remain directly on `main`; no PR or release was created. Current main tree is complete at 232 entries / 218 blobs. Hardware release gates H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain blocked. Exact next action: wait for physical PS5 FW 13.60, Steam Controller 2026, Puck and spare DualSense access to execute those gates; continue P1 hook rollback source/ABI analysis without speculative target patching.
