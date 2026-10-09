@@ -767,3 +767,12 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Verification: `make -C tests clean test` PASS; `make -C tests sanitize` PASS; SDK v0.43/LLVM 18.1.8 clean build PASS with explicit `LLVM_CONFIG`; ELF SHA-256 `5b3a7df02d4e845f56eb351134e562cc65ec5b296b80187b49a4daed157f85fc`; `git diff --check` PASS. The first SDK attempt without `LLVM_CONFIG` failed because its wrapper resolved the compiler to nonexistent `/llvm-clang`; the explicit SDK toolchain variable fixed that invocation. Detailed test evidence is in `TEST_LOG.md`.
 - Actions on the previous source/fix commits remain queued as of 06:50 UTC: `37888347135`, `37888347062`, `37893512422`, `37893512335`, `37893626574`, `37893626605`. No CI pass is claimed. Current P0-2 source/test/doc/memory change set is ready for direct-main publication under the owner's standing instruction, after rechecking main and its exact base tree.
 - No PS5, DualSense, Steam Controller, official Puck, USB ioctl, Bluetooth/HCI/radio, firmware/system write, PR, or binary release was used. Physical signal, USB and VDA cleanup gates remain open.
+
+
+### M1-201 direct-main publication confirmation — 2026-10-09 06:55 UTC
+
+- Re-fetched `main` immediately before updating it: `feaf320018625295d48909b3531c8e567f2ff8a6`, tree `761fa26ff18f01f7d93537a47a3c09a5099e3eaf`. Published the reviewed P0-2 source/test/docs/evidence tree as `115341056cb18eafa500eb1d3bd1020934db7106` (parent `feaf320...`, tree `90ba6303485b3d28986bc33c346897f2a3d18201`); GitHub acknowledged the expected-head guarded `force=false` update.
+- Git tree was built on the full main base. The 26 intended blob changes were checked against local Git blob hashes. Post-publication ref/commit/tree verification reports 214 entries/201 blobs, `truncated=false`, no deleted base paths, and all required core files present.
+- New Actions runs `37896053365` (Host) and `37896053373` (PS5 cross-build) both target the published commit and are queued. M1-199/M1-200 Actions were still queued at 06:50 UTC.
+- Local gates remain: full normal host suite PASS; ASan/UBSan suite PASS; SDK v0.43/LLVM 18.1.8 cross-build PASS (ELF SHA-256 `5b3a7df02d4e845f56eb351134e562cc65ec5b296b80187b49a4daed157f85fc`); `git diff --check` PASS. No hardware, USB ioctl, Bluetooth, firmware/system write, PR, or release action occurred.
+- Continue with actual Actions outcomes, then P0-3 privilege audit. Physical-console shutdown and rollback tests remain gated on PS5/controller/Puck access.
