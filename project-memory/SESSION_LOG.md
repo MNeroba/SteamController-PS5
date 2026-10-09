@@ -745,3 +745,10 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Normal host suite, ASan/UBSan suite and clean SDK v0.43 cross-build pass; ELF SHA is in M1-200 TEST_LOG. This is compile-only evidence. No target or physical-device operation was run.
 - Remaining uncertainty: the installed SDK has the `libScePad.so` binary but no `AddDevice` API contract header. The code only treats a positive immediate return as attributable; semantics of the API, success-without-returned-handle cleanup, real delete behavior and device reconnection remain target-unverified.
 - Exact next action: publish the reviewed M1-200 paths via GitHub Git Data against a fresh `main` tree and expected-head ref update. Then inspect thread lifecycle ownership and implement P0-2 before starting P0-3.
+
+### M1-200 direct-main publication — 2026-10-09 06:26 UTC
+
+- Re-fetched main immediately before publication; head was `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`, tree `f9c8a7d93716a900815483d024443f968f1c90f7`. Built the new tree on that base, created commit `ab69c02d502238a4956e37d1f611f8382c486f43`, and advanced `main` with expected SHA and `force=false`; GitHub returned success.
+- Re-fetched ref, commit and recursive tree after update: parent `aefa832...`, tree `448d610603c7dfb095841899f67db9158fa55dd8`, 210 entries, non-truncated. All 11 changed blob SHAs match local content and required payload files remain. No PR or history rewrite.
+- Actions for the source commit: PS5 cross-build `37893512335` queued; Host tests `37893512422` queued. Previous fix CI `37888347135`/`37888347062` also still need outcome checks. No workflow is called passed while queued.
+- Next work, in required order: check Actions, then implement centralized stop/USB cancellation/neutral input/registry rollback; only after review and tests begin the privilege audit.

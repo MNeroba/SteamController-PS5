@@ -642,3 +642,11 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - `PS5_PAYLOAD_SDK=.../ps5-payload-sdk LLVM_CONFIG=... make -C payload clean` followed by `make -C payload` — PASS (exit 0), SDK v0.43 pin `d9c9519116944a7f1c22d262012c53b80b3520b7`, LLVM 18.1.8. ELF64 x86-64 PIE SHA-256 `d2484cf3c96616c02b1ccf6d5983c986e46d20d2056e7007913d1ddb119d1f42`; compile/link evidence only.
 - `git diff --check` — PASS. No PS5, DualSense, Steam Controller, Puck, USB ioctl, or Bluetooth hardware operation was performed. The SDK `AddDevice` return contract and target cleanup/reconnect behavior remain unverified.
 - Exact follow-up: publish the reviewed P0-1 source, test and memory changes to `main` with a fresh expected-head check; then begin P0-2 centralized shutdown without using detach/reset or hardware probes.
+
+### M1-200 direct-main publication confirmation — 2026-10-09 06:26 UTC
+
+- Published the reviewed P0-1 change directly to `main` as `ab69c02d502238a4956e37d1f611f8382c486f43`, parent `aefa83283ba0360d0ee1444ce0d78d3c7e0504da`, tree `448d610603c7dfb095841899f67db9158fa55dd8`, message `fix(safety): delete only owned virtual devices`. The expected-head update was acknowledged with `force=false`.
+- Published exactly 11 paths: `payload/gc_main.c`, `payload/shellui_pad.c`, `tests/Makefile`, `tests/test_vda_ownership.py`, `docs/TEST_PLAN.md`, and six project-memory files. Every GitHub blob SHA matches the corresponding local Git object hash.
+- Re-fetched GitHub main and recursive tree: commit/ref match `ab69c02d...`, parent and tree match the expected values, 210 tree entries, `truncated=false`, all 11 changed blobs match, and critical core paths `gc_main.c`, `controller_sc2.c`, `sc2_haptics.c`, `slot_registry.c`, and `steam_protocol.c` are present.
+- New Host tests run `37893512422` and PS5 cross-build run `37893512335` target this commit and are queued. No remote CI result is claimed yet.
+- Next: wait for both runs, record actual outcomes, then continue P0-2 shutdown design. The separate queued M1-199 Actions `37888347135`/`37888347062` still need final outcomes recorded.
