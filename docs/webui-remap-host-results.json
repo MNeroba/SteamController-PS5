@@ -159,5 +159,26 @@
     "host": "macOS arm64",
     "fixture": "127.0.0.1:8765; in-memory profiles; preview-only bearer token"
   },
-  "recorded_on": "2026-10-10"
+  "recorded_on": "2026-10-10",
+  "github_actions": {
+    "commit": "408900592f50b1eb39b0003c357c95a137410f2f",
+    "host_run": {
+      "id": 38067268430,
+      "url": "https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268430",
+      "conclusion": "success",
+      "normal_host_suite": "success",
+      "asan_ubsan_suite": "success",
+      "chromium_browser_regression": "success",
+      "minimum_required_browser_checks": 114
+    },
+    "ps5_cross_build_run": {
+      "id": 38067268427,
+      "url": "https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268427",
+      "conclusion": "success",
+      "artifact_id": 11676095033,
+      "artifact_name": "ghost-control-ps5-cross-build",
+      "artifact_sha256": "85add35acff842f0bee8670b7fa66ee949346409459c322fcdbfc3e5446025f1",
+      "expires_at": "2027-01-08T16:20:34Z"
+    }
+  }
 }

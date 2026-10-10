@@ -32,3 +32,5 @@ A local Microsoft Edge fixture passed 99 interaction checks and seven portable e
 ### Remap UX calibration follow-up (M1-216)
 
 The local fixture now passes 114 browser checks, including calibrated DualSense L1/R1 upper shoulder and L2/R2 lower trigger regions, face-button centers, the expanded coarse-pointer hit margin, Shift/import consistency and direct output staging. Eight portable layout/generator tests pass. This updates only host evidence. Actual FW 12.00 portal rendering, live highlighting and profile persistence remain NOT_RUN / BLOCKED_HARDWARE; H-09 and every other existing hardware gate are unchanged.
+
+M1-216 source publication on main: `408900592f50b1eb39b0003c357c95a137410f2f`. Host/Chromium/normal/ASan-UBSan Actions `38067268430` and PS5 SDK cross-build Action `38067268427` pass. This does not satisfy H-09 or any console/hardware row. FW 12.00 operation, live highlighting and persisted target profiles remain NOT_RUN / BLOCKED_HARDWARE.

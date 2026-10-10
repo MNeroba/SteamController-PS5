@@ -35,7 +35,7 @@ For a per-feature view of what exists in source, what has host coverage, and wha
 
 ## Button remapping
 
-The **Remap → Buttons** screen uses interactive Steam Controller and DualSense images, front/back views, calibrated L1/R1 and face-button hotspots, 24 inputs, 18 digital outputs, combo highlights and the existing game-profile editor. The local browser fixture passes 114 desktop, mobile, keyboard and touch checks; Host Actions runs this browser regression alongside the normal and ASan/UBSan suites. Operation on a real PS5 remains unverified.
+The **Remap → Buttons** screen uses interactive Steam Controller and DualSense images, front/back views, calibrated L1/R1 and face-button hotspots, 24 inputs, 18 digital outputs, combo highlights and the existing game-profile editor. The local browser fixture passes 114 desktop, mobile, keyboard and touch checks; [Host Actions](https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268430) also passes the Chromium regression alongside normal and ASan/UBSan suites. The [SDK cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268427) passes. Operation on a real PS5 remains unverified.
 
 ![Image-based Steam Controller remapping](docs/images/remap-desktop.png)
 

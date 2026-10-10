@@ -43,7 +43,7 @@
 
 ## Exact next action
 
-The firmware retarget and image-remapping implementation are complete for host/browser/build validation. M1-216 passes 114 browser checks; reproduce them with `python3 payload/gen_html.py`, `python3 tests/webui_preview.py`, `playwright-cli open about:blank --browser msedge`, and `playwright-cli run-code --filename tests/webui_remap_browser.js`; see `docs/WEBUI_REMAP.md`. Actual portal H-09 must include front/back hotspots, live highlighting, authentication and persisted profile reload on the PS5. Keep the first-release gate blocked until real hardware records replace the owner-reported placeholders and pass H-01/H-02/H-03/H-04/H-05/H-09/H-12. Do not update the console, deploy the payload, or claim FW 12.00 compatibility without actual device/runtime evidence.
+The firmware retarget and image-remapping implementation are complete for host/browser/build validation. M1-216 passes 114 local browser checks; [Host Actions](https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268430) also passes its normal suite, ASan/UBSan and Chromium browser regression, and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268427) passes. Reproduce locally with `python3 payload/gen_html.py`, `python3 tests/webui_preview.py`, `playwright-cli open about:blank --browser msedge`, and `playwright-cli run-code --filename tests/webui_remap_browser.js`; see `docs/WEBUI_REMAP.md`. Actual portal H-09 must include front/back hotspots, live highlighting, authentication and persisted profile reload on the PS5. Keep the first-release gate blocked until real hardware records replace the owner-reported placeholders and pass H-01/H-02/H-03/H-04/H-05/H-09/H-12. Do not update the console, deploy the payload, or claim FW 12.00 compatibility without actual device/runtime evidence.
 
 ## Active P1 image remapping update (M1-214)
 
@@ -52,3 +52,12 @@ Paired Steam Controller / DualSense artwork UI is implemented and locally verifi
 ### Latest source Actions (M1-215)
 
 Source `4065ff41d51b86fdf3a60f972f72b2b24855c647`: [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/38061016300) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38061016345) both PASS. Temporary `ghost-control-ps5-cross-build` artifact ID 11673116887, ZIP SHA-256 `bf4acba960df78e5baa70c46a17dcaa2d7b0824ceeed33cb0dedb192c8d951ca`, expires 2027-01-08T14:47:32Z. The ELF is available via that run's artifact, not as a Release. Target runtime/firmware remains unverified.
+
+
+## Active Remap UX follow-up (M1-216)
+
+DualSense screenshot calibration and the attached Shift/import/output-picker audit were addressed and published as `408900592f50b1eb39b0003c357c95a137410f2f`. Both views map L1/R1 to upper shoulders and L2/R2 to lower triggers; △/○ are aligned. Shift, `NONE`, Merge import, direct output staging, grouped actions, glyph labels and coarse-pointer targets are covered by eight portable tests and 114 local browser checks. Full normal and ASan/UBSan suites pass; SDK v0.43 build ELF SHA-256 `3f19ca8a85af5583840ccc9542aa91796740b6b166d6ae553723e7b588565fbf`. Host/Chromium Actions `38067268430` and cross-build Actions `38067268427` pass. Source publication was a verified no-delete 23-path fast-forward. Hardware remains untested. See ADR-049/F097/F098/P1-REMAP-UX-01/M1-216/M1-217 and `docs/WEBUI_REMAP.md`.
+
+## Exact next action
+
+Run H-09 on an actual PS5 using its measured firmware, including image rendering/hotspots, live button highlighting, authenticated portal, and profile save/reload. Preserve all other hardware rows as NOT_RUN until their specified setups are available. Do not deploy or claim PS5 FW 12.00 compatibility before that evidence.

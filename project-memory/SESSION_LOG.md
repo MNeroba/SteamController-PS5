@@ -919,3 +919,12 @@ Calibrated DualSense front/back shoulder/trigger regions and front △/○ cente
 Local validation passed: eight portable cases, `make -C tests clean test`, `make -C tests clean sanitize`, Playwright CLI 0.1.22 / Edge 152.0.4191.53 loopback fixture (114 checks), and SDK v0.43 clean build. ELF SHA-256 `3f19ca8a85af5583840ccc9542aa91796740b6b166d6ae553723e7b588565fbf`. The 14px touch boundary had a reproduced rounding miss (14.57px); 16px passes. A duplicate fixture startup found the already-running loopback server; that in-memory server was used. No physical console, controller, Puck, radio/HCI, deployment, firmware write, Release or PR was used.
 
 Next action: final `git diff --check`, validate workflow and allowlist, publish only the Remap UX/docs/tests/memory paths as a non-forced fast-forward on the reviewed main SHA, read back the complete tree and every blob hash, then inspect Host/browser and PS5 cross-build Actions. Hardware H-09 and FW 12.00 compatibility remain unverified.
+
+
+## Publication finalization — 2026-10-10: Remap UX on main (M1-217)
+
+Published the 23-path reviewed overlay at `408900592f50b1eb39b0003c357c95a137410f2f` as a direct, expected-head, non-force fast-forward to main. The commit parent is `78cc6f027e7a43a805d47e7bc3183e4274ee5dba`; tree `3fbd9e72cd5ffed4180112a28b0cf03dd3793404`. Full recursive tree comparison retained all 249 entries/233 blobs, matched all 23 local blob SHAs, and found no additions or removals. No unrelated inherited dirty paths were staged or published.
+
+GitHub Host/Chromium/normal/ASan-UBSan run `38067268430` and PS5 cross-build `38067268427` both PASS. The cross-build uploaded temporary artifact `11676095033` (SHA-256 `85add35acff842f0bee8670b7fa66ee949346409459c322fcdbfc3e5446025f1`; expires 2027-01-08T16:20:34Z). Local Edge fixture also passes 114 checks; final SDK ELF SHA-256 is `3f19ca8a85af5583840ccc9542aa91796740b6b166d6ae553723e7b588565fbf`.
+
+Next action: only physical H-09 and other hardware gates remain for this UI. Run on an actual PS5 with measured FW and controller/Puck as the TEST_PLAN requires; until then keep FW 12.00 compatibility and all hardware rows unverified.
