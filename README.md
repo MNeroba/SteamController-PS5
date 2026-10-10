@@ -31,6 +31,8 @@ SteamController-PS5 is a focused payload project for carrying Steam Controller i
 
 Evidence labels used in the project: `VERIFIED_CODE`, `VERIFIED_HOST_TEST`, `VERIFIED_PS5_BUILD`, `VERIFIED_HARDWARE`, `UPSTREAM_CLAIM`, `EXTERNAL_HARDWARE`, `HYPOTHESIS`, and `BLOCKED`. A cross-build is not a runtime or hardware test. See the [test plan](docs/TEST_PLAN.md) and [hardware matrix](project-memory/HARDWARE_MATRIX.md) for detail.
 
+For a per-feature view of what exists in source, what has host coverage, and what still needs console evidence, see [Steam Controller feature status](STEAM_CONTROLLER_2026.md).
+
 ## Default runtime safety mode
 
 At startup, the payload reads the optional local file
@@ -49,6 +51,12 @@ published only after the required hardware rows H-01, H-02, H-03, H-04, H-05,
 H-09, and H-12 are recorded as `VERIFIED_HARDWARE` with concrete test-log
 evidence. The current matrix is blocked, so this repository has no verified
 release binary.
+
+The [PS5 cross-build workflow](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml)
+also uploads a temporary Actions artifact named `ghost-control-ps5-cross-build`
+containing the ELF and its SHA-256 file. Download it from the latest successful
+workflow run. Actions artifacts expire under GitHub's retention policy and are
+build outputs only; they are not Releases or evidence of PS5 runtime support.
 
 Optional services require explicit local configuration, one setting per line:
 
@@ -147,6 +155,7 @@ If the payload starts and its portal is available, it listens at `http://<PS5-IP
 | [`payload/`](payload/) | Payload, PS5 adapter, Steam protocol/mapping modules, portal and web assets |
 | [`tests/`](tests/) | Portable tests, host SDK stubs, and sanitizer targets |
 | [`docs/`](docs/) | Architecture, source evidence, build, licensing, BLE gates, and test plan |
+| [`STEAM_CONTROLLER_2026.md`](STEAM_CONTROLLER_2026.md) | Per-feature implementation and evidence status; not an installation guide |
 | [`project-memory/`](project-memory/) | Append-only findings, decisions, issues, test/session logs, and hardware matrix |
 | [`CODEX_TASK.md`](CODEX_TASK.md) | Full development specification and milestones |
 | [`AGENTS.md`](AGENTS.md) | Repository workflow, safety, provenance, and evidence requirements |

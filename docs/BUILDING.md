@@ -64,3 +64,17 @@ On 2026-10-08, after strict validation of `bNumInterfaces`, per-interface/altern
 ## M1-198 fixed standard USB descriptor lengths
 
 On 2026-10-08, after requiring standard configuration/interface/endpoint descriptor lengths of 9/9/7 bytes, the pinned SDK v0.43 / LLVM 18.1.8 cross-build succeeded on Darwin 27.0.1 arm64. The output payload/ghost-control-ps5.elf is an ELF64 x86-64 shared object with SHA-256 362d584f60d26a0206a983c55980ebe7083f4c05fc9bd7adf9b878839a49fa1c; llvm-readobj reports the expected PS5 SDK libraries. This confirms compilation and linking only. No USB ioctl, Steam Controller, Puck, console, or firmware behavior was exercised; see M1-198 in project-memory/TEST_LOG.md. M1-198 was published to main at commit e84f792fb37c47a332f4b914b25fbd74640b7cf0 (tree dfb72ab1b4dad7f3aac9d8bdbd672f9deaa0385a); GitHub confirms all 196 blobs across 209 entries.
+
+## Current reproducible build and Actions artifact
+
+The current source snapshot on `main` is commit `0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79`. GitHub Actions Host tests (`37986069382`) and PS5 cross-build (`37986069353`) both completed successfully for that commit. The cross-build run uploaded the temporary artifact `ghost-control-ps5-cross-build`, containing `ghost-control-ps5.elf` and its `.sha256` file. Open the [PS5 cross-build workflow](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) and download the artifact from the latest successful run. Artifacts expire under repository retention settings; they are not Releases and do not prove that the ELF loads or works on a PS5.
+
+An independent local rebuild of the same 218-blob source tree passed on 2026-10-10 with macOS 27.0.1 arm64, Apple clang 21.0.0, Homebrew LLVM 18.1.8, and SDK v0.43. The cached SDK archive matched the documented SHA-256 `a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb`. Commands: `make -C tests clean test`, `make -C tests clean sanitize`, `make -C payload clean`, and `make -C payload`; all passed. The locally produced ELF SHA-256 is `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`; `llvm-readobj` reports `libSceLibcInternal.sprx`, `libSceNet.sprx`, `libScePad.sprx`, `libSceSystemService.sprx`, `libSceUserService.sprx`, and `libkernel_web.sprx`. This is host-test and compile/link evidence only. No PS5 runtime or hardware test was performed.
+
+## Final no-console verification — 2026-10-10
+
+The exact 218-blob source snapshot at main commit 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79 passed both GitHub Actions workflows: [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/37986069382) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/37986069353). Local make -C tests clean test and make -C tests clean sanitize also passed.
+
+For the local SDK build, export both variables before invoking Make. On the recorded macOS setup, set LLVM_CONFIG to $(brew --prefix llvm@18)/bin/llvm-config and PS5_PAYLOAD_SDK to $PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk, then run make -C payload clean followed by make -C payload.
+
+This run produced ELF SHA-256 b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7 and linked against the six libraries listed above. It confirms compilation/linking only. No payload deployment, console loading, USB/Puck operation, firmware compatibility or runtime behavior was tested. The required hardware rows remain blocked; the CI artifact is temporary and is not a release.
