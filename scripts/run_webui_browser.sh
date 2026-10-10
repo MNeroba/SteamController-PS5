@@ -21,5 +21,9 @@ for attempt in $(seq 1 30); do
 done
 curl --fail --silent http://127.0.0.1:8765/ >/dev/null
 playwright-cli --session steamcontroller-regression open about:blank --config tests/playwright-cli.json
-playwright-cli --session steamcontroller-regression --json run-code --filename tests/webui_remap_browser.js > "$log_dir/browser.json"
+if ! playwright-cli --session steamcontroller-regression --json run-code --filename tests/webui_remap_browser.js > "$log_dir/browser.json" 2>&1; then
+  cat "$log_dir/browser.json"
+  cat "$log_dir/preview.log"
+  exit 1
+fi
 python3 scripts/check_browser_result.py "$log_dir/browser.json"

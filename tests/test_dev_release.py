@@ -68,6 +68,7 @@ class DevRelease(unittest.TestCase):
         self.assertEqual(config['browser']['browserName'], 'chromium')
         self.assertEqual(config['browser']['launchOptions']['channel'], 'chromium')
         self.assertIn('--config tests/playwright-cli.json', (ROOT / 'scripts/run_webui_browser.sh').read_text())
+        self.assertIn('cat "$log_dir/browser.json"', (ROOT / 'scripts/run_webui_browser.sh').read_text())
         validate_browser({'result': 'PASS', 'checks': 181})
         validate_browser({'output': json.dumps({'result': 'PASS', 'checks': 181})})
         for value in [{}, {'result': 'FAIL', 'checks': 181},

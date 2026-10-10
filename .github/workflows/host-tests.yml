@@ -24,3 +24,12 @@ jobs:
         run: make -C tests sanitize
       - name: Run remap browser regression
         run: bash scripts/run_webui_browser.sh
+      - name: Preserve browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: SteamController-PS5-browser-evidence
+          path: |
+            output/playwright/
+            .playwright-cli/
+          if-no-files-found: warn
