@@ -73,7 +73,9 @@ An independent local rebuild of the same 218-blob source tree passed on 2026-10-
 
 ## Final no-console verification — 2026-10-10
 
-The exact 218-blob source snapshot at main commit 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79 passed both GitHub Actions workflows: [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/37986069382) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/37986069353). Local make -C tests clean test and make -C tests clean sanitize also passed.
+The source code snapshot is unchanged from main source commit 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79; the documentation and memory finalization is published at d2107fe1b0719e5878d468b0f0120580ce4f8a1e. GitHub Actions passed on that published commit: [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/38047541353) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38047541326). The cross-build uploaded artifact ghost-control-ps5-cross-build (artifact ID 11668855395, ZIP SHA-256 24004f11c987e8b89d1a4b379dcfab51484bde88179b72e7de231e9b93a9fc67), available until 2027-01-08. Download it from the PS5 cross-build workflow run; it is a temporary build output, not a release or hardware proof.
+
+Local make -C tests clean test and make -C tests clean sanitize also passed. The exact source tree has 218 blobs and its recursive GitHub tree is not truncated.
 
 For the local SDK build, export both variables before invoking Make. On the recorded macOS setup, set LLVM_CONFIG to $(brew --prefix llvm@18)/bin/llvm-config and PS5_PAYLOAD_SDK to $PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk, then run make -C payload clean followed by make -C payload.
 

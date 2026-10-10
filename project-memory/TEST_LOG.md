@@ -783,3 +783,11 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - GitHub Actions on source main 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79: Host tests 37986069382 PASS and PS5 cross-build 37986069353 PASS. Cross-build artifact is temporary; it is not a release or hardware result.
 - python3 scripts/check_release_gate.py exits nonzero by design because H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain unverified. No physical PS5, controller, DualSense or Puck test, deploy, active Bluetooth/HCI, firmware/system write, or Release was performed.
 - Final README/build/status/contribution docs and this project memory are prepared for direct-main publication. Final diff/links/secrets checks and exact GitHub tree comparison must pass before updating main. The Actions results above are for source commit 0b00c98, not the later documentation-only commit.
+
+
+### M1-210 — Documentation publication and Actions confirmation — 2026-10-10
+
+- Published the readiness/README/memory finalization directly to main as d2107fe1b0719e5878d468b0f0120580ce4f8a1e, parent 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79, tree fb5d06aa2357346ada46c64da5078f19ae0d6f64. The acknowledged recursive tree is complete: 232 entries / 218 blobs, truncated=false; no entries were added or removed, and only the 11 intended documentation/memory blobs changed.
+- GitHub Host tests run 38047541353 — PASS; host-tests job and its portable host/sanitizer step succeeded. GitHub PS5 cross-build run 38047541326 — PASS; build and cross-build artifact upload steps succeeded.
+- GitHub artifact ghost-control-ps5-cross-build, ID 11668855395, size 621,602 bytes, ZIP SHA-256 24004f11c987e8b89d1a4b379dcfab51484bde88179b72e7de231e9b93a9fc67, expires 2027-01-08T11:11:39Z. This is a temporary build artifact, not a verified release or console test.
+- Repository main now includes complete source, current feature/build/contribution docs and reconciled project memory. No PR or Release was created. The release-gate command still correctly fails closed because H-01/H-02/H-03/H-04/H-05/H-09/H-12 have no hardware evidence. No physical device, deployment, Bluetooth operation, or firmware/system write was used.

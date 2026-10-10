@@ -861,3 +861,11 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Re-ran the full normal suite and ASan/UBSan suite: PASS. Rebuilt payload with SDK v0.43 and Homebrew LLVM 18.1.8 after explicitly exporting LLVM_CONFIG and PS5_PAYLOAD_SDK: PASS; ELF SHA-256 b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7.
 - Updated the current-state summary and P0/P2 issue statuses; appended test, session, finding and architecture decision entries. Prepared public README feature/build/install guidance, feature evidence matrix, build/CI artifact note, and continuation instructions. Direct-main publication and full-tree post-write verification remain the next steps in this session.
 - Hardware-dependent gates remain blocked as requested: no PS5/controller/Puck test, no deploy, no BLE/HCI or firmware/system write, and no Release. The automated release gate correctly refuses publication until H-01/H-02/H-03/H-04/H-05/H-09/H-12 evidence exists.
+
+
+### M1-210 — Publish and verify no-console finalization — 2026-10-10
+
+- Published 11 reviewed README/status/build/test-plan/project-memory files directly to main in d2107fe1b0719e5878d468b0f0120580ce4f8a1e. The commit is a fast-forward child of 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. Full recursive tree verification retained all 218 blobs/232 entries, with exactly the selected 11 blobs updated and zero additions/deletions.
+- Both workflows on the published commit completed successfully: Host 38047541353; PS5 cross-build 38047541326. Verified upload artifact ID 11668855395 and its SHA-256/expiry.
+- Refined issue statuses to distinguish host fixes from target-unverified integration. The release gate remains blocked exactly on required real-hardware rows.
+- Final state: software source is host-tested and cross-buildable; there is no verified PS5 runtime/release. No console deployment or active Bluetooth operation was performed. Next meaningful validation requires the development hardware named in PROJECT_MEMORY.md and the H-01–H-12 matrix.

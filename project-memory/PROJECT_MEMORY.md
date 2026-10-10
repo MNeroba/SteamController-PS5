@@ -1,8 +1,8 @@
 # Project memory — current status
 
-**Snapshot:** 2026-10-10 11:05 UTC.
+**Snapshot:** 2026-10-10 11:16 UTC.
 **Repository:** private GitHub repository MNeroba/SteamController-PS5; default branch main.
-**Published source at start of this finalization:** 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79 (tree bf562fc961c1288ae8df5a79afc1942c157c37fb).
+**Latest source commit:** 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. **Last CI-verified docs publication:** d2107fe1b0719e5878d468b0f0120580ce4f8a1e (tree fb5d06aa2357346ada46c64da5078f19ae0d6f64). The current memory synchronization is a documentation-only descendant and preserves the full source tree.
 
 ## Current readiness
 
@@ -11,11 +11,11 @@
 - M1–M3 portable protocol, USB/session, mapping, motion/touch, profile, feedback, haptics, slot, lifecycle, and portal modules have broad host coverage; USB/Puck enumeration, gameplay, real haptics, and controller behavior remain unverified.
 - Native PS5 BLE is research-only. No active HCI/radio operation was performed. Edge/ShellUI identity and multiple SC2 sessions are not supported features.
 - No PS5, Steam Controller, Puck, or DualSense hardware test has been performed. The release gate correctly blocks on H-01/H-02/H-03/H-04/H-05/H-09/H-12. No Release or installer is published. The Actions ELF artifact is temporary and is not a verified runtime binary.
-- The latest published main source tree has 232 recursive entries / 218 blobs, not truncated; the local candidate file blobs were previously compared against all 218 main entries. The desktop checkout is an older dirty overlay (branch fix/p0-safety at 78460113ef7c48502c765a1f83ba34d53c977134). Never reset it or publish its entire working tree; publish only explicitly reviewed paths on top of the current GitHub main tree with an expected-head, fast-forward update.
+- The published main tree has 232 recursive entries / 218 blobs, not truncated; the local candidate file blobs were previously compared against all 218 main entries. The desktop checkout is an older dirty overlay (branch fix/p0-safety at 78460113ef7c48502c765a1f83ba34d53c977134). Never reset it or publish its entire working tree; publish only explicitly reviewed paths on top of the current GitHub main tree with an expected-head, fast-forward update.
 
 ## Verification evidence
 
-- GitHub Actions on source commit 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79: Host tests run 37986069382 PASS; PS5 cross-build run 37986069353 PASS.
+- GitHub Actions on finalization commit d2107fe1b0719e5878d468b0f0120580ce4f8a1e: Host tests run 38047541353 PASS; PS5 cross-build run 38047541326 PASS. Cross-build artifact 11668855395 (ZIP SHA-256 24004f11c987e8b89d1a4b379dcfab51484bde88179b72e7de231e9b93a9fc67) expires 2027-01-08; it is not a release.
 - Local strict-C11 host suite: make -C tests clean test PASS.
 - Local AddressSanitizer/UndefinedBehaviorSanitizer suite: make -C tests clean sanitize PASS.
 - Local PS5 SDK v0.43 / LLVM 18.1.8 cross-build: PASS when LLVM_CONFIG and PS5_PAYLOAD_SDK are explicitly exported. ELF SHA-256 b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7. Dependencies include libSceLibcInternal.sprx, libSceNet.sprx, libScePad.sprx, libSceSystemService.sprx, libSceUserService.sprx, and libkernel_web.sprx.
