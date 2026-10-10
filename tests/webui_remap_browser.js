@@ -183,7 +183,7 @@ async (page) => {
   await view('steam','front');
   await source('A').click();await page.locator('#sheet.show').waitFor();
   const outputGroups=await page.locator('#pick .pick-group h4').allTextContents();
-  check(outputGroups.join('|')==='Face buttons|D-pad|Shoulders & triggers|Sticks|System|Touchpad|Puckbridge actions','output actions grouped by function');
+  check(outputGroups.join('|')==='Face buttons|D-pad|Shoulders & triggers|Sticks|System|Touchpad|SteamController-PS5 actions','output actions grouped by function');
   check((await picker('CROSS').innerText()).trim()==='✕'&&await picker('CROSS').getAttribute('aria-label')==='Cross (✕)','face labels use symbols visually and descriptive accessible names');
   await page.locator('#cancel').click();
   check((await page.locator('#dualHint').textContent()).includes('A selected'),'DualSense instructions follow the selected Steam input');
@@ -313,7 +313,7 @@ async (page) => {
     await touchPage.waitForFunction(()=>document.querySelector('#sheetScrollHint').textContent.includes('below'));
     check(await touchPage.locator('#sheetScrollHint').isVisible()&&(await touchPage.locator('#sheetScrollHint').textContent()).includes('below'),'mobile editor indicates more output groups below');
     await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').scrollIntoViewIfNeeded();
-    check(await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').isVisible(),'last Puckbridge action reachable in mobile dialog');
+    check(await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').isVisible(),'last internal action reachable in mobile dialog');
     await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').tap();
     check(await touchPage.evaluate(()=>draft[''].has('PB_GYRO_TOGGLE')),'last mobile output action selectable');
     await touchPage.locator('#pick .g-CROSS').tap();await touchPage.locator('#cancel').tap();

@@ -1,0 +1,9 @@
+{
+  "schema": 1,
+  "channel": "experimental-dev",
+  "target_firmware": "12.00",
+  "firmware_verified": false,
+  "sdk": "v0.43",
+  "critical_code_blockers": [],
+  "review": "Host code defects resolved through M1-220; hardware-dependent risks remain in ISSUES.md and HARDWARE_MATRIX.md. This is an experimental build authorization, not hardware clearance."
+}

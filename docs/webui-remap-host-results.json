@@ -156,10 +156,10 @@
     "touch browser exposes coarse-pointer targets",
     "touch tap opens production editor",
     "mobile editor indicates more output groups below",
-    "last Puckbridge action reachable in mobile dialog",
+    "last internal action reachable in mobile dialog",
     "last mobile output action selectable",
     "touch Cancel retains assignment",
-    "enlarged touch target stages a nearby DualSense output {\"coarse\":true,\"selectedKey\":\"A\",\"sheetKey\":\"A\",\"act\":\"\",\"circleStaged\":true,\"rect\":{\"x\":302.50238037109375,\"y\":659.1436157226562,\"width\":20.925048828125,\"height\":20.925048828125,\"top\":659.1436157226562,\"right\":323.42742919921875,\"bottom\":680.0686645507812,\"left\":302.50238037109375}}",
+    "enlarged touch target stages a nearby DualSense output {\"coarse\":true,\"selectedKey\":\"A\",\"sheetKey\":\"A\",\"act\":\"\",\"circleStaged\":true,\"rect\":{\"x\":302.50238037109375,\"y\":659.5029907226562,\"width\":20.925048828125,\"height\":20.925048828125,\"top\":659.5029907226562,\"right\":323.42742919921875,\"bottom\":680.4280395507812,\"left\":302.50238037109375}}",
     "touch back grip maps physical left input",
     "Games navigation still works",
     "Settings navigation still works",
@@ -218,5 +218,8 @@
       "ih": 1254
     }
   ],
-  "hardware": "NOT_RUN; loopback fixture only"
+  "hardware": "NOT_RUN",
+  "environment": "macOS27.0.1 arm64; Chromium155.0.8059.12; Node24.11.0; PlaywrightCLI0.1.22",
+  "evidence": "M1-222; fresh source export; loopback RAM fixture with production C profile parser/formatter; no PS5",
+  "firmware": "NOT_MEASURED; intended12.00"
 }

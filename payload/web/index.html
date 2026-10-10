@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="color-scheme" content="dark">
-<title>PuckbridgePS5</title>
+<title>SteamController-PS5</title>
 <style>
 
 :root{
@@ -326,7 +326,7 @@ dialog.profile-guard::backdrop{background:#0009}
 <body>
 <header>
   <div class="wrap head">
-    <div class="brand">PuckbridgePS5<small>Steam Controller for PS5</small></div>
+    <div class="brand">SteamController-PS5<small>Steam Controller for PS5</small></div>
     <nav class="tabs" role="tablist" aria-label="Pages">
       <button role="tab" aria-selected="true" data-tab="remap">Remap</button>
       <button role="tab" aria-selected="false" data-tab="games">Games</button>
@@ -479,7 +479,7 @@ dialog.profile-guard::backdrop{background:#0009}
         <div class="body"><div class="btns"><button class="primary" id="ghRec">Use recommended settings</button></div></div>
       </section>
       <section class="sec card" data-sec="pause" id="sec-pause">
-        <div class="ch"><div><h3>Pause Puckbridge</h3><p>Hold the Steam Controller's <kbd>…</kbd> button for 5 seconds, anywhere (in a game or on the home screen), to pause Puckbridge: the Steam Controller stops sending input and your DualSense works exactly as normal. Hold it for 5 seconds again to resume. The controller gives a long buzz when pausing and a short one when resuming.</p></div></div>
+        <div class="ch"><div><h3>Pause SteamController-PS5</h3><p>Hold the Steam Controller's <kbd>…</kbd> button for 5 seconds, anywhere (in a game or on the home screen), to pause SteamController-PS5: the Steam Controller stops sending input and your DualSense works exactly as normal. Hold it for 5 seconds again to resume. The controller gives a long buzz when pausing and a short one when resuming.</p></div></div>
         <div class="body"><div class="btns"><button id="pauseBtn">Pause now</button></div></div>
       </section>
       <section class="sec card" data-sec="handoff" id="sec-handoff">
@@ -510,7 +510,7 @@ dialog.profile-guard::backdrop{background:#0009}
       <section class="sec card" data-sec="menu" id="sec-menu">
         <div class="ch"><div><h3>Menu on the console</h3><p>Switch profiles or remap a button without leaving the game. Messages appear as PS5 notifications.</p></div></div>
         <div class="body"><ol>
-          <li>Bind <b>Puckbridge menu</b> to any button or activator (for example View → Long press). Press it to open or close.</li>
+          <li>Bind <b>SteamController-PS5 menu</b> to any button or activator (for example View → Long press). Press it to open or close.</li>
           <li><b>D-pad up/down</b> chooses, <b>left/right</b> changes profile, <b>A</b> selects, <b>B</b> closes.</li>
           <li>To remap: pick <b>Remap a button</b>, press the button to change, then press the button it should act as. It saves to the current game's profile.</li>
         </ol></div>
@@ -564,14 +564,14 @@ const GROUPS=[["Face buttons",["A","B","X","Y"]],["Shoulders and triggers",["LB"
  ["Sticks and d-pad",["L3","R3","DUP","DDOWN","DLEFT","DRIGHT"]],["System",["VIEW","MENU","STEAM","QAM"]],
  ["Back grips",["L4","L5","R4","R5"]],["Trackpad clicks",["LPAD_CLICK","RPAD_CLICK"]]];
 const BITS=["A","B","X","Y","LB","RB","LT","RT","L3","R3","DUP","DDOWN","DLEFT","DRIGHT","VIEW","MENU","STEAM","QAM","L4","L5","R4","R5","LPAD_CLICK","RPAD_CLICK"];
-const OUTS=[["CROSS","Cross"],["CIRCLE","Circle"],["SQUARE","Square"],["TRIANGLE","Triangle"],["L1","L1"],["R1","R1"],["L2","L2"],["R2","R2"],["L3","L3"],["R3","R3"],["UP","Up"],["DOWN","Down"],["LEFT","Left"],["RIGHT","Right"],["OPTIONS","Options"],["CREATE","Create"],["PS","PS"],["TOUCHPAD","Touchpad"],["PB_MENU","Puckbridge menu"],["PB_GYRO_ON","Gyro on (hold)"],["PB_GYRO_OFF","Gyro off (hold)"],["PB_GYRO_TOGGLE","Gyro on/off"]];
+const OUTS=[["CROSS","Cross"],["CIRCLE","Circle"],["SQUARE","Square"],["TRIANGLE","Triangle"],["L1","L1"],["R1","R1"],["L2","L2"],["R2","R2"],["L3","L3"],["R3","R3"],["UP","Up"],["DOWN","Down"],["LEFT","Left"],["RIGHT","Right"],["OPTIONS","Options"],["CREATE","Create"],["PS","PS"],["TOUCHPAD","Touchpad"],["PB_MENU","SteamController-PS5 menu"],["PB_GYRO_ON","Gyro on (hold)"],["PB_GYRO_OFF","Gyro off (hold)"],["PB_GYRO_TOGGLE","Gyro on/off"]];
 const OUTNAME=Object.fromEntries(OUTS);
-const OUTPUT_GROUPS=[["Face buttons",["CROSS","CIRCLE","SQUARE","TRIANGLE"]],["D-pad",["UP","DOWN","LEFT","RIGHT"]],["Shoulders & triggers",["L1","R1","L2","R2"]],["Sticks",["L3","R3"]],["System",["CREATE","OPTIONS","PS"]],["Touchpad",["TOUCHPAD"]],["Puckbridge actions",["PB_MENU","PB_GYRO_ON","PB_GYRO_OFF","PB_GYRO_TOGGLE"]]];
+const OUTPUT_GROUPS=[["Face buttons",["CROSS","CIRCLE","SQUARE","TRIANGLE"]],["D-pad",["UP","DOWN","LEFT","RIGHT"]],["Shoulders & triggers",["L1","R1","L2","R2"]],["Sticks",["L3","R3"]],["System",["CREATE","OPTIONS","PS"]],["Touchpad",["TOUCHPAD"]],["SteamController-PS5 actions",["PB_MENU","PB_GYRO_ON","PB_GYRO_OFF","PB_GYRO_TOGGLE"]]];
 /* button icons: inlined by gen_html.py from web/icons (CC0, see web/icons/LICENSE.txt) */
 const ICON=/*__ICONS__*/{};
 function ic(key,cls){const u=ICON[key];return u?`<img class="${cls||"ic"}" src="${u}" alt="" aria-hidden="true">`:""}
 const DEFAULTS={A:"CROSS",B:"CIRCLE",X:"SQUARE",Y:"TRIANGLE",LB:"L1",RB:"R1",LT:"L2",RT:"R2",L3:"L3",R3:"R3",DUP:"UP",DDOWN:"DOWN",DLEFT:"LEFT",DRIGHT:"RIGHT",VIEW:"CREATE",MENU:"OPTIONS",STEAM:"PS",QAM:"NONE",L4:"L3",L5:"L1+R1",R4:"R3",R5:"L3+R3",LPAD_CLICK:"TOUCHPAD",RPAD_CLICK:"TOUCHPAD"};
-const RESERVED="QAM", RESERVED_TXT="Reserved: hold 5 s to pause or resume Puckbridge";
+const RESERVED="QAM", RESERVED_TXT="Reserved: hold 5 s to pause or resume SteamController-PS5";
 const PADS=[["OFF","Off"],["TOUCH","Touchpad"],["STICK","Stick"],["DPAD","D-pad"]];
 const GAXES=[["YAW","Turning"],["ROLL","Tilting"]];
 const RSTICKS=[["NORMAL","Normal"],["FLICK","Flick stick"]];
@@ -919,7 +919,7 @@ const ACTS=[["","Press","Sends these while held. Pick several for a combo."],
 let draft={},act="",sheetAddOutput=null;
 function actsFor(k){return ACTS.filter(a=>a[0]!==".full"||k==="LT"||k==="RT").filter(a=>a[0]!==".shift"||cur.SHIFT&&cur.SHIFT!=="NONE"&&cur.SHIFT!==k)}
 function openSheet(k,options={}){
-  if(k===RESERVED){showCaption(k);toast("… is reserved: hold it for 5 seconds to pause or resume Puckbridge");return}
+  if(k===RESERVED){showCaption(k);toast("… is reserved: hold it for 5 seconds to pause or resume SteamController-PS5");return}
   selectedKey=k;
   if(cur.SHIFT===k){sheetKey=null;paintPad();showCaption(k);toast(LABEL[k]+" is the Shift modifier; choose another Shift button before editing its output.");return}
   sheetReturnFocus=document.activeElement;sheetKey=k;sheetAddOutput=options.addOutput||null;$("#sheetT").innerHTML=ic("s_"+k)+esc(LABEL[k]);
@@ -1081,7 +1081,7 @@ $("#revert").onclick=()=>{cur=parse(saved);render();toast("Changes undone")};
 $("#exp").onclick=()=>{
   const name=(cur.name||editing).replace(/[^\w .()-]+/g,"_").trim()||"profile";
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([fmt(cur)],{type:"text/plain"}));
-  a.download=`Puckbridge - ${name}.ini`;document.body.appendChild(a);a.click();a.remove();
+  a.download=`SteamController-PS5 - ${name}.ini`;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   toast(isDirty()?"Exported, including unsaved changes":"Exported");
 };
@@ -1101,7 +1101,7 @@ $("#impFile").onchange=async e=>{
   if(f.size>32768){toast("That file is too big to be a profile");return}
   try{
     const p=parse(await f.text()),next=mergeImportedProfile(cur,p);
-    if(!BITS.some(k=>Object.hasOwn(p,k))){toast("That doesn't look like a Puckbridge profile");return}
+    if(!BITS.some(k=>Object.hasOwn(p,k))){toast("That doesn't look like a SteamController-PS5 profile");return}
     if(!confirm("Merge settings from "+f.name+" into \""+pname(editing)+"\"? Values present in the file replace current values; omitted settings stay unchanged. An empty or NONE activator clears only that activator. Review, then Save."))return;
     cur=next;render();dirty();toast("Merged. Check the profile, then Save");
   }catch(error){toast("Import rejected: "+error.message)}

@@ -12,6 +12,10 @@ TESTS := $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_
 
 all: test
 
+WEB_ASSETS := $(wildcard ../payload/web/icons/*.png ../payload/web/controllers/*.webp) ../payload/web/controllers/layouts.json
+../payload/webui_html.h: ../payload/web/index.html ../payload/gen_html.py $(WEB_ASSETS)
+	python3 ../payload/gen_html.py
+
 browser-fixture: $(BUILD)/webui_profile_fixture
 
 $(BUILD)/webui_profile_fixture: webui_profile_fixture.c ../payload/sc2_profile.c ../payload/runtime_control.c | $(BUILD)
@@ -63,6 +67,7 @@ test: $(TESTS)
 	python3 test_release_gate.py
 	python3 test_pid_file_contract.py
 	python3 test_webui_controllers.py
+	python3 test_dev_release.py
 
 sanitize:
 	$(MAKE) clean

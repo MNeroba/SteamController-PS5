@@ -92,3 +92,9 @@ P0-REMAP-IMPORT-01 / P1-REMAP-EDGE-01 publication: FIXED — HOST/BROWSER/BUILD 
 - P1-PROFILE-NAV-01: FIXED_HOST_BROWSER — Save/Discard/Cancel, no orphan on Cancel, stale response/draft/editor protection, Delete/Create/Back/Forward and canonical readback. Physical portal H-09 NOT_RUN.
 - P2-LONG-MODIFIERS-01: FIXED_HOST — supported Long Turbo/Toggle semantics are documented and tested; ordinary Toggle precedence retained.
 - P2-HTTP-DELIVERY-01: FIXED_HOST — actual embedded page under short writes/EINTR/EAGAIN and deterministic timeout/disconnect; failure logging/SIGPIPE guards. Actual FW 12.00 throughput, browser/dialog support and socket behavior BLOCKED_HARDWARE.
+
+## Consolidation and DEV channel (2026-10-10)
+
+- P2-BUILD-GENERATED-01: FIXED_HOST — fresh host tree without tracked webui_html.h previously failed; both Makefiles now regenerate it, clean export Host/ASan-UBSan/SDK/browser pass. No source/asset deletion.
+- P2-PUBLISH-ACCESS-01: BLOCKED_ACCESS — connector cannot workflow_dispatch or modify repository description; Edge permission rejected, in-app GitHub signed out. Experimental workflow/notes are ready; owner login/manual dispatch needed. Suggested description: Steam Controller 2026 experimental PS5 payload: USB-C/Puck, remapping, motion/touch/haptics; FW12.00 unverified.
+- DEV review: no remaining reproducible unfixed critical host-code defect identified in this consolidation. Existing PS5 ABI/USB/privilege/hook/filesystem risks remain hardware-dependent and unverified; stable gate stays closed. Any newly found critical code defect must enter dev-release.json before publication.

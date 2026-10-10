@@ -21,11 +21,12 @@ WEB_ASSETS := $(wildcard web/icons/*.png web/controllers/*.webp) web/controllers
 webui_html.h: web/index.html gen_html.py $(WEB_ASSETS)
 	python3 gen_html.py
 
-$(TARGET): $(SRC) webui_html.h
+HEADERS := $(wildcard *.h bridge/*.h)
+$(TARGET): $(SRC) $(HEADERS) webui_html.h
 	$(CC) $(CFLAGS) -o $@ $(SRC) $(LDFLAGS)
 
 clean:
-	rm -f $(TARGET)
+	rm -f $(TARGET) webui_html.h
 
 deploy: $(TARGET)
 	nc -w 8 $(PS5_HOST) $(PORT) < $(TARGET)

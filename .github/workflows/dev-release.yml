@@ -1,0 +1,181 @@
+name: Experimental DEV prerelease
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: Full 40-character main commit SHA with green Host and PS5 push checks
+        required: true
+        type: string
+      version:
+        description: Experimental version (v0.1.0-dev.1)
+        required: true
+        default: v0.1.0-dev.1
+        type: string
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: experimental-dev-release
+  cancel-in-progress: false
+
+jobs:
+  select-source:
+    runs-on: ubuntu-24.04
+    outputs:
+      source_sha: ${{ steps.select.outputs.source_sha }}
+      version: ${{ steps.select.outputs.version }}
+    steps:
+      - name: Require explicitly selected mainline source and successful push checks
+        id: select
+        uses: actions/github-script@v8
+        env:
+          SOURCE_SHA: ${{ inputs.source_sha }}
+          DEV_VERSION: ${{ inputs.version }}
+        with:
+          script: |
+            const sha = process.env.SOURCE_SHA;
+            const version = process.env.DEV_VERSION;
+            if (context.ref !== 'refs/heads/main') throw new Error('Run this workflow from main');
+            if (sha.length !== 40 || !/^[0-9a-f]{40}$/.test(sha)) throw new Error('Full lowercase source SHA required');
+            if (/[\r\n]/.test(version) || !/^v\d+\.\d+\.\d+-dev\.\d+$/.test(version)) throw new Error('DEV version required');
+            const repo = context.repo;
+            const { data: comparison } = await github.rest.repos.compareCommits({
+              ...repo, base: sha, head: 'main'
+            });
+            if (!['identical', 'ahead'].includes(comparison.status)) {
+              throw new Error('Source must be main or its ancestor');
+            }
+            const { data } = await github.rest.actions.listWorkflowRunsForRepo({
+              ...repo, head_sha: sha, event: 'push', per_page: 100
+            });
+            for (const path of ['.github/workflows/host-tests.yml', '.github/workflows/ps5-cross-build.yml']) {
+              const run = data.workflow_runs.filter(r => r.path === path && r.head_sha === sha)
+                .sort((a, b) => b.id - a.id)[0];
+              if (!run || run.status !== 'completed' || run.conclusion !== 'success') {
+                throw new Error(`Latest push gate not successful: ${path}`);
+              }
+            }
+            try {
+              await github.rest.git.getRef({ ...repo, ref: `tags/dev/${version}` });
+              throw new Error('DEV tag already exists; select a new version');
+            } catch (e) { if (e.status !== 404) throw e; }
+            core.setOutput('source_sha', sha);
+            core.setOutput('version', version);
+
+  validate-build:
+    needs: select-source
+    runs-on: ubuntu-24.04
+    env:
+      SDK_VERSION: v0.43
+      SDK_SHA256: a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb
+      SOURCE_SHA: ${{ needs.select-source.outputs.source_sha }}
+      DEV_VERSION: ${{ needs.select-source.outputs.version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ needs.select-source.outputs.source_sha }}
+          persist-credentials: false
+      - name: Verify exact checkout and experimental policy
+        run: |
+          test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python3 -c 'import json; from pathlib import Path; from scripts.package_dev_release import validate_policy; validate_policy(json.loads(Path("docs/development/dev-release.json").read_text()))'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned browser tooling and LLVM 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 llvm-18 unzip
+          npm install --global @playwright/cli@0.1.22
+          playwright-cli install-browser chromium --with-deps
+      - name: Verify SDK archive
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/sdk.zip" "https://github.com/ps5-payload-dev/sdk/releases/download/${SDK_VERSION}/ps5-payload-sdk.zip"
+          printf '%s  %s\n' "$SDK_SHA256" "$RUNNER_TEMP/sdk.zip" | sha256sum --check
+          unzip -q "$RUNNER_TEMP/sdk.zip" -d "$RUNNER_TEMP"
+          echo "PS5_PAYLOAD_SDK=$RUNNER_TEMP/ps5-payload-sdk" >> "$GITHUB_ENV"
+      - name: Run fresh normal host and sanitizer suites
+        run: |
+          make -C tests clean test
+          make -C tests sanitize
+      - name: Require full Chromium regression
+        run: bash scripts/run_webui_browser.sh
+      - name: Verify deterministic embedded assets and clean SDK build
+        run: |
+          python3 payload/gen_html.py
+          sha256sum payload/webui_html.h > "$RUNNER_TEMP/generated.sha256"
+          python3 payload/gen_html.py
+          sha256sum --check "$RUNNER_TEMP/generated.sha256"
+          make -C payload clean
+          make -C payload
+          sha256sum --check "$RUNNER_TEMP/generated.sha256"
+      - name: Package DEV ELF with exact source, checksum and notices
+        run: |
+          python3 scripts/package_dev_release.py --source-sha "$SOURCE_SHA" --version "$DEV_VERSION" --output release-assets
+          cd release-assets
+          sha256sum --check "SteamController-PS5-${DEV_VERSION}.elf.sha256"
+          test -s RELEASE_NOTES.md
+          test -s LOADING.md
+          test -s NOTICES.md
+          test -s LICENSE
+      - uses: actions/upload-artifact@v6
+        with:
+          name: experimental-dev-assets
+          path: release-assets/*
+          if-no-files-found: error
+      - name: Preserve browser evidence
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: experimental-dev-browser-evidence
+          path: output/playwright/
+          if-no-files-found: warn
+
+  publish-prerelease:
+    needs: [select-source, validate-build]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      SOURCE_SHA: ${{ needs.select-source.outputs.source_sha }}
+      DEV_VERSION: ${{ needs.select-source.outputs.version }}
+    steps:
+      - uses: actions/download-artifact@v6
+        with:
+          name: experimental-dev-assets
+          path: release-assets
+      - name: Recheck downloaded ELF checksum and required files
+        run: |
+          cd release-assets
+          sha256sum --check "SteamController-PS5-${DEV_VERSION}.elf.sha256"
+          for file in RELEASE_NOTES.md LOADING.md NOTICES.md LICENSE; do test -s "$file"; done
+      - name: Reject a tag created while the build was running
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const tag = 'dev/' + process.env.DEV_VERSION;
+            try {
+              await github.rest.git.getRef({ ...context.repo, ref: `tags/${tag}` });
+              throw new Error('DEV tag now exists; refusing to update an existing release');
+            } catch (e) { if (e.status !== 404) throw e; }
+      - name: Publish experimental prerelease only
+        if: success()
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: dev/${{ needs.select-source.outputs.version }}
+          target_commitish: ${{ needs.select-source.outputs.source_sha }}
+          name: SteamController-PS5 ${{ needs.select-source.outputs.version }} (experimental)
+          prerelease: true
+          make_latest: false
+          body_path: release-assets/RELEASE_NOTES.md
+          fail_on_unmatched_files: true
+          files: |
+            release-assets/SteamController-PS5-*.elf
+            release-assets/SteamController-PS5-*.elf.sha256
+            release-assets/RELEASE_NOTES.md
+            release-assets/LOADING.md
+            release-assets/NOTICES.md
+            release-assets/LICENSE

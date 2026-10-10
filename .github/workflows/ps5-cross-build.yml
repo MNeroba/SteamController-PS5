@@ -38,10 +38,15 @@ jobs:
           make
           sha256sum ghost-control-ps5.elf | tee ghost-control-ps5.elf.sha256
 
+      - name: Verify checksum
+        working-directory: payload
+        run: sha256sum --check ghost-control-ps5.elf.sha256
+
       - name: Upload cross-build artifact
         uses: actions/upload-artifact@v6
         with:
-          name: ghost-control-ps5-cross-build
+          name: SteamController-PS5-cross-build
           path: |
             payload/ghost-control-ps5.elf
             payload/ghost-control-ps5.elf.sha256
+          if-no-files-found: error
