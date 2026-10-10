@@ -29,10 +29,10 @@
 
 | ID | Source | What the evidence actually says | Not proven |
 |---|---|---|---|
-| B01 | [SharpProspero SceBluetoothHid](https://github.com/SvenGDK/SharpProspero/blob/main/src/SharpProspero/Interop/Bluetooth/SceBluetoothHid.cs) · [wrapper](https://github.com/SvenGDK/SharpProspero/blob/main/src/SharpProspero/Platform/BluetoothHid.cs) (observed commit `5dfdb4b0b166e83dc9ae275001afb695f12c7174`) | 17 reconstructed Bluetooth HID functions, privileged access to `/dev/bt`/`/dev/bluetooth_hid`; pointer layouts not fully documented | No confirmed arbitrary BLE/GAP/GATT Central API; no FW 13.60 runtime authorization |
-| B02 | [PS5-3.20_Libs export stubs](https://github.com/DNNDHH/PS5-3.20_Libs/blob/main/libSceBluetoothHid.c) | Named exports + NIDs in historical firmware stub source | Signatures and permissions on 13.60, LE support |
+| B01 | [SharpProspero SceBluetoothHid](https://github.com/SvenGDK/SharpProspero/blob/main/src/SharpProspero/Interop/Bluetooth/SceBluetoothHid.cs) · [wrapper](https://github.com/SvenGDK/SharpProspero/blob/main/src/SharpProspero/Platform/BluetoothHid.cs) (observed commit `5dfdb4b0b166e83dc9ae275001afb695f12c7174`) | 17 reconstructed Bluetooth HID functions, privileged access to `/dev/bt`/`/dev/bluetooth_hid`; pointer layouts not fully documented | No confirmed arbitrary BLE/GAP/GATT Central API; no runtime authorization on the reported FW 12.00 target |
+| B02 | [PS5-3.20_Libs export stubs](https://github.com/DNNDHH/PS5-3.20_Libs/blob/main/libSceBluetoothHid.c) | Named exports + NIDs in historical firmware stub source | Signatures and permissions on FW 12.00, LE support remain unverified |
 | B03 | [PS5 Linux patches PR #19](https://github.com/ps5-linux/ps5-linux-patches/pull/19) | **Merged 2026-06-23**, xHCI Salina and btusb fixes; PR admits unstable Bluetooth and xHCI shutdown errors | Safe ProsperoOS radio takeover or BLE GATT |
-| B04 | [PS5 Bluetooth fix](https://github.com/cZdrikjdm/ps5-dualsense-bt-fix) | Reported Marvell `1286:2059`, duplicate HCI interface under Linux and workable Bluetooth fix | Every PS5 model is same; ProsperoOS HCI ownership; BLE Central on 13.60 |
+| B04 | [PS5 Bluetooth fix](https://github.com/cZdrikjdm/ps5-dualsense-bt-fix) | Reported Marvell `1286:2059`, duplicate HCI interface under Linux and workable Bluetooth fix | Every PS5 model is same; ProsperoOS HCI ownership; BLE Central on FW 12.00 |
 | B05 | [PS5 Linux loader](https://github.com/ps5-linux/ps5-linux-loader) | Third-party Linux can use internal Bluetooth on compatible hardware | PS5 native homebrew host/GATT API |
 | B06 | [btstack-dev hardware report](https://groups.google.com/g/btstack-dev/c/N7oIyyh2Fi4) | 2025-03-09 Logitech Craft BLE-only keyboard rejected on retail PS5 with `CE-109524-1`, Classic BT keyboard worked | All BLE disabled at hardware level; diagnostic LE scan is impossible |
 | B07 | [AnyPS5 emulator shim](https://github.com/boykopovar/AnyPS5/blob/main/core/libs/prx/libSceBluetoothHid/Export.cpp) | Stub definitions mimicking Bluetooth HID exports | Actual PS5 runtime functionality (emulator stubs are not real driver evidence) |
@@ -48,8 +48,8 @@
 
 ## Missing proof ledger
 
-- `libSceBluetoothHid` exported entry points **resolved and tested on actual FW 13.60**: NOT_VERIFIED.
-- System-managed arbitrary BLE Central scan/connect/GATT on native FW 13.60: NOT_VERIFIED.
+- `libSceBluetoothHid` exported entry points **resolved and tested on the reported FW 12.00 target**: NOT_VERIFIED.
+- System-managed arbitrary BLE Central scan/connect/GATT on native FW 12.00: NOT_VERIFIED.
 - Real first LE Advertising Report from native PS5 payload without interfering with stock DualSense: NOT_VERIFIED.
 - Steam Controller 2026 connected by internal PS5 BLE and GATT notifications delivered: NOT_VERIFIED.
 - Edge virtual device with extra independent buttons visible to PS5 games: NOT_VERIFIED.

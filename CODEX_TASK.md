@@ -1,6 +1,6 @@
 # FINAL CODEX TASK — SteamController-PS5
 
-**Revision:** 1.0 · **Research cutoff:** 2026-10-08 · **Primary target:** jailbroken PS5 with ProsperoOS firmware 13.60 · **Implementation language:** portable C99 for the payload/engine, other languages only where justified for host tools and UI.
+**Revision:** 1.1 · **Research cutoff:** 2026-10-08 · **Primary target:** jailbroken PS5 with ProsperoOS firmware 12.00 (owner-reported target; compatibility unverified) · **Implementation language:** portable C99 for the payload/engine, other languages only where justified for host tools and UI.
 
 **Read first:** [`AGENTS.md`](AGENTS.md), [`docs/SOURCES_AND_EVIDENCE.md`](docs/SOURCES_AND_EVIDENCE.md), [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md), [`project-memory/PROJECT_MEMORY.md`](project-memory/PROJECT_MEMORY.md).
 
@@ -21,7 +21,7 @@ Build a maintainable standalone open-source project **SteamController-PS5**: a s
 ### Success definitions
 
 1. One ELF/payload, one input/core profile model and **one authoritative slot manager**. No second competing virtual-pad stack or bridge payload.
-2. On real firmware 13.60, Steam Controller can operate in at least one real PS5 game and console UI via **USB-C and Puck**, after explicit hardware validation. Before that, label as implementation/build only.
+2. On the owner's target firmware (currently reported as 12.00), Steam Controller can operate in at least one real PS5 game and console UI via **USB-C and Puck**, after explicit hardware validation. Record the exact installed firmware in each test; until then, label the project as implementation/build only and do not claim 12.00 compatibility.
 3. Controller-specific capabilities are never silently discarded by prematurely converting raw packets to ordinary six-axis/button state.
 4. PS5 stock DualSense stays available; all hooks have rollback and explicit feature switches.
 5. All imported and authored code has recorded provenance and compatible licensing.
@@ -171,7 +171,7 @@ Every changed module requires: stated responsibility, input/output/error contrac
 
 - Unit tests with **real source-derived/consented input fixtures** and synthetic edge cases; verify CRC/checksum where applicable, malformed length, replay, dropped/reordered packets, sign/axis conversions, report variants, per-interface routing.
 - USB/Puck smoke matrix: first connect, profile assignment, 20+ reconnect cycles (target, not claimed), suspend/resume/standby, two controllers not interfering, no hidden mouse/keyboard mode.
-- Host parser quality may be `HOST_VERIFIED`; claim `HARDWARE_VERIFIED` only after actual gameplay on FW 13.60.
+- Host parser quality may be `HOST_VERIFIED`; claim `HARDWARE_VERIFIED` only after actual gameplay on the exact firmware recorded in the hardware evidence (current target: owner-reported FW 12.00).
 
 ## 7. M2 — rich Steam input, profiles and advanced gameplay
 
@@ -195,7 +195,7 @@ Every changed module requires: stated responsibility, input/output/error contrac
 
 ## 8. M3 — haptics, adaptive trigger translation and bidirectional feedback
 
-- Audit how Puckbridge currently captures DualSense output and game-driven audio/rumble via hooks, the provenance of its PoorDS4 bridge, and actual FW 13.60 limitations. Keep functioning code where evidence exists.
+- Audit how Puckbridge currently captures DualSense output and game-driven audio/rumble via hooks and the provenance of its PoorDS4 bridge. Treat its FW 13.60 support as an upstream claim; identify target-sensitive differences for the owner-reported FW 12.00 goal without inferring compatibility. Keep functioning code where evidence exists.
 - Define `FeedbackEvent` (source, target slot, type, intensity, duration, timestamp, priority) and a transport-independent output interface. Map standard rumble, grip motors/haptics and supported trigger events to physically possible sensations; do **not** claim real adaptive resistance on Steam hardware that lacks resistance motors.
 - Serialize output reports per transport, throttle/coalesce, guard battery/thermal power, stop safely upon transport shutdown. Fail closed for unsupported effects.
 - Game hooks must be isolated, version/fingerprint aware and opt-in where invasive; always preserve basic input on hook failure. Never port unexplained offsets from one firmware to another.
@@ -203,11 +203,11 @@ Every changed module requires: stated responsibility, input/output/error contrac
 
 ## 9. M4 — BLE feasibility and staged implementation (research/high risk)
 
-**Critical confirmed distinction:** internal PS5 Bluetooth hardware exists; PS5 Linux has `btusb`/xHCI work, but this is **not** proof of arbitrary LE/GATT from ProsperoOS FW 13.60. `libSceBluetoothHid` exports describe HID reports/devices, not a proven GATT Central client. The retail console rejected a tested BLE-only Logitech Craft keyboard while Classic HID worked (specific report; not universal LE impossibility). Do not claim BLE support until hardware gates pass.
+**Critical confirmed distinction:** internal PS5 Bluetooth hardware exists; PS5 Linux has `btusb`/xHCI work, but this is **not** proof of arbitrary LE/GATT from ProsperoOS on the project target (owner-reported FW 12.00). `libSceBluetoothHid` exports describe HID reports/devices, not a proven GATT Central client. The retail console rejected a tested BLE-only Logitech Craft keyboard while Classic HID worked (specific report; not universal LE impossibility). Do not claim BLE support until hardware gates pass.
 
 ### 9.1 Source audit and static diagnostics
 
-- Read `docs/BLE_FEASIBILITY.md` and primary links. Cross-check `libSceBluetoothHid` names/NIDs with `DNNDHH/PS5-3.20_Libs` and `SvenGDK/SharpProspero`, recording exact SHAs and firmware of reference. SharpProspero declares 17 exports, discusses privileged `/dev/bt` and `/dev/bluetooth_hid`, and unknown pointer structure layouts — **not** confirmed on 13.60.
+- Read `docs/BLE_FEASIBILITY.md` and primary links. Cross-check `libSceBluetoothHid` names/NIDs with `DNNDHH/PS5-3.20_Libs` and `SvenGDK/SharpProspero`, recording exact SHAs and firmware of reference. SharpProspero declares 17 exports, discusses privileged `/dev/bt` and `/dev/bluetooth_hid`, and unknown pointer structure layouts — **not** confirmed on the 12.00 target.
 - Search public community SDK for OS-managed BLE GAP Central/GATT APIs; differentiate accepted OS symbols, emulator stubs, Sony Partner SDK (restricted), PS5 Linux drivers and USB HCI experimentation.
 - Investigate Marvell `1286:2059` evidence; identify actual model/chip on target rather than assume all PS5 units match. Review xHCI/BTUSB Linux patch PR #19 and its instability warning.
 - Build **read-only opt-in diagnostic ELF**: OS model/FW, module availability, symbol resolution, safe device-node metadata, privileges, error codes; redact private identifiers; no unknown-ABI calls.
@@ -216,7 +216,7 @@ Every changed module requires: stated responsibility, input/output/error contrac
 ### 9.2 Capability gates (do not skip)
 
 - **B0:** Host research + source/ABI matrix (all assertions pinned and categorized).
-- **B1:** Read-only FW 13.60 probe with normal DualSense functioning before/during/after.
+- **B1:** Read-only probe on the exact installed firmware (target reported as 12.00), with normal DualSense functioning before/during/after. This diagnostic remains unperformed.
 - **B2:** Approved low-impact OS-managed BLE availability test, with exact API arguments/contracts and reversible side effects.
 - **B3:** Real LE scan: timestamped valid LE advertising report `LE Meta Event 0x3E` or equivalent reliable system API. Merely seeing the PS5 Bluetooth pairing menu **does not count**.
 - **B4:** LE connect + controlled SMP/bond + GATT service discovery; paired native DualSense stays functional.
@@ -237,7 +237,7 @@ Each gate must include source/revision, test ID, hardware model, FW, before/afte
 
 - Default production backend is **regular DualSense**; Steam Controller rear buttons and extra sensors remain independent inside the input core.
 - Research Edge-specific HID fields (two paddles and Fn controls) separately from **PS5 game API exposure**. Linux HID bits do not prove games receive unique Edge actions. Do not set Edge VID/PID and call that real Edge emulation.
-- Edge proof-of-concept only after finding registration ABI, virtual pad class, event handling, game/API visibility, user assignment and rollback on 13.60. If benefit is nil or unverified, remain normal DualSense and remap extra buttons via profiles.
+- Edge proof-of-concept only after finding registration ABI, virtual pad class, event handling, game/API visibility, user assignment and rollback on the exact target firmware (currently reported as 12.00). If benefit is nil or unverified, remain normal DualSense and remap extra buttons via profiles.
 - Optional ShellUI cosmetic alias `Steam Controller` and unique icon must be per-virtual-device, reversible and opt-in; first research source of display names/assets. Never globally replace the real Edge icon or write Sony system resource files.
 - Both features must be isolated so release can ship without them.
 
@@ -267,7 +267,7 @@ Each gate must include source/revision, test ID, hardware model, FW, before/afte
 
 ### Mandatory hardware matrix (when hardware is available)
 
-- FW 13.60 with console type (Fat/Slim/Pro), loader/SDK versions, actual SC 2026 firmware revision, official Puck version, USB-C cable type.
+- Exact installed FW (owner currently reports 12.00), console type (Fat/Slim/Pro), loader/SDK versions, actual SC 2026 firmware revision, official Puck version, and USB-C cable type.
 - Native DualSense untouched baseline; PS5 home UI; profile selection; one native PS5 game and one secondary title, repeatable menu/navigation; other controllers do not interfere.
 - Wired and Puck connect/disconnect/standby/reconnect, profile change under active input, button release after timeout, no phantom duplicates and no uncontrolled game hooks.
 - Motion/trackpad game scenarios, audio/haptics, trigger feedback only when supported by hardware, save/restart/cleanup. Log actual repeat count and results, not expected counts.
@@ -331,4 +331,4 @@ When concluding a development iteration, report:
 7. Artifacts with checksum and licensing attributions, only when created.
 8. Updated memory snapshot and exact next safe action.
 
-**Definition of done for initial release:** a secure, reproducible single payload with Steam Controller 2026 USB and official Puck support verified on actual FW 13.60 hardware, basic DualSense functions and reliable cleanup; high-value extended functions enabled only where tested; no invented BLE/Edge/firmware claims; clean source/license/test/memory/PR trail. If no PS5 is available, state "host development complete; hardware release gate outstanding" rather than calling the initial release done.
+**Definition of done for initial release:** a secure, reproducible single payload with Steam Controller 2026 USB and official Puck support verified on the owner's actual target (currently reported as FW 12.00), basic DualSense functions and reliable cleanup; high-value extended functions enabled only where tested; no invented BLE/Edge/firmware claims; clean source/license/test/memory trail. Until required console tests pass, state "host development complete; hardware release gate outstanding" rather than calling the initial release done. The release gate accepts the exact firmware actually tested only when the matrix and its matching TEST_LOG record agree; no particular firmware is hard-coded.

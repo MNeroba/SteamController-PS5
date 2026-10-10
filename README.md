@@ -12,7 +12,7 @@
   <img alt="BLE: research only" src="https://img.shields.io/badge/native%20BLE-research%20only-lightgrey.svg">
 </p>
 
-> **Development project — not a verified release.** The source has passed portable host tests and a PS5 SDK cross-build. No physical PS5, Steam Controller, DualSense, or Puck was available for runtime testing. Firmware compatibility and gameplay support are therefore **not claimed**.
+> **Development project — not a verified release.** The source has passed portable host tests and a PS5 SDK cross-build. The owner reports a PS5 on firmware 12.00; no console, Steam Controller, DualSense, or Puck runtime test has been performed. Firmware compatibility and gameplay support are therefore **not claimed**.
 
 SteamController-PS5 is a focused payload project for carrying Steam Controller input into the PS5 controller stack. It builds on the Steam USB/Puck and virtual-controller work in PuckbridgePS5, while extracting reusable protocol, mapping, motion, session, and lifecycle code for independent host testing.
 
@@ -144,7 +144,7 @@ There is no persistent installer or supported release package yet. The payload M
 make -C payload deploy PS5_HOST=192.168.1.50 PORT=9021
 ```
 
-Use this only when you have independently confirmed that your **development** console, firmware, and payload loader support this ELF and the loader is listening on the selected port. Port `9021` is the inherited Makefile default, not a compatibility guarantee. This project's deploy path has not been tested on a physical PS5. Do not use this as an installation recipe for a stock console or infer support for firmware 13.60 from upstream claims.
+Use this only when you have independently confirmed that your **development** console, exact firmware, and payload loader support this ELF and the loader is listening on the selected port. Port `9021` is the inherited Makefile default, not a compatibility guarantee. This project's deploy path has not been tested on a physical PS5. Do not use this as an installation recipe for a stock console or infer support for the reported FW 12.00 from upstream claims.
 
 If the payload starts and its portal is available, it listens at `http://<PS5-IP>:8090`. The server accepts loopback, RFC1918 private, and IPv4 link-local peers only; public IPv4 peers and IPv6 are rejected. The portal token is stored at `/data/ghostpad/webui.token`; retrieve it through trusted local console access. Portal traffic is plain HTTP, so use it only on a trusted local network and never expose the port to the public internet. API requests still require the bearer token. See the P0 web-security requirements in [CODEX_TASK.md](CODEX_TASK.md) and the repository's [security issue list](project-memory/ISSUES.md).
 

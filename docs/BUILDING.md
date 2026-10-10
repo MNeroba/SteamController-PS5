@@ -80,3 +80,7 @@ Local make -C tests clean test and make -C tests clean sanitize also passed. The
 For the local SDK build, export both variables before invoking Make. On the recorded macOS setup, set LLVM_CONFIG to $(brew --prefix llvm@18)/bin/llvm-config and PS5_PAYLOAD_SDK to $PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk, then run make -C payload clean followed by make -C payload.
 
 This run produced ELF SHA-256 b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7 and linked against the six libraries listed above. It confirms compilation/linking only. No payload deployment, console loading, USB/Puck operation, firmware compatibility or runtime behavior was tested. The required hardware rows remain blocked; the CI artifact is temporary and is not a release.
+
+## Re-run after firmware-target update — 2026-10-10
+
+After removing the release check's fixed 13.60 requirement and updating the target to owner-reported FW 12.00, both host commands passed again: `make -C tests clean test` and `make -C tests clean sanitize`. The clean PS5 cross-build also passed with SDK v0.43 and Homebrew LLVM 18.1.8 using the environment documented above. The ELF SHA-256 is unchanged at `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`, with the same six expected SDK libraries. These tests validate source policy, host behavior, and compilation/linking only; no PS5 12.00 console or controller was tested, and compatibility is not claimed.

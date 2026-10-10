@@ -2,7 +2,7 @@
 
 This page describes the Steam Controller 2026 work in **SteamController-PS5**. It is a feature-status page, **not an installation or compatibility guide**.
 
-> **No physical PS5, Steam Controller, DualSense, or Valve Puck has been tested in this project.** Source code, host tests, a PS5 SDK cross-build, and a downloadable CI artifact do not establish that the payload loads or works on a console. There is no verified release. Read the [README](README.md) before building; do not treat this page as a recommendation to run the payload on a stock or primary console.
+> **No physical PS5, Steam Controller, DualSense, or Valve Puck has been tested in this project.** The owner reports a PS5 on firmware 12.00, which is the target and has not been compatibility-tested. Source code, host tests, a PS5 SDK cross-build, and a downloadable CI artifact do not establish that the payload loads or works on a console. There is no verified release. Read the [README](README.md) before building; do not treat this page as a recommendation to run the payload on a stock or primary console.
 
 ## Feature status
 

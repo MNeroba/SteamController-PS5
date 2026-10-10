@@ -9,6 +9,7 @@ import sys
 REQUIRED_GATES = ("H-01", "H-02", "H-03", "H-04", "H-05", "H-09", "H-12")
 PLACEHOLDER = re.compile(r"NOT_TESTED|UNKNOWN|NOT_RUN|BLOCKED|TBD|N/?A|—", re.I)
 COMMIT = re.compile(r"(?<![0-9a-f])[0-9a-f]{40}(?![0-9a-f])", re.I)
+FIRMWARE_VERSION = re.compile(r"^\d+\.\d+(?:\.\d+)?$")
 EVIDENCE = re.compile(r"^project-memory/TEST_LOG\.md#(h-\d{2})$", re.I)
 
 
@@ -54,8 +55,8 @@ def validate_matrix(text, test_log_text=None):
             continue
         if columns[7] != "VERIFIED_HARDWARE":
             errors.append(f"{gate}: result must be VERIFIED_HARDWARE")
-        if columns[3] != "13.60":
-            errors.append(f"{gate}: firmware must be exactly 13.60")
+        if not FIRMWARE_VERSION.fullmatch(columns[3]):
+            errors.append(f"{gate}: firmware must be an exact numeric version such as 12.00")
         for index, label in ((2, "PS5 model"), (4, "controller model/firmware"),
                              (5, "transport"), (6, "payload commit / SDK"),
                              (8, "evidence")):
@@ -76,9 +77,11 @@ def validate_matrix(text, test_log_text=None):
         if "Result: VERIFIED_HARDWARE" not in section:
             errors.append(f"{gate}: test-log entry must record Result: VERIFIED_HARDWARE")
         commit_match = COMMIT.search(columns[6])
+        firmware_entries = re.findall(r"^Firmware:\s*(.*?)\s*$", section, re.M)
+        if firmware_entries != [columns[3]]:
+            errors.append(f"{gate}: test-log entry does not record matching exact firmware")
         required_evidence = (
             (columns[2], "PS5 model"),
-            (columns[3], "firmware"),
             (columns[4], "controller model/firmware"),
             (columns[5], "transport"),
         )

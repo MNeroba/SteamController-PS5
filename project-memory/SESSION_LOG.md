@@ -876,3 +876,11 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Direct-main documentation/memory follow-up 6b727b6502585c90878944a00d3fc29d6ef2bc36 was acknowledged as a fast-forward from d2107fe1b0719e5878d468b0f0120580ce4f8a1e. Its tree retains all 218 blobs and 232 recursive entries; seven approved paths changed, with no additions/deletions.
 - Host run 38047930840 and PS5 cross-build run 38047930852 both completed successfully. The artifact ID, digest and expiry are recorded in TEST_LOG.md and docs/BUILDING.md.
 - Source code remains the previously verified commit 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. The remaining blockers require physical development hardware and are not safely resolvable by host-only changes.
+
+### M1-212 — Adapt project target to PS5 FW 12.00 — 2026-10-10
+
+- Confirmed GitHub main at `c49df86ac2b8dd177aac5af28aa330aa2ce450ba`, no open PRs, and latest Host / PS5 cross-build Actions passed on that baseline. Kept the dirty local overlay intact.
+- Removed the 13.60 project requirement; made 12.00 the owner-reported target. Updated the specification, release checker, regression tests, hardware matrix, README, BLE protocol/decision, test plan, source evidence notes, feature-status notice, and project memory. Historical test logs and upstream claims were left as historical evidence.
+- Strengthened release validation: exact numeric firmware required; exactly one `Firmware:` line in that gate's anchored TEST_LOG section must equal the matrix value byte-for-byte. Nine checker tests pass, including no-version-pin and 12.00.1 prefix-collision cases. The live matrix correctly remains blocked.
+- Re-ran `make -C tests clean test` (PASS), `make -C tests clean sanitize` (PASS), and clean SDK v0.43/LLVM 18.1.8 cross-build (PASS; ELF SHA-256 `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`). `git diff --check`/final review and exact main tree verification are pending.
+- No PS5/controller/Puck runtime test, deployment, active BLE/HCI, firmware update/write, or release was performed. No compatibility claim for FW 12.00. Next action: publish only the allowlisted target/checker/test/docs/memory files as a fast-forward to current main and inspect resulting Actions.

@@ -11,7 +11,7 @@ SPEC.loader.exec_module(RELEASE_GATE)
 
 
 def matrix_row(gate, *, result="VERIFIED_HARDWARE", model="PS5 retail model",
-               firmware="13.60", controller="Steam Controller 2026 / fw 1.0",
+               firmware="12.00", controller="Steam Controller 2026 / fw 1.0",
                commit="0123456789abcdef0123456789abcdef01234567",
                evidence=None):
     evidence = evidence or f"project-memory/TEST_LOG.md#{gate.lower()}"
@@ -21,14 +21,14 @@ def matrix_row(gate, *, result="VERIFIED_HARDWARE", model="PS5 retail model",
     )) + " |"
 
 
-def evidence_log():
+def evidence_log(firmware="12.00"):
     entries = []
     for gate in RELEASE_GATE.REQUIRED_GATES:
         entries.append("\n".join((
             f"### {gate}",
             f"Test ID: {gate}",
             "PS5 model: PS5 retail model",
-            "Firmware: 13.60",
+            f"Firmware: {firmware}",
             "Controller: Steam Controller 2026 / fw 1.0",
             "Transport: USB-C",
             "Payload commit: 0123456789abcdef0123456789abcdef01234567",
@@ -38,14 +38,19 @@ def evidence_log():
 
 
 class ReleaseGateTests(unittest.TestCase):
-    def valid_matrix(self):
+    def valid_matrix(self, firmware="12.00"):
         return "\n".join(
-            matrix_row(gate) for gate in RELEASE_GATE.REQUIRED_GATES
+            matrix_row(gate, firmware=firmware) for gate in RELEASE_GATE.REQUIRED_GATES
         )
 
     def test_complete_evidenced_hardware_matrix_passes(self):
         self.assertEqual(RELEASE_GATE.validate_matrix(
             self.valid_matrix(), evidence_log()), [])
+
+    def test_firmware_is_not_pinned_when_exact_evidence_matches(self):
+        firmware = "13.60"
+        self.assertEqual(RELEASE_GATE.validate_matrix(
+            self.valid_matrix(firmware), evidence_log(firmware)), [])
 
     def test_missing_required_gate_fails_closed(self):
         matrix = "\n".join(
@@ -74,24 +79,30 @@ class ReleaseGateTests(unittest.TestCase):
         self.assertTrue(any("H-01: evidence must link to a test-log entry" in error
                             for error in errors))
 
-    def test_wrong_firmware_and_unrecorded_test_log_entry_fail(self):
-        rows = [matrix_row(gate, firmware="13.60 target" if gate == "H-03"
-                           else "13.60")
+    def test_non_exact_firmware_and_unrecorded_test_log_entry_fail(self):
+        rows = [matrix_row(gate, firmware="12.00 (owner-reported)" if gate == "H-03"
+                           else "12.00")
                 for gate in RELEASE_GATE.REQUIRED_GATES]
         errors = RELEASE_GATE.validate_matrix("\n".join(rows), "only H-01")
-        self.assertTrue(any("H-03: firmware must be exactly 13.60" in error
+        self.assertTrue(any("H-03: firmware must be an exact numeric version" in error
                             for error in errors))
         self.assertTrue(any("H-02: anchored hardware test entry is absent" in error
                             for error in errors))
 
     def test_test_log_must_match_matrix_values_and_release_result(self):
         log = evidence_log().replace(
-            "Firmware: 13.60", "Firmware: 13.50", 1
+            "Firmware: 12.00", "Firmware: 12.01", 1
         ).replace("Result: VERIFIED_HARDWARE", "Result: PASS", 1)
         errors = RELEASE_GATE.validate_matrix(self.valid_matrix(), log)
         self.assertTrue(any("H-01: test-log entry must record Result: VERIFIED_HARDWARE" in error
                             for error in errors))
-        self.assertTrue(any("H-01: test-log entry does not record matching firmware" in error
+        self.assertTrue(any("H-01: test-log entry does not record matching exact firmware" in error
+                            for error in errors))
+
+    def test_firmware_log_match_is_exact_not_a_substring(self):
+        log = evidence_log().replace("Firmware: 12.00", "Firmware: 12.00.1", 1)
+        errors = RELEASE_GATE.validate_matrix(self.valid_matrix(), log)
+        self.assertTrue(any("H-01: test-log entry does not record matching exact firmware" in error
                             for error in errors))
 
     def test_test_log_anchor_must_be_gate_specific(self):
