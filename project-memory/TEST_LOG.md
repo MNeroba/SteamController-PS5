@@ -791,3 +791,11 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - GitHub Host tests run 38047541353 — PASS; host-tests job and its portable host/sanitizer step succeeded. GitHub PS5 cross-build run 38047541326 — PASS; build and cross-build artifact upload steps succeeded.
 - GitHub artifact ghost-control-ps5-cross-build, ID 11668855395, size 621,602 bytes, ZIP SHA-256 24004f11c987e8b89d1a4b379dcfab51484bde88179b72e7de231e9b93a9fc67, expires 2027-01-08T11:11:39Z. This is a temporary build artifact, not a verified release or console test.
 - Repository main now includes complete source, current feature/build/contribution docs and reconciled project memory. No PR or Release was created. The release-gate command still correctly fails closed because H-01/H-02/H-03/H-04/H-05/H-09/H-12 have no hardware evidence. No physical device, deployment, Bluetooth operation, or firmware/system write was used.
+
+
+### M1-211 — Final readiness status synchronization — 2026-10-10
+
+- Main commit 6b727b6502585c90878944a00d3fc29d6ef2bc36 is a documentation/memory-only child of d2107fe1b0719e5878d468b0f0120580ce4f8a1e. It updates the final P0/P1 host-vs-target issue classifications and latest build/artifact details. Full tree remains 232 entries / 218 blobs, truncated=false; seven reviewed blobs changed and no paths were added or removed.
+- GitHub Host tests 38047930840 — PASS. PS5 cross-build 38047930852 — PASS; build and artifact-upload steps completed.
+- Latest artifact ghost-control-ps5-cross-build ID 11668467159; size 621,602 bytes; ZIP SHA-256 8701025029d3fa43c77c8a2eeafea3a7526cf71aefcac6e52db92455dfcceceb; expires 2027-01-08T11:18:17Z. The payload source did not change from 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. This artifact is not a release.
+- Hardware matrix and fail-closed release gate are unchanged: H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain blocked. No console, controller, Puck, deploy, BLE/HCI, firmware/system write, or Release was used.

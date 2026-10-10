@@ -1,8 +1,8 @@
 # Project memory — current status
 
-**Snapshot:** 2026-10-10 11:16 UTC.
+**Snapshot:** 2026-10-10 11:19 UTC.
 **Repository:** private GitHub repository MNeroba/SteamController-PS5; default branch main.
-**Latest source commit:** 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. **Last CI-verified docs publication:** d2107fe1b0719e5878d468b0f0120580ce4f8a1e (tree fb5d06aa2357346ada46c64da5078f19ae0d6f64). The current memory synchronization is a documentation-only descendant and preserves the full source tree.
+**Latest source commit:** 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. **Latest finalized docs/status commit:** 6b727b6502585c90878944a00d3fc29d6ef2bc36 (tree 90cbdb9684484fb0e852e60b0c255f6491047de5), a documentation-only descendant of d2107fe1b0719e5878d468b0f0120580ce4f8a1e. It preserves the complete source tree.
 
 ## Current readiness
 
@@ -15,7 +15,7 @@
 
 ## Verification evidence
 
-- GitHub Actions on finalization commit d2107fe1b0719e5878d468b0f0120580ce4f8a1e: Host tests run 38047541353 PASS; PS5 cross-build run 38047541326 PASS. Cross-build artifact 11668855395 (ZIP SHA-256 24004f11c987e8b89d1a4b379dcfab51484bde88179b72e7de231e9b93a9fc67) expires 2027-01-08; it is not a release.
+- GitHub Actions on latest finalized docs/status commit 6b727b6502585c90878944a00d3fc29d6ef2bc36: Host tests run 38047930840 PASS; PS5 cross-build run 38047930852 PASS. Cross-build artifact 11668467159 (ZIP SHA-256 8701025029d3fa43c77c8a2eeafea3a7526cf71aefcac6e52db92455dfcceceb) expires 2027-01-08T11:18:17Z; it is not a release.
 - Local strict-C11 host suite: make -C tests clean test PASS.
 - Local AddressSanitizer/UndefinedBehaviorSanitizer suite: make -C tests clean sanitize PASS.
 - Local PS5 SDK v0.43 / LLVM 18.1.8 cross-build: PASS when LLVM_CONFIG and PS5_PAYLOAD_SDK are explicitly exported. ELF SHA-256 b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7. Dependencies include libSceLibcInternal.sprx, libSceNet.sprx, libScePad.sprx, libSceSystemService.sprx, libSceUserService.sprx, and libkernel_web.sprx.

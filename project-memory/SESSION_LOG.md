@@ -869,3 +869,10 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Both workflows on the published commit completed successfully: Host 38047541353; PS5 cross-build 38047541326. Verified upload artifact ID 11668855395 and its SHA-256/expiry.
 - Refined issue statuses to distinguish host fixes from target-unverified integration. The release gate remains blocked exactly on required real-hardware rows.
 - Final state: software source is host-tested and cross-buildable; there is no verified PS5 runtime/release. No console deployment or active Bluetooth operation was performed. Next meaningful validation requires the development hardware named in PROJECT_MEMORY.md and the H-01–H-12 matrix.
+
+
+### M1-211 — Reconcile latest main checks and artifact — 2026-10-10
+
+- Direct-main documentation/memory follow-up 6b727b6502585c90878944a00d3fc29d6ef2bc36 was acknowledged as a fast-forward from d2107fe1b0719e5878d468b0f0120580ce4f8a1e. Its tree retains all 218 blobs and 232 recursive entries; seven approved paths changed, with no additions/deletions.
+- Host run 38047930840 and PS5 cross-build run 38047930852 both completed successfully. The artifact ID, digest and expiry are recorded in TEST_LOG.md and docs/BUILDING.md.
+- Source code remains the previously verified commit 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. The remaining blockers require physical development hardware and are not safely resolvable by host-only changes.
