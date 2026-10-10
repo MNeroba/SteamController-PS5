@@ -66,6 +66,24 @@ class Controllers(unittest.TestCase):
         shapes = {s['id']: s for s in LAYOUTS['steam']['back']['shapes']}
         self.assertGreater(shapes['l4']['cx'], shapes['r4']['cx'])
 
+    def test_dualsense_trigger_and_face_button_calibration(self):
+        # Coordinates use the supplied image's 1254 x 1254 source-pixel space.
+        front = {s['id']: s for s in LAYOUTS['dual']['front']['shapes']}
+        self.assertLess(front['l1']['cy'], front['l2']['cy'])
+        self.assertLess(front['r1']['cy'], front['r2']['cy'])
+        self.assertLess(front['l1']['cx'], front['r1']['cx'])
+        self.assertLessEqual(abs(front['tri']['cx'] - 994), 2)
+        self.assertLessEqual(abs(front['tri']['cy'] - 360), 2)
+        self.assertLessEqual(abs(front['ci']['cx'] - 1078), 2)
+        self.assertLessEqual(abs(front['ci']['cy'] - 440), 2)
+
+        back = {s['id']: s for s in LAYOUTS['dual']['back']['shapes']}
+        center_y = lambda shape: sum(point[1] for point in shape['pts']) / len(shape['pts'])
+        center_x = lambda shape: sum(point[0] for point in shape['pts']) / len(shape['pts'])
+        self.assertLess(center_y(back['l1']), center_y(back['l2']))
+        self.assertLess(center_y(back['r1']), center_y(back['r2']))
+        self.assertGreater(center_x(back['l1']), center_x(back['r1']))
+
     def test_informational_controls_not_mappings(self):
         for key in ('grl', 'grr', 'usbc', 'puck'):
             self.assertNotIn(key, mapping('SOURCE_KEYS'))

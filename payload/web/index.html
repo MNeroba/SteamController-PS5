@@ -260,13 +260,15 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
 .sheet .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;width:100%;max-width:560px;padding:20px;max-height:88vh;overflow:auto}
 .sheet h3{margin:0 0 4px;font-size:1.2rem;display:flex;align-items:center}
 .sheet p{color:var(--muted);margin:0}
-.pick{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:14px 0}
-.pick button{display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 6px;font-size:.9rem;line-height:1.2;min-height:44px}
-.pick button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#0f1a33;font-weight:700}
-.pick .g-CROSS[aria-pressed=false]{color:var(--cross)}.pick .g-CIRCLE[aria-pressed=false]{color:var(--circle)}
-.pick .g-SQUARE[aria-pressed=false]{color:var(--square)}.pick .g-TRIANGLE[aria-pressed=false]{color:var(--triangle)}
-.pick .g-PB_MENU[aria-pressed=false],.pick [class^=g-PB_GYRO][aria-pressed=false]{color:var(--warn)}
-.pick .g-PB_MENU,.pick [class^=g-PB_GYRO]{grid-column:span 2}
+.pick{display:grid;gap:12px;margin:14px 0}
+.pick-group h4{font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px}
+.pick-grid button{display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 6px;font-size:.9rem;line-height:1.2;min-height:44px}
+.pick-grid button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#0f1a33;font-weight:700}
+.pick-grid .g-CROSS[aria-pressed=false]{color:var(--cross)}.pick-grid .g-CIRCLE[aria-pressed=false]{color:var(--circle)}
+.pick-grid .g-SQUARE[aria-pressed=false]{color:var(--square)}.pick-grid .g-TRIANGLE[aria-pressed=false]{color:var(--triangle)}
+.pick-grid [class^=g-PB_][aria-pressed=false]{color:var(--warn)}
+.editor-label{font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--muted);margin:14px 0 -8px}
 .sheet .foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;bottom:-20px;margin:0 -20px -20px;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
 .acts-tabs{display:flex;gap:4px;margin:14px 0 0;flex-wrap:wrap}
 .acts-tabs button{min-height:36px;padding:6px 12px;font-size:.9rem;background:transparent;color:var(--muted)}
@@ -308,8 +310,7 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
   .glive{max-width:40%;font-size:.85rem}
   .sheet{align-items:flex-end;padding:0}
   .sheet .box{border-radius:18px 18px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom));max-height:92vh}
-  .pick{grid-template-columns:repeat(3,1fr)}
-  .pick .g-PB_MENU,.pick [class^=g-PB_GYRO]{grid-column:span 3}
+  .pick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   .games{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
   .savebar .wrap{flex-wrap:wrap}
   .savebar .btns{margin-left:auto}
@@ -349,13 +350,13 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
       <div class="pacts">
         <span class="pstate" id="pstate">Saved</span>
         <button id="exp" class="ghost" title="Download this profile as a file">Export</button>
-        <button id="imp" class="ghost" title="Load a profile file into this profile">Import</button>
+        <button id="imp" class="ghost" title="Merge values from a profile file into this profile">Import</button>
         <input type="file" id="impFile" accept=".ini,.txt,text/plain" hidden aria-label="Profile file to import">
         <button id="del" class="ghost danger">Delete</button>
       </div>
     </div>
     <nav class="sub" aria-label="Remap sections"><div class="subs">
-      <button data-sec="buttons">Buttons</button><button data-sec="sticks">Sticks &amp; trackpads</button><button data-sec="gyro">Gyro &amp; motion</button><button data-sec="flick">Flick stick</button><button data-sec="triggers">Triggers</button><button data-sec="timing">Shift &amp; timing</button>
+      <button data-sec="buttons">Buttons</button><button data-sec="sticks">Sticks &amp; trackpads</button><button data-sec="gyro">Gyro &amp; motion</button><button data-sec="flick">Flick stick</button><button data-sec="triggers">Trigger feedback</button><button data-sec="timing">Shift &amp; timing</button>
     </div></nav>
 
     <section class="sec" data-sec="buttons" id="sec-buttons">
@@ -433,7 +434,7 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
     </section>
 
     <section class="sec" data-sec="triggers" id="sec-triggers">
-      <div class="sech"><h2>Triggers</h2><small>Feel the game's adaptive trigger effects.</small></div>
+      <div class="sech"><h2>Adaptive trigger feedback</h2><small>Adjust the strength of game-requested clicks and buzzes. Full Pull button actions for L2/R2 are configured in Buttons.</small></div>
       <div class="card tfx">
         <div class="ch"><div><h3>Trigger effects</h3><p>When a game sets an adaptive trigger effect, you feel it as clicks and buzzes on that side as you pull the trigger. How strong is up to you.</p></div></div>
         <div class="rows">
@@ -446,7 +447,7 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
     <section class="sec" data-sec="timing" id="sec-timing">
       <div class="sech"><h2>Shift &amp; timing</h2><small>For the long press, double press, shift and turbo activators.</small></div>
       <div class="card"><div class="rows">
-        <label class="opt full"><span class="lbl">Shift button<small>Hold it to use each button's shift binding</small></span><select id="shiftSel" data-k="SHIFT"></select></label>
+        <label class="opt full"><span class="lbl">Shift button<small>While held, buttons use their Shift binding. The Shift button itself has no normal output.</small></span><select id="shiftSel" data-k="SHIFT"></select></label>
         <div data-sl="LONG_MS"><b>Long press time</b><small>Hold a button this long to trigger its long-press binding</small></div>
         <div data-sl="DOUBLE_MS"><b>Double press window</b><small>Two presses within this time count as a double press</small></div>
         <div data-sl="TURBO_MS" class="full"><b>Turbo speed</b><small>Time between repeats while a turbo button is held</small></div>
@@ -529,9 +530,11 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
   <div class="box">
     <h3 id="sheetT"></h3>
+    <div class="editor-label">WHEN THIS INPUT ACTIVATES</div>
     <div class="acts-tabs" role="tablist" id="actTabs"></div>
     <p class="acthelp" id="actHelp"></p>
     <div class="sheetpreview"><div class="controller-stage" id="sheetDual"></div><div><div class="viewswitch" role="group" aria-label="Assignment preview view" data-controller="sheet"><button data-view="front" aria-pressed="true">Front</button><button data-view="back" aria-pressed="false">Back / top</button></div><div class="mapping-badges" id="draftBadges" aria-live="polite"></div></div></div>
+    <div class="editor-label">OUTPUT ACTIONS</div>
     <div class="pick" id="pick"></div>
     <div class="actopts" id="actOpts">
       <label><input type="checkbox" class="box" id="optTurbo"> Turbo (repeats while held)</label>
@@ -554,6 +557,7 @@ const GROUPS=[["Face buttons",["A","B","X","Y"]],["Shoulders and triggers",["LB"
 const BITS=["A","B","X","Y","LB","RB","LT","RT","L3","R3","DUP","DDOWN","DLEFT","DRIGHT","VIEW","MENU","STEAM","QAM","L4","L5","R4","R5","LPAD_CLICK","RPAD_CLICK"];
 const OUTS=[["CROSS","Cross"],["CIRCLE","Circle"],["SQUARE","Square"],["TRIANGLE","Triangle"],["L1","L1"],["R1","R1"],["L2","L2"],["R2","R2"],["L3","L3"],["R3","R3"],["UP","Up"],["DOWN","Down"],["LEFT","Left"],["RIGHT","Right"],["OPTIONS","Options"],["CREATE","Create"],["PS","PS"],["TOUCHPAD","Touchpad"],["PB_MENU","Puckbridge menu"],["PB_GYRO_ON","Gyro on (hold)"],["PB_GYRO_OFF","Gyro off (hold)"],["PB_GYRO_TOGGLE","Gyro on/off"]];
 const OUTNAME=Object.fromEntries(OUTS);
+const OUTPUT_GROUPS=[["Face buttons",["CROSS","CIRCLE","SQUARE","TRIANGLE"]],["D-pad",["UP","DOWN","LEFT","RIGHT"]],["Shoulders & triggers",["L1","R1","L2","R2"]],["Sticks",["L3","R3"]],["System",["CREATE","OPTIONS","PS"]],["Touchpad",["TOUCHPAD"]],["Puckbridge actions",["PB_MENU","PB_GYRO_ON","PB_GYRO_OFF","PB_GYRO_TOGGLE"]]];
 /* button icons: inlined by gen_html.py from web/icons (CC0, see web/icons/LICENSE.txt) */
 const ICON=/*__ICONS__*/{};
 function ic(key,cls){const u=ICON[key];return u?`<img class="${cls||"ic"}" src="${u}" alt="" aria-hidden="true">`:""}
@@ -589,7 +593,9 @@ const PS_SYMBOLS={CROSS:"✕",CIRCLE:"○",SQUARE:"□",TRIANGLE:"△"};
 const VIEW_STATE={steam:"front",dual:"front",sheet:"front"};
 let selectedKey=null, sheetReturnFocus=null;
 function outputIcon(k){return PS_SYMBOLS[k]?`<span class="ps-symbol ps-${k}" aria-hidden="true">${PS_SYMBOLS[k]}</span>`:ic("o_"+k,"ic sm")}
-function outputLabel(k){return k==="TOUCHPAD"?"Touchpad click":k==="L3"?"L3 click":k==="R3"?"R3 click":OUTNAME[k]||k}
+function outputLabel(k){return PS_SYMBOLS[k]|| (k==="TOUCHPAD"?"Touchpad click":k==="L3"?"L3 click":k==="R3"?"R3 click":OUTNAME[k]||k)}
+function outputAccessibleLabel(k){return PS_SYMBOLS[k]?`${OUTNAME[k]} (${PS_SYMBOLS[k]})`:outputLabel(k)}
+function outputChoice(k){return PS_SYMBOLS[k]?esc(outputLabel(k)):`${outputIcon(k)}${esc(outputLabel(k))}`}
 
 let cur={}, saved="", editing="default", profiles=[], status={}, games=[], sheetKey=null;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
@@ -598,7 +604,7 @@ const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 function parse(t){const p={};t.split("\n").forEach(l=>{const i=l.indexOf("=");if(i>0)p[l.slice(0,i).trim()]=l.slice(i+1).trim()});return p}
 function fmt(p){return Object.entries(p).map(([k,v])=>k+"="+v).join("\n")+"\n"}
 function combo(v){return !v||v==="NONE"?[]:v.split("+")}
-function comboText(v){const c=combo(v);return c.length?c.map(o=>OUTNAME[o]||o).join(" + "):"Nothing"}
+function comboText(v){const c=combo(v);return c.length?c.map(outputLabel).join(" + "):"Nothing"}
 function norm(v){return combo(v).sort().join("+")}
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2400)}
 let portalTokenCache=null,portalTokenPrompt=null;
@@ -696,39 +702,56 @@ function buildController(device,host,preview=false){
       const k=map[s.id],info=INFO_NAMES[s.id],g=svgEl("g",{class:k?(source?"ctl":"destination"):"informational",tabindex:0,role:k?"button":"img"},svg);
       if(k){g.dataset[source?"k":"out"]=k;if(k===RESERVED){g.classList.add("reserved");g.setAttribute("aria-disabled","true")}}
       else g.setAttribute("aria-label",info);
-      hotspot(s,g);svgEl("title",{},g).textContent=k?(source?LABEL[k]:outputLabel(k)):info;
+      hotspot(s,g);svgEl("title",{},g).textContent=k?(source?LABEL[k]:outputAccessibleLabel(k)):info;
       if(!source&&PS_SYMBOLS[k])svgEl("text",{x:s.cx,y:s.cy,class:"face-symbol face-"+k,"aria-hidden":"true"},g).textContent=PS_SYMBOLS[k];
-      const describe=()=>{if(source&&k)showCaption(k);else if(!preview)$(source?"#steamHint":"#dualHint").textContent=k?outputLabel(k):info};
-      const activate=()=>{if(!k){describe();return}if(source)openSheet(k);else if(preview)toggleOutput(k);else if(selectedKey&&selectedKey!==RESERVED)openSheet(selectedKey);else toast("Select a Steam Controller input first")};
+      const describe=()=>{if(source&&k)showCaption(k);else if(!preview)$(source?"#steamHint":"#dualHint").textContent=k?outputAccessibleLabel(k):info};
+      const activate=()=>{if(!k){describe();return}if(source)openSheet(k);else if(preview)toggleOutput(k);else if(selectedKey&&selectedKey!==RESERVED)openSheet(selectedKey,{addOutput:k});else toast("Select a Steam Controller input first, then tap a DualSense output.")};
       g.onmouseenter=g.onfocus=describe;g.onclick=activate;g.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate()}};
     });
+    if(!source&&window.matchMedia("(pointer: coarse)").matches)svg.addEventListener("click",e=>{
+      if(!e.detail)return;
+      const point={x:e.clientX,y:e.clientY},candidates=[...svg.querySelectorAll(".destination")].map(g=>{
+        const r=g.getBoundingClientRect(),dx=Math.max(r.left-point.x,0,point.x-r.right),dy=Math.max(r.top-point.y,0,point.y-r.bottom);
+        return {g,d:Math.hypot(dx,dy)};
+      }).filter(v=>v.d<=16).sort((a,b)=>a.d-b.d);
+      if(!candidates.length)return;
+      e.preventDefault();e.stopImmediatePropagation();const key=candidates[0].g.dataset.out;
+      if(preview)toggleOutput(key);
+      else if(selectedKey&&selectedKey!==RESERVED)openSheet(selectedKey,{addOutput:key});
+      else toast("Select a Steam Controller input first, then tap a DualSense output.");
+    },true);
   });
 }
 function switchController(name,view){
   VIEW_STATE[name]=view;const host=$(name==="steam"?"#steamStage":name==="dual"?"#dualStage":"#sheetDual");
   host.querySelectorAll("svg").forEach(svg=>svg.toggleAttribute("hidden",svg.dataset.view!==view));
   $$(`.viewswitch[data-controller="${name}"] button`).forEach(b=>b.setAttribute("aria-pressed",b.dataset.view===view));
-  if(name!=="sheet")$(name==="steam"?"#steamHint":"#dualHint").textContent=view==="back"?"Physical L is on the right; R is on the left.":name==="steam"?"Select a button to edit its assignment.":"Highlighted buttons show the selected assignment.";
+  if(name!=="sheet")$(name==="steam"?"#steamHint":"#dualHint").textContent=name==="steam"?(view==="back"?"Physical L is on the right; R is on the left.":"Select a button to edit its assignment."):view==="back"?"Physical L is on the right; R is on the left.":selectedKey&&selectedKey!==RESERVED?`${LABEL[selectedKey]} selected · tap an output to stage it, then confirm Done.`:"Select a Steam Controller input first, then tap a DualSense output.";
 }
 function buildPad(){
   buildController("steam",$("#steamStage"));buildController("dual",$("#dualStage"));buildController("dual",$("#sheetDual"),true);
   $$(".viewswitch button").forEach(b=>b.onclick=()=>switchController(b.parentElement.dataset.controller,b.dataset.view));
 }
-function assignmentBadges(values){return values.length?values.map(k=>`<span class="chip c-${k}">${outputIcon(k)}${esc(outputLabel(k))}</span>`).join(""):'<span class="chip none">Nothing</span>'}
+function assignmentBadges(values){return values.length?values.map(k=>`<span class="chip c-${k}" aria-label="${esc(outputAccessibleLabel(k))}">${outputChoice(k)}</span>`).join(""):'<span class="chip none">Nothing</span>'}
 function paintDestinations(){
   const inSheet=$("#sheet").classList.contains("show"),values=inSheet?[...draft[act]]:selectedKey&&selectedKey!==RESERVED?combo(cur[selectedKey]):[];
-  $$(".destination").forEach(g=>{const on=values.includes(g.dataset.out);g.classList.toggle("assigned",on);g.setAttribute("aria-pressed",on);g.setAttribute("aria-label",`${outputLabel(g.dataset.out)}${on?", assigned":""}`)});
+  $$(".destination").forEach(g=>{const on=values.includes(g.dataset.out);g.classList.toggle("assigned",on);g.setAttribute("aria-pressed",on);g.setAttribute("aria-label",`${outputAccessibleLabel(g.dataset.out)}${on?", assigned":""}`)});
   $("#mappingBadges").innerHTML=selectedKey===RESERVED?'<span class="tag">Reserved system action</span>':selectedKey?assignmentBadges(values):"";
   $("#draftBadges").innerHTML=assignmentBadges(values);
 }
 function showCaption(k){
-  const text=k===RESERVED?RESERVED_TXT:comboText(cur[k]);
+  const isShift=k!==RESERVED&&cur.SHIFT===k;
+  const text=k===RESERVED?RESERVED_TXT:isShift?"Shift modifier · ordinary output disabled":comboText(cur[k]);
+  if(selectedKey===k){
+    const backHint=VIEW_STATE.dual==="back"?" · physical L is on the right; R is on the left":"";
+    $("#dualHint").textContent=(isShift?LABEL[k]+" is the Shift modifier; its ordinary output is disabled":LABEL[k]+" selected · tap an output to stage it, then confirm Done")+backHint;
+  }
   if(selectedKey&&selectedKey!==k){$("#steamHint").textContent=`${LABEL[k]} → ${text}`;return}
-  const x=k===RESERVED?[]:extras(k);$("#caption").innerHTML=`<b>${esc(LABEL[k])}</b> → ${esc(text)}${x.length?` <span>· ${esc(x.join(" · "))}</span>`:""}`;
+  const x=k===RESERVED||isShift?[]:extras(k);$("#caption").innerHTML=`<b>${esc(LABEL[k])}</b> → ${esc(text)}${x.length?` <span>· ${esc(x.join(" · "))}</span>`:""}`;
 }
 function paintPad(){
-  $$(".ctl").forEach(g=>{const k=g.dataset.k,reserved=k===RESERVED;g.classList.toggle("sel",k===selectedKey);g.classList.toggle("changed",!reserved&&(norm(cur[k])!==norm(DEFAULTS[k])||extras(k).length>0));
-    const label=reserved?`${LABEL[k]}: ${RESERVED_TXT}`:`${LABEL[k]} → ${comboText(cur[k])}`;g.querySelector("title").textContent=label;g.setAttribute("aria-label",label)});
+  $$(".ctl").forEach(g=>{const k=g.dataset.k,reserved=k===RESERVED,isShift=!reserved&&cur.SHIFT===k;g.classList.toggle("sel",k===selectedKey);g.classList.toggle("changed",!reserved&&!isShift&&(norm(cur[k])!==norm(DEFAULTS[k])||extras(k).length>0));
+    const label=reserved?`${LABEL[k]}: ${RESERVED_TXT}`:isShift?`${LABEL[k]}: Shift modifier; ordinary output disabled`:`${LABEL[k]} → ${comboText(cur[k])}`;g.querySelector("title").textContent=label;g.setAttribute("aria-label",label)});
   if(selectedKey)showCaption(selectedKey);paintDestinations();
 }
 function toggleOutput(k){if(!sheetKey||!$("#sheet").classList.contains("show"))return;const set=draft[act];set.has(k)?set.delete(k):set.add(k);renderActTabs();renderPick()}
@@ -737,8 +760,9 @@ function toggleOutput(k){if(!sheetKey||!$("#sheet").classList.contains("show"))r
 function renderList(){
   $("#list").innerHTML=GROUPS.map(([t,keys])=>`<div class="group"><h3>${t}</h3>${keys.map(k=>{const c=combo(cur[k]);
     if(k===RESERVED)return `<div class="row reserved" data-k="${k}"><span class="phys">${ic("s_"+k)}${esc(LABEL[k])}</span><span class="chips"><span class="tag">${esc(RESERVED_TXT)}</span></span></div>`;
+    const isShift=cur.SHIFT===k;
     return `<div class="row" tabindex="0" role="button" data-k="${k}"><span class="phys">${ic("s_"+k)}${esc(LABEL[k])}</span><span class="chips">${
-      c.length?c.map(o=>`<span class="chip c-${o}">${outputIcon(o)}${esc(outputLabel(o))}</span>`).join(""):'<span class="chip none">Nothing</span>'}${extras(k).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</span></div>`}).join("")}</div>`).join("");
+      isShift?'<span class="tag">Shift modifier · ordinary output disabled</span>':c.length?c.map(o=>`<span class="chip c-${o}" aria-label="${esc(outputAccessibleLabel(o))}">${outputChoice(o)}</span>`).join(""):'<span class="chip none">Nothing</span>'}${isShift?"":extras(k).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</span></div>`}).join("")}</div>`).join("");
   $$(".row").forEach(r=>{if(r.dataset.k===RESERVED){r.onmouseenter=()=>showCaption(RESERVED);return}r.onclick=()=>openSheet(r.dataset.k);r.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openSheet(r.dataset.k)}};r.onmouseenter=()=>showCaption(r.dataset.k)});
 }
 
@@ -789,12 +813,15 @@ const ACTS=[["","Press","Sends these while held. Pick several for a combo."],
  [".double","Double press","Press twice quickly: the second press sends these."],
  [".shift","Shift layer","Sent instead of Press while the Shift button is held."],
  [".full","Full pull","Extra output when the trigger clicks at the end of its travel."]];
-let draft={},act="";
+let draft={},act="",sheetAddOutput=null;
 function actsFor(k){return ACTS.filter(a=>a[0]!==".full"||k==="LT"||k==="RT").filter(a=>a[0]!==".shift"||cur.SHIFT&&cur.SHIFT!=="NONE"&&cur.SHIFT!==k)}
-function openSheet(k){
+function openSheet(k,options={}){
   if(k===RESERVED){showCaption(k);toast("… is reserved: hold it for 5 seconds to pause or resume Puckbridge");return}
-  sheetReturnFocus=document.activeElement;selectedKey=k;sheetKey=k;$("#sheetT").innerHTML=ic("s_"+k)+esc(LABEL[k]);
+  selectedKey=k;
+  if(cur.SHIFT===k){sheetKey=null;paintPad();showCaption(k);toast(LABEL[k]+" is the Shift modifier; choose another Shift button before editing its output.");return}
+  sheetReturnFocus=document.activeElement;sheetKey=k;sheetAddOutput=options.addOutput||null;$("#sheetT").innerHTML=ic("s_"+k)+esc(LABEL[k]);
   draft={};ACTS.forEach(([a])=>draft[a]=new Set(combo(cur[k+a])));
+  if(options.addOutput)draft[""].add(options.addOutput);
   draft.turbo=cur[k+".turbo"]==="1";draft.toggle=cur[k+".toggle"]==="1";
   $$(".ctl").forEach(g=>g.classList.toggle("sel",g.dataset.k===k));
   act="";renderActTabs();renderPick();
@@ -803,7 +830,7 @@ function openSheet(k){
 function renderActTabs(){
   $("#actTabs").innerHTML=actsFor(sheetKey).map(([a,l])=>`<button role="tab" data-a="${a}" aria-selected="${a===act}">${l}${a&&draft[a].size?'<span class="n"></span>':""}</button>`).join("");
   $$("#actTabs button").forEach(b=>b.onclick=()=>{act=b.dataset.a;renderActTabs();renderPick()});
-  $("#actHelp").textContent=ACTS.find(a=>a[0]===act)[2];
+  $("#actHelp").textContent=ACTS.find(a=>a[0]===act)[2]+(act===""&&sheetAddOutput?" "+outputAccessibleLabel(sheetAddOutput)+" staged; choose Done to apply or Cancel to discard.":"");
   $("#actOpts").hidden=act!=="";
   $("#optTurbo").checked=draft.turbo;$("#optToggle").checked=draft.toggle;
 }
@@ -811,8 +838,14 @@ $("#optTurbo").onchange=e=>{draft.turbo=e.target.checked;if(draft.turbo){draft.t
 $("#optToggle").onchange=e=>{draft.toggle=e.target.checked;if(draft.toggle){draft.turbo=false;$("#optTurbo").checked=false}};
 function renderPick(){
   const set=draft[act],p=$("#pick");p.innerHTML="";
-  OUTS.forEach(([v,l])=>{const b=document.createElement("button");b.className="g-"+v;b.innerHTML=outputIcon(v)+esc(outputLabel(v));b.setAttribute("aria-pressed",set.has(v));
-    b.onclick=()=>toggleOutput(v);p.appendChild(b)});
+  OUTPUT_GROUPS.forEach(([label,keys])=>{
+    const section=document.createElement("section");section.className="pick-group";
+    const heading=document.createElement("h4");heading.textContent=label;section.appendChild(heading);
+    const grid=document.createElement("div");grid.className="pick-grid";
+    keys.forEach(v=>{const b=document.createElement("button");b.type="button";b.className="g-"+v;b.innerHTML=outputChoice(v);b.setAttribute("aria-label",outputAccessibleLabel(v));b.setAttribute("aria-pressed",set.has(v));
+      b.onclick=()=>toggleOutput(v);grid.appendChild(b)});
+    section.appendChild(grid);p.appendChild(section);
+  });
   paintDestinations();
 }
 function closeSheet(apply){
@@ -823,14 +856,14 @@ function closeSheet(apply){
     if(draft.toggle)cur[k+".toggle"]="1";else delete cur[k+".toggle"];
     render();showCaption(k);
   }
-  $("#sheet").classList.remove("show");sheetKey=null;paintPad();
+  $("#sheet").classList.remove("show");sheetKey=null;sheetAddOutput=null;paintPad();
   const returnTo=sheetReturnFocus&&sheetReturnFocus.isConnected?sheetReturnFocus:$("#steamStage svg:not([hidden]) .ctl[data-k='"+selectedKey+"']");if(returnTo)returnTo.focus();
 }
 function extras(k){const t=[];
-  if(cur[k+".long"])t.push("Long: "+comboText(cur[k+".long"]));
-  if(cur[k+".double"])t.push("Double: "+comboText(cur[k+".double"]));
-  if(cur[k+".shift"])t.push("Shift: "+comboText(cur[k+".shift"]));
-  if(cur[k+".full"])t.push("Full pull: "+comboText(cur[k+".full"]));
+  if(combo(cur[k+".long"]).length)t.push("Long: "+comboText(cur[k+".long"]));
+  if(combo(cur[k+".double"]).length)t.push("Double: "+comboText(cur[k+".double"]));
+  if(combo(cur[k+".shift"]).length)t.push("Shift: "+comboText(cur[k+".shift"]));
+  if(combo(cur[k+".full"]).length)t.push("Full pull: "+comboText(cur[k+".full"]));
   if(cur[k+".turbo"]==="1")t.push("Turbo");if(cur[k+".toggle"]==="1")t.push("Toggle");
   if(cur.SHIFT===k)t.push("Shift button");return t}
 $("#done").onclick=()=>closeSheet(true);
@@ -879,17 +912,22 @@ $("#exp").onclick=()=>{
   toast(isDirty()?"Exported, including unsaved changes":"Exported");
 };
 $("#imp").onclick=()=>{$("#impFile").value="";$("#impFile").click()};
+function mergeImportedProfile(current,incoming){
+  const next={...current};
+  Object.entries(incoming).forEach(([key,value])=>{
+    if(/\.(long|double|shift|full)$/.test(key)&&!combo(value).length)delete next[key];
+    else if(/\.(turbo|toggle)$/.test(key))next[key]=value==="1"?"1":"0";
+    else next[key]=value;
+  });
+  next.name=current.name;return next;
+}
 $("#impFile").onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
   if(f.size>32768){toast("That file is too big to be a profile");return}
   const p=parse(await f.text());
   if(!BITS.some(k=>k in p)){toast("That doesn't look like a Puckbridge profile");return}
-  if(!confirm(`Replace the settings of "${pname(editing)}" with ${f.name}? You can still review them before saving.`))return;
-  /* activators the file doesn't set are cleared, everything else it leaves out keeps its value */
-  const next={...cur};
-  Object.keys(next).forEach(k=>{if(k.includes(".")&&!(k in p))next[k]=/\.(turbo|toggle)$/.test(k)?"0":"NONE"});
-  Object.assign(next,p);next.name=cur.name;
-  cur=next;render();dirty();toast("Imported. Check it, then Save");
+  if(!confirm("Merge settings from "+f.name+" into \""+pname(editing)+"\"? Values present in the file replace current values; omitted settings stay unchanged. An empty or NONE activator clears only that activator. Review, then Save."))return;
+  cur=mergeImportedProfile(cur,p);render();dirty();toast("Merged. Check the profile, then Save");
 };
 $("#del").onclick=async()=>{if(editing==="default"||!confirm(`Delete "${pname(editing)}"?`))return;await api("/api/delete?id="+encodeURIComponent(editing),{method:"POST"});await refreshList();await load("default",true);toast("Deleted")};
 window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()){e.preventDefault();e.returnValue=""}});

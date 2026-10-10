@@ -35,7 +35,7 @@ For a per-feature view of what exists in source, what has host coverage, and wha
 
 ## Button remapping
 
-The **Remap → Buttons** screen now uses interactive Steam Controller and DualSense images, with front/back views, 24 inputs, 18 digital outputs, combo highlights and the existing game-profile editor. Desktop, mobile, keyboard and touch scenarios passed 99 browser checks against a local fixture; operation on a real PS5 remains unverified.
+The **Remap → Buttons** screen uses interactive Steam Controller and DualSense images, front/back views, calibrated L1/R1 and face-button hotspots, 24 inputs, 18 digital outputs, combo highlights and the existing game-profile editor. The local browser fixture passes 114 desktop, mobile, keyboard and touch checks; Host Actions runs this browser regression alongside the normal and ASan/UBSan suites. Operation on a real PS5 remains unverified.
 
 ![Image-based Steam Controller remapping](docs/images/remap-desktop.png)
 
@@ -137,6 +137,7 @@ unzip -q -o .build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk.zip \
   -d .build-cache/ps5-payload-sdk-v0.43
 
 export PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk"
+python3 payload/gen_html.py
 make -C payload clean all
 file payload/ghost-control-ps5.elf
 shasum -a 256 payload/ghost-control-ps5.elf

@@ -43,7 +43,7 @@
 
 ## Exact next action
 
-The firmware retarget and P1 image-remapping request are complete for host/browser/build validation. Reproduce the 99 UI checks with `python3 payload/gen_html.py`, `python3 tests/webui_preview.py` and `playwright-cli run-code --filename tests/webui_remap_browser.js`; see `docs/WEBUI_REMAP.md`. Actual portal H-09 must include front/back hotspots, live highlighting, authentication and persisted profile reload on the PS5. Keep the first-release gate blocked until real hardware records replace the owner-reported placeholders and pass H-01/H-02/H-03/H-04/H-05/H-09/H-12. Do not update the console, deploy the payload, or claim FW 12.00 compatibility without actual device/runtime evidence.
+The firmware retarget and image-remapping implementation are complete for host/browser/build validation. M1-216 passes 114 browser checks; reproduce them with `python3 payload/gen_html.py`, `python3 tests/webui_preview.py`, `playwright-cli open about:blank --browser msedge`, and `playwright-cli run-code --filename tests/webui_remap_browser.js`; see `docs/WEBUI_REMAP.md`. Actual portal H-09 must include front/back hotspots, live highlighting, authentication and persisted profile reload on the PS5. Keep the first-release gate blocked until real hardware records replace the owner-reported placeholders and pass H-01/H-02/H-03/H-04/H-05/H-09/H-12. Do not update the console, deploy the payload, or claim FW 12.00 compatibility without actual device/runtime evidence.
 
 ## Active P1 image remapping update (M1-214)
 

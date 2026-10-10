@@ -28,3 +28,7 @@ H-06 through H-08 are feature-specific: do not claim motion, touch, or feedback 
 ### Image remapping UI follow-up (M1-214)
 
 A local Microsoft Edge fixture passed 99 interaction checks and seven portable embedding tests. This is host evidence only. Actual authenticated PS5 portal rendering, live button highlighting and on-console profile persistence remain NOT_RUN / BLOCKED_HARDWARE on the owner-reported FW 12.00 target. Add the image remapping scenario in `docs/WEBUI_REMAP.md` to H-09 when hardware becomes available; do not change any existing NOT_RUN row to PASS based on these browser tests.
+
+### Remap UX calibration follow-up (M1-216)
+
+The local fixture now passes 114 browser checks, including calibrated DualSense L1/R1 upper shoulder and L2/R2 lower trigger regions, face-button centers, the expanded coarse-pointer hit margin, Shift/import consistency and direct output staging. Eight portable layout/generator tests pass. This updates only host evidence. Actual FW 12.00 portal rendering, live highlighting and profile persistence remain NOT_RUN / BLOCKED_HARDWARE; H-09 and every other existing hardware gate are unchanged.

@@ -9,5 +9,63 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Run portable host and sanitizer suite
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned Playwright CLI and Chromium
+        run: |
+          npm install --global @playwright/cli@0.1.22
+          playwright-cli install-browser chromium --with-deps
+      - name: Generate self-contained portal page
+        run: python3 payload/gen_html.py
+      - name: Run portable host suite
+        run: make -C tests clean test
+      - name: Run AddressSanitizer and UndefinedBehaviorSanitizer suite
         run: make -C tests sanitize
+      - name: Run remap browser regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p output/playwright
+          python3 tests/webui_preview.py > /tmp/webui-preview.log 2>&1 &
+          preview_pid=$!
+          trap 'kill "$preview_pid" 2>/dev/null || true' EXIT
+          for attempt in $(seq 1 30); do
+            if curl --fail --silent http://127.0.0.1:8765/ >/dev/null; then
+              break
+            fi
+            sleep 1
+          done
+          curl --fail --silent http://127.0.0.1:8765/ >/dev/null
+          playwright-cli open about:blank
+          playwright-cli --json run-code --filename tests/webui_remap_browser.js > /tmp/webui-remap-result.json
+          playwright-cli close
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+
+          def find_pass(value):
+              if isinstance(value, dict):
+                  if value.get("result") == "PASS" and isinstance(value.get("checks"), int):
+                      return value
+                  for child in value.values():
+                      result = find_pass(child)
+                      if result:
+                          return result
+              elif isinstance(value, str):
+                  try:
+                      return find_pass(json.loads(value))
+                  except (json.JSONDecodeError, TypeError):
+                      return None
+              elif isinstance(value, list):
+                  for child in value:
+                      result = find_pass(child)
+                      if result:
+                          return result
+              return None
+
+          result = find_pass(json.loads(Path("/tmp/webui-remap-result.json").read_text()))
+          if result is None or result["checks"] < 114:
+              raise SystemExit("Remap browser regression did not report PASS with at least 114 checks")
+          print(f"Remap browser regression: PASS ({result['checks']} checks)")
+          PY

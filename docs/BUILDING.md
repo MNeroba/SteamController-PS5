@@ -18,6 +18,7 @@ unzip -q -o .build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk.zip \
   -d .build-cache/ps5-payload-sdk-v0.43
 
 export PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk"
+python3 payload/gen_html.py
 make -C payload clean
 make -C payload
 ```
@@ -90,6 +91,10 @@ GitHub Actions on the FW 12.00-target documentation/checker commit `81501afa53e2
 
 ## Image remapping build — 2026-10-10
 
-After embedding four controller WebPs and their preserved geometry, the SDK v0.43 / Homebrew LLVM 18.1.8 clean build passed on Darwin 27.0.0 arm64. ELF SHA-256: `667db8369ebe58163b9afe677d2873c62cd56df56ade62f8e6b334d978ed2b07`. The six expected SDK runtime libraries are unchanged. The generated page is 672,184 bytes; Make tracks the WebP/layout/icon dependencies. `make -C tests clean test` and `make -C tests clean sanitize` pass, and seven embedding tests round-trip every asset and the declared response length. Browser checks: `docs/WEBUI_REMAP.md`. Compile/link and local-fixture browser evidence do not establish PS5 FW 12.00 loading or operation. No Release or console deployment occurred.
+At the initial image-remapping publication, the generated page was 672,184 bytes and seven embedding tests passed. Make tracks the WebP/layout/icon dependencies. The follow-up calibration and Remap UX verification are recorded below. Compile/link and local-fixture browser evidence do not establish PS5 FW 12.00 loading or operation. No Release or console deployment occurred.
+
+### Remap UX follow-up — 2026-10-10
+
+DualSense L1/R1 overlays now target the upper shoulder buttons, with L2/R2 on the lower triggers; triangle and circle centers were calibrated against the supplied artwork. The generated page is 674,696 bytes. Eight portable asset/geometry/embedding tests, the full normal suite, and ASan/UBSan pass. SDK v0.43 / Homebrew LLVM 18.1.8 clean cross-build passes; current ELF SHA-256: `3f19ca8a85af5583840ccc9542aa91796740b6b166d6ae553723e7b588565fbf`. The six expected SDK runtime libraries are unchanged. The local Microsoft Edge fixture passes 114 browser checks. See `docs/WEBUI_REMAP.md` and `project-memory/TEST_LOG.md` for exact commands and limits.
 
 The image-remapping source is published at `4065ff41d51b86fdf3a60f972f72b2b24855c647`. [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/38061016300) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38061016345) both pass for that exact commit. The PS5 workflow uploaded temporary artifact `ghost-control-ps5-cross-build` (ID 11673116887, ZIP SHA-256 `bf4acba960df78e5baa70c46a17dcaa2d7b0824ceeed33cb0dedb192c8d951ca`, expires 2027-01-08T14:47:32Z). This is an available compiled output, not a console-verified release.

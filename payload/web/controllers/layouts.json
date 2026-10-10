@@ -702,7 +702,7 @@
           "name": "△ Треугольник",
           "desc": "Лицевая кнопка",
           "t": "c",
-          "cx": 990,
+          "cx": 994,
           "cy": 360,
           "r": 40
         },
@@ -720,7 +720,7 @@
           "name": "○ Круг",
           "desc": "Лицевая кнопка",
           "t": "c",
-          "cx": 1083,
+          "cx": 1078,
           "cy": 440,
           "r": 40
         },
@@ -773,9 +773,9 @@
           "rot": 0
         },
         {
-          "id": "l2",
-          "name": "L2 (левый курок)",
-          "desc": "Виден сверху; подробнее — на виде сзади",
+          "id": "l1",
+          "name": "L1 (left bumper)",
+          "desc": "Visible from the front; more detail in back view",
           "t": "e",
           "cx": 262,
           "cy": 262,
@@ -784,9 +784,9 @@
           "rot": -5
         },
         {
-          "id": "r2",
-          "name": "R2 (правый курок)",
-          "desc": "Виден сверху; подробнее — на виде сзади",
+          "id": "r1",
+          "name": "R1 (right bumper)",
+          "desc": "Visible from the front; more detail in back view",
           "t": "e",
           "cx": 990,
           "cy": 262,
@@ -795,9 +795,9 @@
           "rot": 5
         },
         {
-          "id": "l1",
-          "name": "L1 (левый бампер)",
-          "desc": "Виден сверху; подробнее — на виде сзади",
+          "id": "l2",
+          "name": "L2 (left trigger)",
+          "desc": "Visible from the front; more detail in back view",
           "t": "e",
           "cx": 260,
           "cy": 306,
@@ -806,9 +806,9 @@
           "rot": -4
         },
         {
-          "id": "r1",
-          "name": "R1 (правый бампер)",
-          "desc": "Виден сверху; подробнее — на виде сзади",
+          "id": "r2",
+          "name": "R2 (right trigger)",
+          "desc": "Visible from the front; more detail in back view",
           "t": "e",
           "cx": 994,
           "cy": 306,
@@ -826,9 +826,9 @@
       "bg": "stage-light",
       "shapes": [
         {
-          "id": "l2",
-          "name": "L2 (левый курок)",
-          "desc": "Аналоговый курок",
+          "id": "l1",
+          "name": "L1 (left bumper)",
+          "desc": "Upper bumper",
           "t": "p",
           "pts": [
             [
@@ -874,9 +874,9 @@
           ]
         },
         {
-          "id": "r2",
-          "name": "R2 (правый курок)",
-          "desc": "Аналоговый курок",
+          "id": "r1",
+          "name": "R1 (right bumper)",
+          "desc": "Upper bumper",
           "t": "p",
           "pts": [
             [
@@ -922,9 +922,9 @@
           ]
         },
         {
-          "id": "l1",
-          "name": "L1 (левый бампер)",
-          "desc": "Верхняя кнопка-бампер",
+          "id": "l2",
+          "name": "L2 (left trigger)",
+          "desc": "Analog trigger",
           "t": "p",
           "pts": [
             [
@@ -958,9 +958,9 @@
           ]
         },
         {
-          "id": "r1",
-          "name": "R1 (правый бампер)",
-          "desc": "Верхняя кнопка-бампер",
+          "id": "r2",
+          "name": "R2 (right trigger)",
+          "desc": "Analog trigger",
           "t": "p",
           "pts": [
             [

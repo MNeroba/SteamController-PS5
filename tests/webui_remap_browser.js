@@ -20,6 +20,17 @@ async (page) => {
   const base = await page.evaluate(() => 'name=Default\n' + Object.entries(DEFAULTS).map(([k,v])=>k+'='+v).join('\n') + '\nSHIFT=L4\n');
   await page.request.post('http://127.0.0.1:8765/api/profile?id=default', {headers:{Authorization:'Bearer preview-only'},data:base});
   await page.reload();await page.waitForFunction(() => saved !== '' && cur.A === 'CROSS');
+  const calibrated = await page.evaluate(() => {
+    const front=Object.fromEntries(SHAPES.dual.front.shapes.map(s=>[s.id,s]));
+    const back=Object.fromEntries(SHAPES.dual.back.shapes.map(s=>[s.id,s]));
+    const cy=s=>s.pts.reduce((n,p)=>n+p[1],0)/s.pts.length;
+    return {frontL1:front.l1.cy,frontL2:front.l2.cy,frontR1:front.r1.cy,frontR2:front.r2.cy,
+      tri:[front.tri.cx,front.tri.cy],circle:[front.ci.cx,front.ci.cy],
+      backL1:cy(back.l1),backL2:cy(back.l2),backR1:cy(back.r1),backR2:cy(back.r2)};
+  });
+  check(calibrated.frontL1<calibrated.frontL2&&calibrated.frontR1<calibrated.frontR2,'front L1/R1 target upper bumper buttons');
+  check(calibrated.backL1<calibrated.backL2&&calibrated.backR1<calibrated.backR2,'back L1/R1 target upper bumper buttons');
+  check(calibrated.tri[0]===994&&calibrated.tri[1]===360&&calibrated.circle[0]===1078&&calibrated.circle[1]===440,'face-button overlays centered on source artwork');
   const decoded = await page.evaluate(async () => {
     const result = [];
     for (const device of ['steam', 'dual']) for (const view of ['front', 'back']) {
@@ -34,6 +45,30 @@ async (page) => {
   check(await page.locator('#steamStage svg:not([hidden])').count() === 1, 'one source view visible');
   check(await page.locator('#dualStage svg:not([hidden])').count() === 1, 'one output view visible');
   check(await page.locator('.assignment-list .row').count() === 24, 'all 24 inputs listed');
+  await view('steam','back');
+  await source('L4').click();
+  check(await page.locator('#sheet.show').count()===0&&await page.locator('.assignment-list .row[data-k="L4"]').textContent().then(t=>t.includes('Shift modifier')&&!t.includes('L3')),'Shift input shown only as a modifier, with no phantom action');
+  check((await page.locator('#toast').textContent()).includes('choose another Shift button'),'Shift modifier explains why its editor is unavailable');
+  await view('steam','front');
+  await source('A').click();await page.locator('#sheet.show').waitFor();
+  const outputGroups=await page.locator('#pick .pick-group h4').allTextContents();
+  check(outputGroups.join('|')==='Face buttons|D-pad|Shoulders & triggers|Sticks|System|Touchpad|Puckbridge actions','output actions grouped by function');
+  check((await picker('CROSS').innerText()).trim()==='✕'&&await picker('CROSS').getAttribute('aria-label')==='Cross (✕)','face labels use symbols visually and descriptive accessible names');
+  await page.locator('#cancel').click();
+  check((await page.locator('#dualHint').textContent()).includes('A selected'),'DualSense instructions follow the selected Steam input');
+  await page.locator('#dualStage .destination[data-out="CIRCLE"]').click();
+  check(await page.locator('#sheet.show').count()===1&&await page.evaluate(()=>sheetKey==='A'&&draft[''].has('CIRCLE')),'DualSense tap stages the selected output for confirmation');
+  check((await page.locator('#actHelp').textContent()).includes('staged; choose Done to apply or Cancel to discard'),'direct output assignment explains the confirmation step');
+  await page.locator('#cancel').click();
+  check(await value('A')==='CROSS','Cancel discards a staged DualSense output');
+  await page.evaluate(()=>{cur.B='CIRCLE';cur['A.long']='PS';cur['B.double']='R1';cur.DEADZONE='23';render();window.confirm=()=>true});
+  await page.locator('#impFile').setInputFiles({name:'partial.ini',mimeType:'text/plain',buffer:Buffer.from('A=SQUARE\nA.long=NONE\n')});
+  await page.waitForFunction(()=>cur.A==='SQUARE'&&cur['A.long']===undefined);
+  check(await value('B')==='CIRCLE'&&await value('B.double')==='R1'&&await value('DEADZONE')==='23','profile import merges supplied keys and preserves omitted settings');
+  check(!await page.locator('.assignment-list .row[data-k="A"]').textContent().then(t=>t.includes('Long:')),'NONE activator is normalized and not shown as a phantom');
+  await page.evaluate(()=>{cur=parse(saved);render()});
+  await page.reload();await page.waitForFunction(()=>saved!==''&&cur.A==='CROSS');
+  await page.evaluate(()=>{cur.SHIFT='NONE';render()});
   // Every remappable input must open the production editor at its physical hit area.
   for (const v of ['front','back']) {
     await view('steam', v);
@@ -72,6 +107,7 @@ async (page) => {
   check(await selected('L1') && await selected('R1'), 'multi output draft highlights both shoulders');
   await page.locator('#cancel').click();
   check(await value('A') === 'CROSS' && await selected('CROSS') && !await selected('L1'), 'Cancel restores saved assignment and highlight');
+  await page.locator('#shiftSel').selectOption('L4');
   await open('A'); await page.locator('#clear').click();
   await picker('L1').click(); await picker('R1').click();
   await page.locator('#actTabs [data-a=".long"]').click(); await picker('PS').click();
@@ -140,10 +176,17 @@ async (page) => {
     await touchContext.addInitScript(()=>sessionStorage.setItem('pb.webuiToken','preview-only'));
     const touchPage = await touchContext.newPage();
     await touchPage.goto('http://127.0.0.1:8765/#remap/profile=default/buttons');await touchPage.waitForFunction(()=>saved!=='');
+    check(await touchPage.evaluate(()=>matchMedia('(pointer: coarse)').matches),'touch browser exposes coarse-pointer targets');
     await touchPage.locator('#steamStage svg:not([hidden]) .ctl[data-k="A"]').tap();
     check(await touchPage.locator('#sheet.show').count()===1,'touch tap opens production editor');
     await touchPage.locator('#pick .g-CROSS').tap();await touchPage.locator('#cancel').tap();
     check(await touchPage.evaluate(()=>cur.A==='L1+R1'),'touch Cancel retains assignment');
+    await touchPage.locator('#dualStage').scrollIntoViewIfNeeded();
+    const circleBox=await touchPage.locator('#dualStage svg:not([hidden]) .destination[data-out="CIRCLE"]').boundingBox();
+    await touchPage.touchscreen.tap(circleBox.x+circleBox.width+13,circleBox.y+circleBox.height/2);
+    const touchAssignment=await touchPage.evaluate(()=>({coarse:matchMedia('(pointer: coarse)').matches,selectedKey,sheetKey,act,circleStaged:draft?.['']?.has('CIRCLE')||false,rect:document.querySelector('#dualStage svg:not([hidden]) .destination[data-out="CIRCLE"]').getBoundingClientRect().toJSON()}));
+    check(await touchPage.locator('#sheet.show').count()===1&&touchAssignment.circleStaged,'enlarged touch target stages a nearby DualSense output '+JSON.stringify(touchAssignment));
+    await touchPage.locator('#cancel').tap();
     await touchPage.locator('.viewswitch[data-controller="steam"] [data-view="back"]').tap();
     await touchPage.locator('#steamStage svg:not([hidden]) .ctl[data-k="L5"]').tap();
     check(await touchPage.evaluate(()=>sheetKey==='L5'),'touch back grip maps physical left input');
