@@ -71,8 +71,8 @@ sanitize:
 $(BUILD):
 	mkdir -p $@
 
-$(BUILD)/test_webui_http: test_webui_http.c ../payload/webui_http.c ../payload/webui_auth.c | $(BUILD)
-	$(CC) $(CFLAGS) -I../payload $^ -o $@
+$(BUILD)/test_webui_http: test_webui_http.c ../payload/webui_http.c ../payload/webui_auth.c ../payload/webui_html.h | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -o $@
 
 $(BUILD)/test_webui_peer_policy: test_webui_peer_policy.c ../payload/webui_peer_policy.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $^ -o $@

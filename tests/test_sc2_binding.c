@@ -21,6 +21,89 @@ static void *invalidate_worker(void *unused) {
     } \
 } while (0)
 
+static void pressure(sc2_bind_state_t *state, const sc2_profile_t *p, uint32_t in,
+                     int full_l, int full_r, int64_t now, uint8_t lt, uint8_t rt,
+                     uint8_t expected_l2, uint8_t expected_r2) {
+    (void)sc2_bind_eval(state, p, 1, in, full_l, full_r, now);
+    uint8_t l2, r2;
+    sc2_bind_trigger_pressure(state, lt, rt, &l2, &r2);
+    CHECK(l2 == expected_l2); CHECK(r2 == expected_r2);
+}
+
+static void trigger_regressions(void) {
+    sc2_profile_t p = {0}; sc2_bind_state_t state = {0};
+    p.shift_in = -1; p.long_ms = 400; p.double_ms = 250; p.turbo_ms = 60;
+    p.map[IN_LT] = SCE_PAD_BUTTON_L2; p.map[IN_RT] = SCE_PAD_BUTTON_R2;
+    p.map[IN_A] = SCE_PAD_BUTTON_CROSS; p.lng[IN_A] = SCE_PAD_BUTTON_L2;
+    pressure(&state, &p, 0, 0, 0, 0, 100, 70, 0, 0); /* initial neutral */
+    pressure(&state, &p, 0, 0, 0, 1, 8, 0, 8, 0); /* below digital threshold */
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 10, 100, 0, 100, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_A), 0, 0, 20, 100, 0, 100, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_A), 0, 0, 419, 100, 0, 100, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_A), 0, 0, 420, 100, 0, 255, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 430, 100, 0, 100, 0);
+    p.lng[IN_A] = 0; p.dbl[IN_A] = SCE_PAD_BUTTON_L2;
+    pressure(&state, &p, 0, 0, 0, 500, 0, 0, 0, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_A), 0, 0, 510, 90, 0, 90, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 520, 90, 0, 90, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_A), 0, 0, 530, 90, 0, 255, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 540, 90, 0, 90, 0);
+    p.shift_in = IN_L4; p.shf[IN_LT] = SCE_PAD_BUTTON_R2; p.dbl[IN_A] = 0;
+    pressure(&state, &p, 0, 0, 0, 600, 0, 0, 0, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_L4), 0, 0, 610, 120, 30, 0, 120);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 620, 120, 30, 120, 30);
+    p.map[IN_LT] = SCE_PAD_BUTTON_R2 | SCE_PAD_BUTTON_CROSS;
+    p.map[IN_RT] = SCE_PAD_BUTTON_L2;
+    pressure(&state, &p, 0, 0, 0, 700, 0, 0, 0, 0);
+    pressure(&state, &p, (1u << IN_LT) | (1u << IN_RT), 0, 0, 710, 110, 75, 75, 110);
+    p.shift_in = IN_LT; p.full[0] = SCE_PAD_BUTTON_L2;
+    pressure(&state, &p, 0, 0, 0, 800, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_LT, 1, 0, 810, 255, 0, 0, 0);
+    p.shift_in = -1; p.map[IN_A] = SCE_PAD_BUTTON_L2; p.turbo[IN_A] = 1;
+    pressure(&state, &p, 0, 0, 0, 900, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 910, 0, 0, 255, 0);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 970, 0, 0, 0, 0);
+    p.turbo[IN_A] = 0; p.toggle[IN_A] = 1;
+    pressure(&state, &p, 0, 0, 0, 1000, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 1010, 0, 0, 255, 0);
+    pressure(&state, &p, 0, 0, 0, 1020, 0, 0, 255, 0);
+    sc2_bind_reset(&state);
+    pressure(&state, &p, 0, 0, 0, 1030, 0, 0, 0, 0);
+    p.toggle[IN_A] = 0;
+    pressure(&state, &p, 0, 0, 0, 1040, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_LT, 1, 0, 1050, 200, 0, 255, 200);
+    p.lng[IN_A] = SCE_PAD_BUTTON_R2; p.toggle[IN_A] = 1;
+    pressure(&state, &p, 0, 0, 0, 1100, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 1110, 0, 0, 0, 0);
+    pressure(&state, &p, 0, 0, 0, 1120, 0, 0, 255, 0); /* quick regular tap */
+    pressure(&state, &p, 0, 0, 0, 1210, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 1300, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 1700, 0, 0, 0, 255);
+    pressure(&state, &p, 0, 0, 0, 1710, 0, 0, 0, 255);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 1800, 0, 0, 0, 255);
+    pressure(&state, &p, 1u << IN_A, 0, 0, 2200, 0, 0, 0, 0);
+    pressure(&state, &p, 0, 0, 0, 2210, 0, 0, 0, 0);
+    p.toggle[IN_A] = 0; p.lng[IN_A] = 0; p.map[IN_A] = SCE_PAD_BUTTON_CROSS;
+    p.shf[IN_A] = SCE_PAD_BUTTON_L2; p.shift_in = IN_L4;
+    p.map[IN_LT] = SCE_PAD_BUTTON_L2; p.map[IN_RT] = SCE_PAD_BUTTON_L2;
+    p.full[0] = 0;
+    pressure(&state, &p, 0, 0, 0, 2300, 0, 0, 0, 0);
+    pressure(&state, &p, (1u << IN_A) | (1u << IN_LT) | (1u << IN_RT), 0, 0, 2310, 80, 110, 110, 0);
+    pressure(&state, &p, (1u << IN_A) | (1u << IN_L4) | (1u << IN_LT), 0, 0, 2320, 80, 0, 255, 80);
+    pressure(&state, &p, (1u << IN_A) | (1u << IN_LT), 0, 0, 2330, 80, 0, 80, 0);
+    p.shift_in = -1; p.dbl[IN_LT] = SCE_PAD_BUTTON_R2;
+    pressure(&state, &p, 0, 0, 0, 2400, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 2410, 90, 0, 90, 0);
+    pressure(&state, &p, 0, 0, 0, 2420, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 2430, 90, 0, 0, 255);
+    pressure(&state, &p, 0, 0, 0, 2440, 0, 0, 0, 0);
+    p.dbl[IN_LT] = 0; p.lng[IN_LT] = SCE_PAD_BUTTON_R2;
+    pressure(&state, &p, 0, 0, 0, 2500, 0, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 2510, 90, 0, 0, 0);
+    pressure(&state, &p, 1u << IN_LT, 0, 0, 2910, 90, 0, 0, 255);
+    pressure(&state, &p, 0, 0, 0, 2920, 0, 0, 0, 0);
+}
+
 int main(void) {
     sc2_profile_t toggle_profile;
     sc2_profile_t other_profile;
@@ -158,6 +241,18 @@ int main(void) {
               (SCE_PAD_BUTTON_TRIANGLE | trigger_profile.full[shift == IN_LT]));
     }
 
+    /* Long + Turbo repeats the long destination after its threshold. */
+    sc2_bind_reset(&state);
+    long_profile.turbo[IN_A] = 1;
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 0, 0, 0, 20000) == 0);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 1u << IN_A, 0, 0, 20001) == 0);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 1u << IN_A, 0, 0, 20401) == SCE_PAD_BUTTON_SQUARE);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 1u << IN_A, 0, 0, 20461) == 0);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 0, 0, 0, 20470) == 0);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 1u << IN_A, 0, 0, 20500) == 0);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 0, 0, 0, 20520) == SCE_PAD_BUTTON_CIRCLE);
+    CHECK(sc2_bind_eval(&state, &long_profile, 99, 0, 0, 0, 20610) == 0);
+    trigger_regressions();
     printf("Steam binding transition checks passed (%d checks)\n", checks);
     return 0;
 }

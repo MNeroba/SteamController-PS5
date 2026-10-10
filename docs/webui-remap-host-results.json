@@ -1,6 +1,6 @@
 {
   "result": "PASS",
-  "checks": 162,
+  "checks": 181,
   "passed": [
     "reject invalid imported identifier 0",
     "reject invalid imported identifier 1",
@@ -163,6 +163,25 @@
     "touch back grip maps physical left input",
     "Games navigation still works",
     "Settings navigation still works",
+    "canonical readback requires settings as well as all base bindings",
+    "invalid Save returns failure and releases the shared Save operation",
+    "valid Save succeeds after a validation failure",
+    "reverse Load responses retain latest committed selection and hash",
+    "late Load cannot overwrite a newer draft",
+    "failed authorized Load preserves dirty draft and selection",
+    "Escape cancels profile navigation without changes",
+    "failed Save in navigation guard retains draft",
+    "Save and canonical confirmation authorize profile navigation",
+    "guard Save keeps default profile persisted",
+    "game-list creation Cancel preserves draft and never prompts name",
+    "cancelled creation leaves no orphan profile",
+    "Now Playing shortcut uses the same unsaved-create guard",
+    "Discard authorizes creation and commits the confirmed new profile",
+    "pending Save can be confirmed before switching profile",
+    "Save and reload of the same ID do not attach stale confirmation to a different editor",
+    "delayed Delete cannot replace newer selection or draft",
+    "Back cancels pending profile history load",
+    "Forward commits profile, dropdown and URL together",
     "no JavaScript runtime errors"
   ],
   "decoded": [
@@ -199,55 +218,5 @@
       "ih": 1254
     }
   ],
-  "hardware": "NOT_RUN; loopback fixture only",
-  "environment": {
-    "os": "macOS arm64",
-    "node": "24.11.0",
-    "browser": "Microsoft Edge 152.0.4191.53",
-    "playwright_cli": "0.1.22",
-    "python": "3.14.3"
-  },
-  "baseline_commit": "799d301b8d8936244fe5ea50ab9967b21cccee2d",
-  "previous_github_actions": {
-    "commit": "408900592f50b1eb39b0003c357c95a137410f2f",
-    "host_run": {
-      "id": 38067268430,
-      "url": "https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268430",
-      "conclusion": "success",
-      "normal_host_suite": "success",
-      "asan_ubsan_suite": "success",
-      "chromium_browser_regression": "success",
-      "minimum_required_browser_checks": 114
-    },
-    "ps5_cross_build_run": {
-      "id": 38067268427,
-      "url": "https://github.com/MNeroba/SteamController-PS5/actions/runs/38067268427",
-      "conclusion": "success",
-      "artifact_id": 11676095033,
-      "artifact_name": "ghost-control-ps5-cross-build",
-      "artifact_sha256": "85add35acff842f0bee8670b7fa66ee949346409459c322fcdbfc3e5446025f1",
-      "expires_at": "2027-01-08T16:20:34Z"
-    }
-  },
-  "github_actions": {
-    "source_commit": "6914442f6b813f90d1156f93d18f532919ff13e8",
-    "host": {
-      "run_id": 38070068676,
-      "conclusion": "success",
-      "browser_minimum_checks": 162,
-      "browser_checks": 162
-    },
-    "cross_build": {
-      "run_id": 38070068771,
-      "conclusion": "success",
-      "artifact": {
-        "id": 11676088176,
-        "name": "ghost-control-ps5-cross-build",
-        "size_bytes": 942353,
-        "zip_sha256": "8de1f1c95ffd9dc12c7c3ea35e322b48c1f907c3e5186a229c3a3dedab6cc307",
-        "expires_at": "2027-01-08T17:01:55Z"
-      }
-    }
-  },
-  "fixture": "Loopback HTTP/RAM; production sc2_profile_parse/format via host stdin adapter; PS5 socket/filesystem/ABI NOT_RUN"
+  "hardware": "NOT_RUN; loopback fixture only"
 }

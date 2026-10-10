@@ -60,6 +60,7 @@ uint32_t sc2_bind_eval(sc2_bind_state_t *state, const sc2_profile_t *P,
     uint32_t out = 0;
     if (!state || !P) return 0;
     state->neutral_report = 0;
+    state->analog_mask[0] = state->analog_mask[1] = state->digital_mask = 0;
     uint32_t current_reset_epoch = reset_epoch();
     if (state->reset_epoch != current_reset_epoch) {
         sc2_bind_reset(state);
@@ -104,27 +105,51 @@ uint32_t sc2_bind_eval(sc2_bind_state_t *state, const sc2_profile_t *P,
         uint32_t lng  = shifted ? 0 : P->lng[i];
         uint32_t dbl  = shifted ? 0 : P->dbl[i];
 
+        uint32_t fired = 0;
+        int analog_base = 0;
         if (edge_dn) {
             state->input[i].dbl_active = (uint8_t)(dbl && state->input[i].t_up && now - state->input[i].t_up <= P->double_ms);
             state->input[i].t_down = now;
             state->input[i].long_fired = 0;
-            if (P->toggle[i] && !lng && !state->input[i].dbl_active) state->input[i].toggled ^= 1;
+            if (P->toggle[i] && !lng && !state->input[i].dbl_active) {
+                state->input[i].toggled ^= 1;
+                state->input[i].toggle_mask = base;
+            }
         }
 
+        /* Continuous analog base routing does not depend on the digital
+         * trigger threshold; it stops when an advanced activator owns input. */
+        if ((i == IN_LT || i == IN_RT) && !lng && !state->input[i].dbl_active &&
+            !P->turbo[i] && !P->toggle[i]) {
+            state->analog_mask[i == IN_RT] = base;
+            analog_base = 1;
+        }
         if (pressed) {
             if (state->input[i].dbl_active) {
-                out |= dbl;
+                fired |= dbl;
             } else if (lng) {
-                if (now - state->input[i].t_down >= P->long_ms) { out |= lng; state->input[i].long_fired = 1; }
+                if (now - state->input[i].t_down >= P->long_ms) {
+                    if (P->toggle[i]) {
+                        if (!state->input[i].long_fired) {
+                            state->input[i].toggled ^= 1;
+                            state->input[i].toggle_mask = lng;
+                        }
+                    } else if (!P->turbo[i] ||
+                        (((now - state->input[i].t_down - P->long_ms) /
+                          (P->turbo_ms ? P->turbo_ms : 60)) & 1) == 0) fired |= lng;
+                    state->input[i].long_fired = 1;
+                }
             } else if (P->toggle[i]) {
                 /* handled below */
             } else if (P->turbo[i]) {
                 int64_t ph = (now - state->input[i].t_down) / (P->turbo_ms ? P->turbo_ms : 60);
-                if ((ph & 1) == 0) out |= base;
+                if ((ph & 1) == 0) fired |= base;
             } else {
-                out |= base;
+                fired |= base;
             }
         }
+        out |= fired;
+        if (!analog_base) state->digital_mask |= fired;
 
         if (edge_up) {
             if (lng && !state->input[i].long_fired && !state->input[i].dbl_active) {   /* short tap on a long-press input */
@@ -135,12 +160,31 @@ uint32_t sc2_bind_eval(sc2_bind_state_t *state, const sc2_profile_t *P,
             state->input[i].t_up = now;
         }
 
-        if (P->toggle[i] && state->input[i].toggled) out |= base;
-        if (state->input[i].pulse_until > now) out |= state->input[i].pulse_mask;
+        uint32_t digital = 0;
+        if (P->toggle[i] && state->input[i].toggled) digital |= P->lng[i] ? state->input[i].toggle_mask : base;
+        if (state->input[i].pulse_until > now) digital |= state->input[i].pulse_mask;
+        out |= digital;
+        state->digital_mask |= digital;
     }
 
     /* Shift inputs are modifiers only, including a trigger's hardware click. */
-    if (full_l && shift_in != IN_LT) out |= P->full[0];
-    if (full_r && shift_in != IN_RT) out |= P->full[1];
+    if (full_l && shift_in != IN_LT) state->digital_mask |= P->full[0];
+    if (full_r && shift_in != IN_RT) state->digital_mask |= P->full[1];
+    out |= state->digital_mask;
     return out;
+}
+
+void sc2_bind_trigger_pressure(const sc2_bind_state_t *state, uint8_t lt,
+                              uint8_t rt, uint8_t *l2, uint8_t *r2) {
+    uint8_t pressure[2] = {0, 0}, raw[2] = {lt, rt};
+    const uint32_t bits[2] = {SCE_PAD_BUTTON_L2, SCE_PAD_BUTTON_R2};
+    if (state && state->profile_valid && !state->neutral_report) {
+        for (int dest = 0; dest < 2; dest++) {
+            for (int source = 0; source < 2; source++)
+                if ((state->analog_mask[source] & bits[dest]) && raw[source] > pressure[dest]) pressure[dest] = raw[source];
+            if (state->digital_mask & bits[dest]) pressure[dest] = 255;
+        }
+    }
+    if (l2) *l2 = pressure[0];
+    if (r2) *r2 = pressure[1];
 }

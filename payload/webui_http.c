@@ -280,8 +280,7 @@ int webui_http_write_chunks(void *context, webui_http_send_fn send,
                      chunks[i].length - sent, remaining_ms);
             if (n < 0) {
                 if (errno == EINTR) continue;
-                if (errno == EAGAIN || errno == EWOULDBLOCK)
-                    return WEBUI_HTTP_WRITE_TIMEOUT;
+                if (errno == EAGAIN || errno == EWOULDBLOCK) continue;
                 return WEBUI_HTTP_WRITE_IO_ERROR;
             }
             if (n == 0 || (size_t)n > chunks[i].length - sent)

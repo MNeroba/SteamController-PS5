@@ -38,7 +38,7 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
-#define REQ_MAX WEBUI_HTTP_BODY_MAX
+#define REQ_MAX (WEBUI_HTTP_HEADER_MAX + WEBUI_HTTP_BODY_MAX)
 #define WEBUI_TOKEN_PATH "/data/ghostpad/webui.token"
 #define WEBUI_RESPONSE_TIMEOUT_MS 5000u
 
@@ -136,7 +136,11 @@ static ssize_t webui_socket_send(void *context, const char *buffer, size_t lengt
     timeout.tv_usec = (suseconds_t)(wait_ms % 1000u) * 1000;
     if (setsockopt(fd, SOL_SOCKET, SO_SNDTIMEO, &timeout, sizeof(timeout)) != 0)
         return -1;
+#ifdef MSG_NOSIGNAL
+    return send(fd, buffer, length, MSG_NOSIGNAL);
+#else
     return send(fd, buffer, length, 0);
+#endif
 }
 
 static int webui_monotonic_ms(void *context, uint64_t *now_ms) {
@@ -149,8 +153,10 @@ static int webui_monotonic_ms(void *context, uint64_t *now_ms) {
 
 static void send_response_chunks(int fd, const webui_http_chunk_t *chunks,
                                  size_t chunk_count) {
-    (void)webui_http_write_chunks(&fd, webui_socket_send, webui_monotonic_ms,
-                                  WEBUI_RESPONSE_TIMEOUT_MS, chunks, chunk_count);
+    int result = webui_http_write_chunks(&fd, webui_socket_send, webui_monotonic_ms,
+                                         WEBUI_RESPONSE_TIMEOUT_MS, chunks, chunk_count);
+    if (result != WEBUI_HTTP_WRITE_OK)
+        LOG("webui: incomplete response (%d); closing client\n", result);
 }
 
 static void handle(int fd) {
@@ -294,15 +300,17 @@ static void handle(int fd) {
                 REPLY_TXT(fd, 400, "profile requires a non-empty text/plain UTF-8 body");
                 return;
             }
-            if (sc2_store_load(id, &p) != 0) sc2_profile_default(&p);
-            sc2_profile_parse(body, &p);
+            int loaded = sc2_store_load(id, &p);
+            if (loaded == SC2_STORE_NOT_FOUND) sc2_profile_default(&p);
+            else if (loaded != 0) { REPLY_TXT(fd, 400, "existing profile unreadable; repair or delete it explicitly"); return; }
+            if (sc2_profile_parse_checked(body, &p, 0) != 0) { REPLY_TXT(fd, 400, "invalid profile"); return; }
             if (sc2_store_save(id, &p) != 0) { REPLY_TXT(fd, 400, "save failed"); return; }
             sc2_select_reload();
             REPLY_TXT(fd, 200, "saved");
         } else {
             if (sc2_store_load(id, &p) != 0) { REPLY_TXT(fd, 404, "no such profile"); return; }
-            static char out[8192]; int n = sc2_profile_format(&p, out, sizeof(out));
-            if (n < 0 || (size_t)n >= sizeof(out) - 1) REPLY_TXT(fd, 500, "profile response overflow");
+            static char out[SC2_PROFILE_CAPACITY]; int n = sc2_profile_format(&p, out, sizeof(out));
+            if (n < 0 || (size_t)n >= sizeof(out)) REPLY_TXT(fd, 500, "profile response overflow");
             else reply(fd, 200, "text/plain", out, (size_t)n);
         }
         return;
@@ -469,7 +477,10 @@ static void *server_thread(void *arg) {
         }
 #ifdef SO_NOSIGPIPE
         int no_sigpipe = 1;
-        setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe));
+        if (setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe)) != 0) {
+            LOG("webui: cannot protect client socket from SIGPIPE\n");
+            close(c); continue;
+        }
 #endif
         struct timeval tv = { 2, 0 };
         setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));

@@ -84,3 +84,11 @@ Status is now **PARTIALLY FIXED (HOST); TARGET ABI/HARDWARE UNVERIFIED**. The wo
 Status: FIXED — LOCAL HOST/BROWSER/BUILD PASS; PUBLICATION/CI PENDING; PS5 H-09 UNVERIFIED. Owner audit identified unsafe class attribute interpolation, Shift phantom highlights/full trigger output, coarse rectangle tie selection, imported Turbo+Toggle conflict and Save without canonical readback. Expected-red browser/C regressions confirmed the defects. ADR-050 applies identifier allowlists and safe DOM rows, full modifier semantics, disjoint SVG shapes and actual geometric hits, shared flag policy, snapshot-aware POST/GET confirmation. Nine portable checks and 162 browser assertions pass; normal/sanitizer suites and clean SDK v0.43 build pass. Optional Replace Profile is deferred P2, not a defect of the documented Merge contract. Real PS5 persistence/rendering/runtime remains blocked by absent hardware.
 
 P0-REMAP-IMPORT-01 / P1-REMAP-EDGE-01 publication: FIXED — HOST/BROWSER/BUILD AND ACTIONS PASS at `6914442f6b813f90d1156f93d18f532919ff13e8` (M1-219), including persistence of cleared activators, mobile scroll cue and disjoint SVG outputs. Target validation is still H-09/NOT_RUN. Optional Replace Profile remains deferred P2; supported import mode is Merge.
+
+## Remaining-binding audit closure — 2026-10-10 (M1-220)
+
+- P0-PROFILE-INTEGRITY-01: FIXED_HOST — overflow errors, 24 KiB complete snapshots, malformed/oversized/truncated rejection, preserved old file under storage failures, checked call-site errors and recovery of invalid files.
+- P1-TRIGGER-PROVENANCE-01: FIXED_HOST — effective Shift/cross/combination routing, proportional pressure and actual digital sources; no inactive activator inflation. Prospero pad/threshold behavior NOT_RUN.
+- P1-PROFILE-NAV-01: FIXED_HOST_BROWSER — Save/Discard/Cancel, no orphan on Cancel, stale response/draft/editor protection, Delete/Create/Back/Forward and canonical readback. Physical portal H-09 NOT_RUN.
+- P2-LONG-MODIFIERS-01: FIXED_HOST — supported Long Turbo/Toggle semantics are documented and tested; ordinary Toggle precedence retained.
+- P2-HTTP-DELIVERY-01: FIXED_HOST — actual embedded page under short writes/EINTR/EAGAIN and deterministic timeout/disconnect; failure logging/SIGPIPE guards. Actual FW 12.00 throughput, browser/dialog support and socket behavior BLOCKED_HARDWARE.

@@ -488,20 +488,9 @@ int sc2_handle_packet(const uint8_t *b, uint32_t len, ScePadData *o, int *link,
     sc2_gyro_buttons(act);
     btn &= ~PB_ACT_MASK;
 
-    /* 3. analog triggers follow a plain LT/RT → L2/R2 binding; any other
-     *    source of L2/R2 (combo, long press, grip...) sends full pressure */
+    /* 3. Pressure follows the binding engine's evaluated source provenance. */
     uint8_t ol2 = 0, or2 = 0;
-    int lt_plain = !P.lng[IN_LT] && !P.turbo[IN_LT] && !P.toggle[IN_LT];
-    int rt_plain = !P.lng[IN_RT] && !P.turbo[IN_RT] && !P.toggle[IN_RT];
-    if (lt_plain && (P.map[IN_LT] & SCE_PAD_BUTTON_L2)) ol2 = lt;
-    if (rt_plain && (P.map[IN_RT] & SCE_PAD_BUTTON_L2) && rt > ol2) ol2 = rt;
-    if (lt_plain && (P.map[IN_LT] & SCE_PAD_BUTTON_R2)) or2 = lt;
-    if (rt_plain && (P.map[IN_RT] & SCE_PAD_BUTTON_R2) && rt > or2) or2 = rt;
-    uint32_t other = 0;                               /* L2/R2 from non-trigger sources */
-    for (int i = 0; i < SC2_IN_COUNT; i++)
-        if (i != IN_LT && i != IN_RT && (in & (1u << i))) other |= P.map[i] | P.lng[i] | P.dbl[i] | P.shf[i];
-    if ((btn & SCE_PAD_BUTTON_L2) && ((other & SCE_PAD_BUTTON_L2) || !ol2)) ol2 = 255;
-    if ((btn & SCE_PAD_BUTTON_R2) && ((other & SCE_PAD_BUTTON_R2) || !or2)) or2 = 255;
+    sc2_bind_trigger_pressure(&input_state->binding, lt, rt, &ol2, &or2);
     o->analogButtons.l2 = ol2;
     o->analogButtons.r2 = or2;
 

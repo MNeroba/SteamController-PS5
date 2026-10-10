@@ -1,6 +1,6 @@
 # Project memory — current status
 
-**Snapshot:** 2026-10-10; repeat Remap audit hardening is published and Host/Chromium/ASan-UBSan/PS5 Actions pass. FW 12.00 remains an unverified target.
+**Snapshot:** 2026-10-10; remaining binding/persistence/navigation audit passes local Host/ASan-UBSan/181 browser/SDK checks; direct-main publication pending. FW 12.00 remains an unverified target.
 **Repository:** private GitHub repository MNeroba/SteamController-PS5; default branch main.
 **Latest source commit:** 6914442f6b813f90d1156f93d18f532919ff13e8 (tree 4bff80b5c83f088da2fef77b826e22c9314c5607; 234 blobs). Firmware target adaptation remains the previously verified source 81501afa53e2acd329db0298ffccdc533161e749; historical records below preserve earlier results.
 
@@ -69,3 +69,9 @@ Baseline main `799d301b8d8936244fe5ea50ab9967b21cccee2d`. Five confirmed Remap a
 ## Latest acknowledged source and exact next action (M1-219)
 
 `6914442f6b813f90d1156f93d18f532919ff13e8` is on main, complete 234-blob tree, no removed paths. Host `38070068676` and PS5 cross-build `38070068771` PASS. Temporary ELF build artifact `11676088176` is available through the cross-build run; no Release. Local 162 browser assertions, nine portable contracts, normal/ASan-UBSan and SDK v0.43 clean build pass. P0 imported HTML safety and all audited Shift/touch/Turbo/Save/persistence issues are fixed at the host/build evidence level. Physical H-09 must repeat authenticated rendering, hostile rejection, canonical saved/cleared state after restart, Shift-trigger and boundary touch behavior on the exact installed FW. All PS5/USB/Puck/haptics/coexistence gates remain NOT_RUN. Optional Replace Profile is deferred P2; Merge is supported.
+
+## Binding, persistence and navigation audit — M1-220 (2026-10-10)
+
+`VERIFIED_HOST_TEST`: full normal and ASan/UBSan suites PASS; profile 52 assertions, atomic storage 71, binding/proportional-pressure 165 and HTTP/auth 110. Nine portable artwork/generator contracts and 181 Edge/Playwright browser assertions PASS (all original 162 retained). The maximum-complexity stored profile is 14,573 bytes; complete 24-input/22-output/activator round-trip succeeds within the 24 KiB capacity. Final generated page: 685,503 UTF-8 bytes, 41 icons/four unchanged controller images. Clean SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `5bdd18153301213e7a4b82e3038dff24563fdc7e0e474ce41546d3c66ffc7dbc`. This is local source/build evidence; publication and Actions acknowledgement follow separately. Physical FW 12.00 remains NOT_RUN.
+
+Current next action: publish only M1-220 allowlisted files over full main 45a8bda6c53efd50099e1f727ea9cc2b3fa30f0b, verify tree/blob preservation and both Actions, then append acknowledged source SHA/results. Thereafter physical H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain blocked. Do not deploy, touch stock BLE/HCI or publish a Release.

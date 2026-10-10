@@ -310,6 +310,7 @@ async (page) => {
     check(await touchPage.evaluate(()=>matchMedia('(pointer: coarse)').matches),'touch browser exposes coarse-pointer targets');
     await touchPage.locator('#steamStage svg:not([hidden]) .ctl[data-k="A"]').tap();
     check(await touchPage.locator('#sheet.show').count()===1,'touch tap opens production editor');
+    await touchPage.waitForFunction(()=>document.querySelector('#sheetScrollHint').textContent.includes('below'));
     check(await touchPage.locator('#sheetScrollHint').isVisible()&&(await touchPage.locator('#sheetScrollHint').textContent()).includes('below'),'mobile editor indicates more output groups below');
     await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').scrollIntoViewIfNeeded();
     check(await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').isVisible(),'last Puckbridge action reachable in mobile dialog');
@@ -331,6 +332,93 @@ async (page) => {
   await page.setViewportSize({width:1440,height:1050});
   await page.locator('[data-tab="games"]').click();check(await page.locator('#tab-games').isVisible(), 'Games navigation still works');
   await page.locator('[data-tab="help"]').click();check(await page.locator('#tab-help').isVisible(), 'Settings navigation still works');
+  check(await page.evaluate(()=>{
+    try{serverProfile(profileWrite(cur).replace(/^MOTION=.*\n/m,''));return false}catch(e){return e.message.includes('Incomplete')}
+  }),'canonical readback requires settings as well as all base bindings');
+  const originalName=await page.evaluate(()=>cur.name);
+  check(await page.evaluate(async()=>{cur.name='N'.repeat(60);render();return !await saveCurrent()&&!saving&&savePromise===null&&isDirty()}),'invalid Save returns failure and releases the shared Save operation');
+  await page.evaluate(name=>{cur.name=name;cur.A='CROSS';render()},originalName);
+  check(await page.evaluate(async()=>await saveCurrent()&&!saving&&savePromise===null&&!isDirty()),'valid Save succeeds after a validation failure');
+  // Profile-operation regressions. Gates control actual browser responses.
+  await page.evaluate(()=>{switchTab('remap')});
+  const gateProfile=async(id,method='GET')=>{
+    let release,ready;const active=[];
+    const gate=new Promise(r=>release=r),started=new Promise(r=>ready=r);
+    const pattern='**/api/'+(method==='DELETE'?'delete':'profile')+'?id='+id;
+    await page.route(pattern,async route=>{
+      if(route.request().method()!==(method==='DELETE'?'POST':method))return route.continue();
+      let done;active.push(new Promise(r=>done=r));
+      try{const response=await route.fetch();ready();await gate;await route.fulfill({response})}finally{done()}
+    });
+    return {started,release,remove:async()=>{await Promise.all(active);await page.unroute(pattern)}};
+  };
+  await page.evaluate(()=>load('default',true));
+  const oldLoad=await gateProfile('PPSA00001');
+  await page.evaluate(()=>{window.navOld=load('PPSA00001',true)});await oldLoad.started;
+  await page.evaluate(()=>load('default',true));oldLoad.release();await page.evaluate(()=>window.navOld);await oldLoad.remove();
+  check(await page.evaluate(()=>editing==='default'&&document.querySelector('#prof').value==='default'&&location.hash.includes('profile=default')),'reverse Load responses retain latest committed selection and hash');
+  const draftLoad=await gateProfile('PPSA00001');
+  await page.evaluate(()=>{window.navDraft=load('PPSA00001',true)});await draftLoad.started;
+  await page.evaluate(()=>{cur.A='TRIANGLE';render()});draftLoad.release();await page.evaluate(()=>window.navDraft);await draftLoad.remove();
+  check(await page.evaluate(()=>editing==='default'&&cur.A==='TRIANGLE'&&isDirty()),'late Load cannot overwrite a newer draft');
+  await page.route('**/api/profile?id=PPSA00001',r=>r.fulfill({status:500,body:'injected load failure'}));
+  await page.evaluate(()=>{window.navFailed=load('PPSA00001')});await page.locator('#profileGuard[open]').waitFor();
+  await page.locator('#guardDiscard').click();await page.evaluate(()=>window.navFailed);
+  check(await page.evaluate(()=>editing==='default'&&cur.A==='TRIANGLE'&&isDirty()&&document.querySelector('#prof').value==='default'),'failed authorized Load preserves dirty draft and selection');
+  await page.unroute('**/api/profile?id=PPSA00001');
+  await page.evaluate(()=>{window.navCancelled=load('PPSA00001')});await page.locator('#profileGuard[open]').waitFor();await page.keyboard.press('Escape');
+  check(await page.evaluate(async()=>!await window.navCancelled&&editing==='default'&&cur.A==='TRIANGLE'),'Escape cancels profile navigation without changes');
+  // Save failure through the explicit leave guard.
+  await page.route('**/api/profile?id=default',async route=>route.request().method()==='POST'?route.fulfill({status:500,body:'injected save failure'}):route.continue());
+  await page.evaluate(()=>{window.navSaveFailed=load('PPSA00001')});await page.locator('#profileGuard[open]').waitFor();await page.locator('#guardSave').click();await page.evaluate(()=>window.navSaveFailed);
+  check(await page.evaluate(()=>editing==='default'&&cur.A==='TRIANGLE'&&isDirty()),'failed Save in navigation guard retains draft');
+  await page.unroute('**/api/profile?id=default');
+  await page.evaluate(()=>{window.navSaveOK=load('PPSA00001')});await page.locator('#profileGuard[open]').waitFor();await page.locator('#guardSave').click();await page.evaluate(()=>window.navSaveOK);
+  check(await page.evaluate(()=>editing==='PPSA00001'&&!isDirty()),'Save and canonical confirmation authorize profile navigation');
+  check((await page.request.get('http://127.0.0.1:8765/api/profile?id=default',{headers:{Authorization:'Bearer preview-only'}})).status()===200,'guard Save keeps default profile persisted');
+  // A game-list cancel must precede the name prompt and any creation request.
+  await page.evaluate(()=>{window.promptCount=0;window.prompt=()=>{window.promptCount++;return 'Created fixture'};cur.A='CIRCLE';render();switchTab('games')});
+  await page.locator('#games button[data-id="PPSA00002"]').waitFor();
+  await page.locator('#games button[data-id="PPSA00002"]').click();await page.locator('#profileGuard[open]').waitFor();await page.locator('#guardCancel').click();
+  check(await page.evaluate(()=>editing==='PPSA00001'&&cur.A==='CIRCLE'&&window.promptCount===0),'game-list creation Cancel preserves draft and never prompts name');
+  check((await page.request.get('http://127.0.0.1:8765/api/profile?id=PPSA00002',{headers:{Authorization:'Bearer preview-only'}})).status()===404,'cancelled creation leaves no orphan profile');
+  await page.route('**/api/status',r=>r.fulfill({status:200,body:JSON.stringify({connected:false,active:'default',inputs:0,title:'PPSA00002',title_name:'New game fixture'})}));
+  await page.evaluate(()=>{status.title='PPSA00002';status.title_name='New game fixture';status.active='default';lastNow='';renderNow();switchTab('remap')});
+  await page.locator('#nowAction').click();await page.locator('#profileGuard[open]').waitFor();await page.locator('#guardCancel').click();
+  check(await page.evaluate(()=>editing==='PPSA00001'&&cur.A==='CIRCLE'&&window.promptCount===0),'Now Playing shortcut uses the same unsaved-create guard');
+  await page.unroute('**/api/status');
+  await page.evaluate(()=>{window.navCreate= createFor('PPSA00002','New game')});await page.locator('#profileGuard[open]').waitFor();await page.locator('#guardDiscard').click();await page.evaluate(()=>window.navCreate);
+  check(await page.evaluate(()=>editing==='PPSA00002'&&cur.name==='Created fixture'&&!isDirty()&&window.promptCount===1),'Discard authorizes creation and commits the confirmed new profile');
+  // Save pending while leaving: the explicit Save choice waits for confirmation.
+  await page.evaluate(()=>{cur.A='SQUARE';render()});const pendingSave=await gateProfile('PPSA00002');
+  await page.locator('#save').click();await pendingSave.started;
+  await page.evaluate(()=>{window.navPendingSave=load('default')});await page.locator('#profileGuard[open]').waitFor();await page.locator('#guardSave').click();
+  pendingSave.release();await page.evaluate(()=>window.navPendingSave);await pendingSave.remove();
+  check(await page.evaluate(()=>editing==='default'&&!isDirty()),'pending Save can be confirmed before switching profile');
+  // Returning to the same ID while old Save is pending must not update its new editor.
+  await page.evaluate(()=>{cur.A='CROSS';render()});const saveReturn=await gateProfile('default');
+  await page.locator('#save').click();await saveReturn.started;
+  await page.evaluate(()=>load('PPSA00001',true));
+  // Default GET is gated, so reload it after releasing the old confirmation.
+  await page.evaluate(()=>{window.navReturn=load('default',true)});saveReturn.release();await page.evaluate(()=>window.navReturn);await page.waitForFunction(()=>!saving);await saveReturn.remove();
+  check(await page.evaluate(()=>editing==='default'&&!isDirty()),'Save and reload of the same ID do not attach stale confirmation to a different editor');
+  // Delete completes after a newer selection and draft are committed.
+  await page.evaluate(()=>load('PPSA00002',true));const deletion=await gateProfile('PPSA00002','DELETE');
+  await page.evaluate(()=>{window.confirm=()=>true;document.querySelector('#del').click()});await deletion.started;
+  await page.evaluate(()=>load('default',true));await page.evaluate(()=>{cur.A='CIRCLE';render()});deletion.release();await deletion.remove();
+  await page.waitForFunction(()=>!profiles.some(p=>p.id==='PPSA00002'));
+  check(await page.evaluate(()=>editing==='default'&&cur.A==='CIRCLE'&&isDirty()),'delayed Delete cannot replace newer selection or draft');
+  // Back/Forward invalidates an earlier load even when Back selects the current ID.
+  await page.evaluate(()=>load('default',true));const historyLoad=await gateProfile('PPSA00001');
+  await page.evaluate(()=>{history.pushState(null,'','#remap/profile=PPSA00001/buttons');dispatchEvent(new PopStateEvent('popstate'))});await historyLoad.started;
+  const beforeBack=await page.evaluate(()=>navigationGeneration);
+  await page.evaluate(()=>history.back());await page.waitForFunction(g=>navigationGeneration>g,beforeBack);
+  await page.waitForFunction(()=>location.hash.includes('profile=default'));
+  historyLoad.release();await historyLoad.remove();await page.waitForTimeout(100);
+  check(await page.evaluate(()=>editing==='default'&&location.hash.includes('profile=default')),'Back cancels pending profile history load');
+  await page.evaluate(()=>history.forward());await page.waitForFunction(()=>editing==='PPSA00001');
+  check(await page.evaluate(()=>document.querySelector('#prof').value==='PPSA00001'&&location.hash.includes('profile=PPSA00001')),'Forward commits profile, dropdown and URL together');
+  await page.evaluate(()=>load('default',true));
   check(errors.length===0, 'no JavaScript runtime errors');
   return {result:'PASS',checks:passed.length,passed,decoded,hardware:'NOT_RUN; loopback fixture only'};
 }

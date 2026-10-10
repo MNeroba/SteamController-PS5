@@ -67,7 +67,14 @@ extern const char *const sc2_in_keys[SC2_IN_COUNT];
 void sc2_profile_default(sc2_profile_t *p);
 /* Parse ini text over p (keys not present keep their current value). */
 void sc2_profile_parse(const char *text, sc2_profile_t *p);
-/* Serialise; returns bytes written. */
+/* 98 combo lines of at most 192 bytes, 48 flag lines and settings fit in
+ * 24 KiB, including NUL. No runtime heap is needed. */
+#define SC2_PROFILE_CAPACITY (24u * 1024u)
+/* Validate text atomically. complete requires every base input and setting;
+ * optional activators remain optional for existing serialized profiles. */
+int sc2_profile_parse_checked(const char *text, sc2_profile_t *p, int complete);
+/* Serialise; returns bytes excluding NUL, or -1 on invalid data/overflow.
+ * Capacity must include NUL; failure leaves out empty when capacity > 0. */
 int  sc2_profile_format(const sc2_profile_t *p, char *out, size_t n);
 /* Friendly "Cross + R1" text for an output mask ("Nothing" if 0). */
 void sc2_combo_name(uint32_t mask, char *out, size_t n);
@@ -85,7 +92,9 @@ void sc2_active_get_versioned(sc2_profile_t *p, uint32_t *generation);
 #define SC2_ID_MAX     32
 
 int  sc2_store_valid_id(const char *id);
-int  sc2_store_load(const char *id, sc2_profile_t *p);   /* 0 ok */
+enum { SC2_STORE_NOT_FOUND = -1, SC2_STORE_INVALID = -2, SC2_STORE_IO_ERROR = -3 };
+/* 0 ok; failure preserves p. Missing files are distinct from corrupt files. */
+int  sc2_store_load(const char *id, sc2_profile_t *p);
 /* Save/delete mutations serialize process-wide; save replaces the complete file atomically. */
 int  sc2_store_save(const char *id, const sc2_profile_t *p);
 int  sc2_store_delete(const char *id);

@@ -5,6 +5,7 @@
 typedef struct {
     uint8_t  down, toggled, long_fired, dbl_active;
     int64_t  t_down, t_up;
+    uint32_t toggle_mask;
     uint32_t pulse_mask;
     int64_t  pulse_until;
 } sc2_bind_input_state_t;
@@ -18,6 +19,10 @@ typedef struct {
     uint32_t reset_epoch;
     int profile_valid;
     uint8_t neutral_report;
+    /* Last evaluated report: continuous ordinary trigger destinations and
+     * genuinely active digital sources (hold/double/tap/turbo/toggle/full). */
+    uint32_t analog_mask[2];
+    uint32_t digital_mask;
 } sc2_bind_state_t;
 
 /* Evaluate Steam Input-style bindings for one report.
@@ -36,3 +41,9 @@ void sc2_bind_reset(sc2_bind_state_t *state);
 /* Request an owner-thread reset of every session context. Safe from portal
  * or notification threads: the generation is atomic and each owner applies it. */
 void sc2_bind_invalidate_sessions(void);
+
+/* Resolve pressure from the last evaluation. Digital sources take 255;
+ * ordinary physical triggers retain proportional values, including Shift
+ * and cross mappings. Neutral/reset reports always resolve to zero. */
+void sc2_bind_trigger_pressure(const sc2_bind_state_t *state, uint8_t lt,
+                              uint8_t rt, uint8_t *l2, uint8_t *r2);

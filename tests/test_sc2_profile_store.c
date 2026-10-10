@@ -8,6 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 static pthread_mutex_t gate_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t gate_cond = PTHREAD_COND_INITIALIZER;
@@ -63,6 +65,9 @@ void sc2_profile_test_before_commit(const char *id, uint32_t generation) {
     (void)id;
     (void)generation;
 }
+
+static int fail_replace;
+int sc2_profile_test_fail_replace(void) { return fail_replace; }
 
 typedef struct {
     sc2_profile_t profile;
@@ -157,6 +162,68 @@ int main(void) {
     int load_result = sc2_store_load("concurrent", &stored);
     CHECK(load_result == 0 || load_result == -1);
 
+    /* Complete reads, atomic failure and the largest supported combination. */
+    hook_round_entries = 2;
+    sc2_profile_t original, candidate, loaded;
+    sc2_profile_default(&original);
+    CHECK(sc2_store_save("integrity", &original) == 0);
+    char buf[SC2_PROFILE_CAPACITY + 8];
+    int bytes = sc2_profile_format(&original, buf, sizeof(buf));
+    CHECK(bytes > 0);
+    const char *path = SC2_DIR "/bad.ini";
+    FILE *file = fopen(path, "w"); CHECK(file != NULL);
+    CHECK(fwrite(buf, 1, (size_t)bytes - 1, file) == (size_t)bytes - 1);
+    CHECK(fclose(file) == 0);
+    loaded = original; loaded.deadzone = 27;
+    CHECK(sc2_store_load("bad", &loaded) != 0 && loaded.deadzone == 27);
+    file = fopen(path, "w"); CHECK(file != NULL);
+    CHECK(fwrite("A=UNKNOWN\n", 1, 10, file) == 10); CHECK(fclose(file) == 0);
+    CHECK(sc2_store_load("bad", &loaded) != 0);
+    file = fopen(path, "w"); CHECK(file != NULL);
+    memset(buf, 'x', sizeof(buf)); CHECK(fwrite(buf, 1, sizeof(buf), file) == sizeof(buf)); CHECK(fclose(file) == 0);
+    CHECK(sc2_store_load("bad", &loaded) != 0);
+    file = fopen(path, "w"); CHECK(file != NULL);
+    bytes = sc2_profile_format(&original, buf, sizeof(buf)); buf[bytes / 2] = 0;
+    CHECK(fwrite(buf, 1, (size_t)bytes, file) == (size_t)bytes); CHECK(fclose(file) == 0);
+    CHECK(sc2_store_load("bad", &loaded) != 0);
+    /* Even syntactically valid line-boundary truncation lacks required fields. */
+    bytes = sc2_profile_format(&original, buf, sizeof(buf));
+    file = fopen(path, "w"); CHECK(file != NULL);
+    CHECK(fwrite(buf, 1, (size_t)bytes - strlen("MOTION=1\n"), file) == (size_t)bytes - strlen("MOTION=1\n")); CHECK(fclose(file) == 0);
+    CHECK(sc2_store_load("bad", &loaded) == SC2_STORE_INVALID);
+    bytes = sc2_profile_format(&original, buf, sizeof(buf));
+    char *motion = strstr(buf, "MOTION=1"); CHECK(motion != NULL); motion[7] = 'x';
+    file = fopen(path, "w"); CHECK(file != NULL);
+    CHECK(fwrite(buf, 1, (size_t)bytes, file) == (size_t)bytes); CHECK(fclose(file) == 0);
+    CHECK(sc2_store_load("bad", &loaded) == SC2_STORE_INVALID);
+    candidate = original; candidate.map[IN_A] = SCE_PAD_BUTTON_CIRCLE;
+    for (fail_replace = 1; fail_replace <= 3; fail_replace++) {
+        CHECK(sc2_store_save("integrity", &candidate) != 0);
+        CHECK(sc2_store_load("integrity", &loaded) == 0);
+        CHECK(memcmp(&original, &loaded, sizeof(original)) == 0);
+        CHECK(access(SC2_DIR "/integrity.ini.tmp", F_OK) != 0);
+    }
+    fail_replace = 0;
+    CHECK(mkdir(SC2_DIR "/integrity.ini.tmp", 0700) == 0);
+    CHECK(sc2_store_save("integrity", &candidate) != 0);
+    CHECK(sc2_store_load("integrity", &loaded) == 0 && loaded.map[IN_A] == original.map[IN_A]);
+    CHECK(rmdir(SC2_DIR "/integrity.ini.tmp") == 0);
+    candidate = original;
+    for (int i = 0; i < SC2_IN_COUNT; i++) {
+        if (i == IN_QAM) continue;
+        candidate.map[i] = candidate.lng[i] = candidate.dbl[i] = candidate.shf[i] = 0x110000u | 0xffffu | PB_ACT_MASK;
+        candidate.toggle[i] = 1;
+    }
+    candidate.full[0] = candidate.full[1] = candidate.map[IN_A];
+    memset(candidate.name, 'N', sizeof(candidate.name) - 1);
+    bytes = sc2_profile_format(&candidate, buf, sizeof(buf)); CHECK(bytes > 8192);
+    CHECK(sc2_store_save("maximum", &candidate) == 0);
+    CHECK(sc2_store_load("maximum", &loaded) == 0);
+    CHECK(memcmp(&candidate, &loaded, sizeof(candidate)) == 0);
+    candidate.name[0] = '\n';
+    CHECK(sc2_store_save("integrity", &candidate) != 0);
+    CHECK(sc2_store_load("integrity", &loaded) == 0 && memcmp(&original, &loaded, sizeof(original)) == 0);
+    unlink(path);
     printf("Steam profile storage concurrency: %u checks passed\n", checks);
     return 0;
 }

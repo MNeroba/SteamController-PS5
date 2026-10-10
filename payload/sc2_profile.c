@@ -93,7 +93,7 @@ static char *trim(char *s) {
 
 static uint32_t parse_combo(const char *v) {
     uint32_t m = 0;
-    char tmp[160];
+    char tmp[256];
     if (!v) return 0;
     strncpy(tmp, v, sizeof(tmp)-1); tmp[sizeof(tmp)-1] = 0;
     char *tok = tmp;
@@ -133,11 +133,11 @@ static void parse_profile_flag(const char *text, uint8_t *out) {
 }
 
 void sc2_profile_parse(const char *text, sc2_profile_t *p) {
-    char line[200];
+    char line[512];
     const char *s = text;
     while (*s) {
         size_t n = strcspn(s, "\n");
-        if (n >= sizeof(line)) n = sizeof(line) - 1;
+        if (n >= sizeof(line)) { s += n; if (*s) s++; continue; }
         memcpy(line, s, n); line[n] = 0;
         s += n; if (*s == '\n') s++;
 
@@ -231,9 +231,110 @@ void sc2_profile_parse(const char *text, sc2_profile_t *p) {
     if (p->shift_in == IN_QAM) p->shift_in = -1;
 }
 
+static int valid_combo(const char *value) {
+    if (!strcasecmp(value, "NONE")) return 1;
+    char copy[256];
+    if (!*value || strlen(value) >= sizeof(copy)) return 0;
+    strcpy(copy, value);
+    char *token = copy;
+    while (token) {
+        char *next = strchr(token, '+');
+        if (next) *next++ = 0;
+        token = trim(token);
+        int found = 0;
+        for (int j = 0; j < N_OUT; j++) if (!strcasecmp(token, k_out[j].n)) found = 1;
+        if (!found) return 0;
+        token = next;
+    }
+    return 1;
+}
+
+int sc2_profile_parse_checked(const char *text, sc2_profile_t *p, int complete) {
+    static const char *const settings[] = {
+        "name", "SHIFT", "LONG_MS", "DOUBLE_MS", "TURBO_MS", "LPAD", "RPAD",
+        "INVERT_LY", "INVERT_RY", "SWAP_STICKS", "DEADZONE", "GYRO", "GYRO_AXIS",
+        "GYRO_SENS_X", "GYRO_SENS_Y", "GYRO_INVERT_X", "GYRO_INVERT_Y",
+        "GYRO_ANTI_DEADZONE", "GYRO_STEADINESS", "GYRO_CURVE", "RSTICK",
+        "FLICK_SPEED", "TRIGGER_FX", "MOTION"
+    };
+    uint64_t seen = 0;
+    uint8_t activators[SC2_IN_COUNT] = {0};
+    if (!text || !p || strlen(text) >= SC2_PROFILE_CAPACITY) return -1;
+    for (const char *s = text; *s;) {
+        char line[512];
+        size_t n = strcspn(s, "\n");
+        if (n >= sizeof(line)) return -1;
+        memcpy(line, s, n); line[n] = 0; s += n; if (*s) s++;
+        for (size_t j = 0; j < n; j++)
+            if ((unsigned char)line[j] < 32 && line[j] != '\t' && line[j] != '\r') return -1;
+        char *key = trim(line);
+        if (!*key || *key == '#' || *key == ';') continue;
+        char *eq = strchr(key, '='); if (!eq) return -1;
+        *eq = 0; key = trim(key); char *value = trim(eq + 1);
+        char *dot = strchr(key, '.'); if (dot) *dot++ = 0;
+        int input = -1, setting = -1;
+        for (int i = 0; i < SC2_IN_COUNT; i++) if (!strcasecmp(key, sc2_in_keys[i])) input = i;
+        if (input >= 0) {
+            if (dot) {
+                static const char *const acts[] = {"long","double","shift","turbo","toggle","full"};
+                int act = -1;
+                for (int i = 0; i < 6; i++) if (!strcasecmp(dot, acts[i])) act = i;
+                if (act < 0 || (act == 5 && input != IN_LT && input != IN_RT) || (activators[input] & (1u << act))) return -1;
+                activators[input] |= (uint8_t)(1u << act);
+                if (act == 3 || act == 4) { int v; if (!parse_profile_int(value, &v) || (v != 0 && v != 1)) return -1; }
+                else if (!valid_combo(value)) return -1;
+            } else {
+                if ((seen & (UINT64_C(1) << input)) || !valid_combo(value)) return -1;
+                seen |= UINT64_C(1) << input;
+            }
+            if (input == IN_QAM && strcasecmp(value, "NONE") && strcmp(value, "0")) return -1;
+            continue;
+        }
+        if (dot) return -1;
+        for (size_t i = 0; i < sizeof(settings)/sizeof(settings[0]); i++) if (!strcasecmp(key, settings[i])) setting = (int)i;
+        if (setting < 0 || (seen & (UINT64_C(1) << (SC2_IN_COUNT + setting)))) return -1;
+        seen |= UINT64_C(1) << (SC2_IN_COUNT + setting);
+        if (setting == 0) { if (strlen(value) >= sizeof(p->name)) return -1; }
+        else if (setting == 1) {
+            int found = !strcasecmp(value, "NONE");
+            for (int i = 0; i < SC2_IN_COUNT; i++) if (i != IN_QAM && !strcasecmp(value, sc2_in_keys[i])) found = 1;
+            if (!found) return -1;
+        } else if (setting == 5 || setting == 6) {
+            int found = 0; for (int i = 0; i < 4; i++) if (!strcasecmp(value, k_pad[i])) found = 1;
+            if (!found) return -1;
+        } else if (setting == 11) {
+            int found = 0; for (int i = 0; i < GYRO_MODES; i++) if (!strcasecmp(value, k_gyro[i])) found = 1;
+            if (!found) return -1;
+        } else if (setting == 12) { if (strcasecmp(value, "YAW") && strcasecmp(value, "ROLL")) return -1; }
+        else if (setting == 20) { if (strcasecmp(value, "NORMAL") && strcasecmp(value, "FLICK")) return -1; }
+        else {
+            static const int minimum[] = {0,0,150,100,20,0,0,0,0,0,0,0,0,1,1,0,0,0,0,10,0,90,0,0};
+            static const int maximum[] = {0,0,2000,800,500,0,0,1,1,1,40,0,0,100,100,1,1,40,30,30,0,1440,200,1};
+            int v; if (!parse_profile_int(value, &v)) return -1;
+            int is_flag = maximum[setting] == 1;
+            if ((complete || is_flag) && (v < minimum[setting] || v > maximum[setting])) return -1;
+        }
+    }
+    const unsigned required = SC2_IN_COUNT + (unsigned)(sizeof(settings)/sizeof(settings[0]));
+    if (complete && seen != ((UINT64_C(1) << required) - 1)) return -1;
+    sc2_profile_t candidate = *p;
+    sc2_profile_parse(text, &candidate);
+    *p = candidate;
+    return 0;
+}
+
 int sc2_profile_format(const sc2_profile_t *p, char *out, size_t n) {
     size_t o = 0;
-#define PUT(...) do { int w = snprintf(out + o, o < n ? n - o : 0, __VA_ARGS__); if (w > 0) o += (size_t)w; } while (0)
+    if (!p || !out || !n) return -1;
+    out[0] = 0;
+    if (!memchr(p->name, 0, sizeof(p->name)) || strpbrk(p->name, "\r\n")) return -1;
+    uint32_t supported = 0;
+    for (int j = 0; j < N_OUT; j++) supported |= k_out[j].m;
+    for (int i = 0; i < SC2_IN_COUNT; i++)
+        if ((p->map[i] | p->lng[i] | p->dbl[i] | p->shf[i]) & ~supported) return -1;
+    if ((p->full[0] | p->full[1]) & ~supported) return -1;
+#define PUT(...) do { int w = snprintf(out + o, n - o, __VA_ARGS__); \
+    if (w < 0 || (size_t)w >= n - o) goto overflow; o += (size_t)w; } while (0)
     PUT("name=%s\n", p->name);
 #define PUTCOMBO(prefix, key, suffix, mask) do { \
         PUT(prefix "%s" suffix "=", key); int first_ = 1; \
@@ -263,19 +364,22 @@ int sc2_profile_format(const sc2_profile_t *p, char *out, size_t n) {
     PUT("TRIGGER_FX=%d\n", p->trig_fx);
     PUT("MOTION=%d\n", p->motion);
 #undef PUT
-    if (o >= n) o = n ? n - 1 : 0;
     return (int)o;
+overflow:
+    out[0] = 0;
+    return -1;
 }
 
 void sc2_combo_name(uint32_t mask, char *out, size_t n) {
     static const char *nice[] = { "Cross","Circle","Square","Triangle","L1","R1","L2","R2",
         "L3","R3","Up","Down","Left","Right","Options","Create","PS","Touchpad","Puckbridge menu",
         "Gyro on (hold)","Gyro off (hold)","Gyro on/off" };
-    size_t o = 0; out[0] = 0;
+    size_t o = 0; if (!out || !n) return; out[0] = 0;
     for (int j = 0; j < N_OUT; j++)
         if (mask & k_out[j].m) {
-            int w = snprintf(out + o, o < n ? n - o : 0, "%s%s", o ? " + " : "", nice[j]);
-            if (w > 0) o += (size_t)w;
+            int w = snprintf(out + o, n - o, "%s%s", o ? " + " : "", nice[j]);
+            if (w < 0 || (size_t)w >= n - o) return;
+            o += (size_t)w;
         }
     if (!o) snprintf(out, n, "Nothing");
 }
@@ -330,39 +434,62 @@ static void ensure_dir(void) {
 static pthread_mutex_t g_store_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int sc2_store_load(const char *id, sc2_profile_t *p) {
-    if (!sc2_store_valid_id(id)) return -1;
+    if (!p || !sc2_store_valid_id(id)) return SC2_STORE_INVALID;
     char path[128]; snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
     FILE *f = fopen(path, "r");
-    if (!f) return -1;
-    char buf[8192]; size_t n = fread(buf, 1, sizeof(buf)-1, f); buf[n] = 0;
-    fclose(f);
-    sc2_profile_default(p);
-    sc2_profile_parse(buf, p);
+    if (!f) return errno == ENOENT ? SC2_STORE_NOT_FOUND : SC2_STORE_IO_ERROR;
+    char buf[SC2_PROFILE_CAPACITY];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    int extra = fgetc(f), bad = ferror(f);
+    int close_error = fclose(f);
+    if (bad || close_error) return SC2_STORE_IO_ERROR;
+    if (extra != EOF || !n || buf[n - 1] != '\n' || memchr(buf, 0, n)) return SC2_STORE_INVALID;
+    buf[n] = 0;
+    sc2_profile_t candidate;
+    sc2_profile_default(&candidate);
+    if (sc2_profile_parse_checked(buf, &candidate, 1) != 0) return SC2_STORE_INVALID;
+    *p = candidate;
     return 0;
 }
 
 int sc2_store_save(const char *id, const sc2_profile_t *p) {
-    if (!sc2_store_valid_id(id)) return -1;
+    if (!p || !sc2_store_valid_id(id)) return -1;
+    char buf[SC2_PROFILE_CAPACITY];
+    int n = sc2_profile_format(p, buf, sizeof(buf));
+    sc2_profile_t checked;
+    sc2_profile_default(&checked);
+    if (n < 0 || sc2_profile_parse_checked(buf, &checked, 1) != 0) return -1;
     pthread_mutex_lock(&g_store_lock);
     ensure_dir();
     char path[128], tmp[136];
     snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
-    char buf[8192]; int n = sc2_profile_format(p, buf, sizeof(buf));
     FILE *f = fopen(tmp, "w");
     if (!f) { pthread_mutex_unlock(&g_store_lock); return -1; }
 #ifdef SC2_PROFILE_STORE_TEST
     extern void sc2_profile_test_store_critical_enter(void);
     sc2_profile_test_store_critical_enter();
 #endif
+#ifdef SC2_PROFILE_STORE_TEST
+    extern int sc2_profile_test_fail_replace(void);
+    int injected_failure = sc2_profile_test_fail_replace();
+#endif
     size_t w = fwrite(buf, 1, (size_t)n, f);
     int close_error = fclose(f);
+#ifdef SC2_PROFILE_STORE_TEST
+    if (injected_failure == 2) w = 0;
+    if (injected_failure == 3) close_error = -1;
+#endif
     if ((int)w != n || close_error != 0) {
         unlink(tmp);
         pthread_mutex_unlock(&g_store_lock);
         return -1;
     }
+#ifdef SC2_PROFILE_STORE_TEST
+    int result = injected_failure == 1 ? -1 : rename(tmp, path);
+#else
     int result = rename(tmp, path);
+#endif
     if (result != 0) unlink(tmp);
     pthread_mutex_unlock(&g_store_lock);
     return result;
@@ -571,7 +698,11 @@ void sc2_select_edit_target(char *id_out) {
     sc2_profile_t p;
     sc2_active_get(&p);
     snprintf(p.name, sizeof(p.name), "%s", tname[0] ? tname : title);
-    sc2_store_save(title, &p);
+    if (sc2_store_save(title, &p) != 0) {
+        LOG("sc2: game profile creation failed\n");
+        strcpy(id_out, sel[0] ? sel : "default");
+        return;
+    }
     strcpy(id_out, title);
 }
 
@@ -613,7 +744,11 @@ void sc2_select_start(void) {
     sc2_profile_t p;
     if (sc2_store_load("default", &p) != 0) {       /* first run: write defaults */
         sc2_profile_default(&p);
-        sc2_store_save("default", &p);
+        /* Preserve an invalid existing file for recovery; only bootstrap a
+         * genuinely absent default. apply_selection uses safe defaults. */
+        if (access(SC2_DIR "/default.ini", F_OK) != 0 && errno == ENOENT) {
+            if (sc2_store_save("default", &p) != 0) LOG("sc2: default profile save failed\n");
+        } else LOG("sc2: invalid default profile retained; using defaults\n");
     }
     apply_selection(1);
     int r = pthread_create(&g_watch_thread, NULL, watch_thread, NULL);

@@ -187,6 +187,40 @@ int main(void) {
     CHECK(next_generation != active_generation);
 
     check_concurrent_combo_parsing();
+    sc2_profile_default(&p);
+    char serialized[32768], small[8];
+    int bytes = sc2_profile_format(&p, serialized, sizeof(serialized));
+    CHECK(bytes > 0);
+    CHECK(sc2_profile_format(&p, small, sizeof(small)) < 0);
+    CHECK(small[0] == 0);
+    CHECK(sc2_profile_format(&p, serialized, (size_t)bytes) < 0);
+    CHECK(sc2_profile_format(&p, serialized, (size_t)bytes + 1) == bytes);
+    sc2_profile_t roundtrip;
+    sc2_profile_default(&roundtrip);
+    sc2_profile_parse(serialized, &roundtrip);
+    CHECK(memcmp(&p, &roundtrip, sizeof(p)) == 0);
+    const uint32_t all = 0x110000u | 0xffffu | PB_ACT_MASK;
+    for (int i = 0; i < SC2_IN_COUNT; i++) {
+        if (i == IN_QAM) continue;
+        p.map[i] = p.lng[i] = p.dbl[i] = p.shf[i] = all;
+        p.turbo[i] = 1;
+    }
+    p.full[0] = p.full[1] = all;
+    bytes = sc2_profile_format(&p, serialized, sizeof(serialized));
+    CHECK(bytes > 8192);
+    CHECK(sc2_profile_format(&p, serialized, (size_t)bytes + 2) == bytes);
+    CHECK(sc2_profile_format(&p, small, 0) == -1);
+    CHECK(sc2_profile_format(&p, NULL, 0) == -1);
+    sc2_profile_default(&roundtrip);
+    sc2_profile_parse(serialized, &roundtrip);
+    CHECK(memcmp(&p, &roundtrip, sizeof(p)) == 0);
+    sc2_profile_default(&roundtrip);
+    CHECK(sc2_profile_parse_checked(serialized, &roundtrip, 1) == 0);
+    CHECK(memcmp(&p, &roundtrip, sizeof(p)) == 0);
+    CHECK(sc2_profile_parse_checked("A=CROSS\n", &roundtrip, 1) == -1);
+    CHECK(sc2_profile_parse_checked("A=CROSS+UNKNOWN\n", &roundtrip, 0) == -1);
+    CHECK(sc2_profile_parse_checked("A=CROSS\nA=CIRCLE\n", &roundtrip, 0) == -1);
+    CHECK(memcmp(&p, &roundtrip, sizeof(p)) == 0);
 
     printf("Steam profile parser checks passed (%d checks)\n", checks);
     return 0;

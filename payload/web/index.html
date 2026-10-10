@@ -318,6 +318,9 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
   .btns button{flex:1 1 auto}
 }
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
+dialog.profile-guard{color:var(--text);background:var(--panel,#1c2030);border:1px solid var(--line,#383d56);border-radius:16px;padding:24px;max-width:min(440px,calc(100vw - 32px))}
+dialog.profile-guard::backdrop{background:#0009}
+.profile-guard .guard-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
 </style>
 </head>
 <body>
@@ -539,13 +542,18 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
     <div class="pick" id="pick"></div>
     <div class="actopts" id="actOpts">
       <label><input type="checkbox" class="box" id="optTurbo"> Turbo (repeats while held)</label>
-      <label><input type="checkbox" class="box" id="optToggle"> Toggle (press on, press off)</label>
+      <label><input type="checkbox" class="box" id="optToggle"> Toggle (qualifying press on/off)</label>
     </div>
     <div class="foot"><small class="scrollhint" id="sheetScrollHint">Scroll for all output actions ↓</small><button id="clear" class="ghost">Clear this tab</button><span class="btns"><button id="cancel" class="ghost">Cancel</button><button class="primary" id="done">Done</button></span></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<dialog id="profileGuard" class="profile-guard" aria-labelledby="profileGuardTitle">
+  <h3 id="profileGuardTitle">Unsaved profile changes</h3>
+  <p>Save and confirm your changes before continuing, or discard this draft.</p>
+  <div class="guard-actions"><button id="guardSave">Save</button><button id="guardDiscard">Discard</button><button id="guardCancel" autofocus>Cancel</button></div>
+</dialog>
 <script>
 /* ── data ── */
 const LABEL={A:"A",B:"B",X:"X",Y:"Y",LB:"Left bumper",RB:"Right bumper",LT:"Left trigger",RT:"Right trigger",
@@ -599,6 +607,7 @@ function outputAccessibleLabel(k){return PS_SYMBOLS[k]?`${OUTNAME[k]} (${PS_SYMB
 function outputChoice(k){return PS_SYMBOLS[k]?esc(outputLabel(k)):`${outputIcon(k)}${esc(outputLabel(k))}`}
 
 let cur={}, saved="", editing="default", profiles=[], status={}, games=[], sheetKey=null,saveUnconfirmed=false;
+let navigationGeneration=0,editorGeneration=0,listGeneration=0,guardPromise=null,savePromise=null;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
@@ -631,7 +640,8 @@ function validatedProfile(p){
       // The server remains authoritative for numeric range normalization.
       next[key]=value;
     }else if(key==="name"){
-      if(/[\r\n\0]/.test(value))throw new Error("Invalid profile name");next.name=value;
+      if(/[\r\n\0]/.test(value))throw new Error("Invalid profile name");
+      if(new TextEncoder().encode(value).length>=48)throw new Error("Profile name must fit in 47 UTF-8 bytes");next.name=value;
     }
     else throw new Error("Unknown profile key: "+key);
   });
@@ -639,7 +649,8 @@ function validatedProfile(p){
 }
 function serverProfile(text){
   const p=validatedProfile(parse(text));
-  if(!BITS.every(k=>Object.hasOwn(p,k))||!Object.hasOwn(p,"name"))throw new Error("Incomplete profile readback");
+  const required=["name",...BITS,...Object.keys(PROFILE_ENUMS),...PROFILE_FLAGS,...Object.keys(SL)];
+  if(!text.endsWith("\n")||!required.every(k=>Object.hasOwn(p,k)))throw new Error("Incomplete profile readback");
   return p;
 }
 function profileWrite(p){
@@ -694,7 +705,7 @@ function parseHash(h){const o={tab:null,prof:null,sec:null};(h||"").replace(/^#/
   if(i===0)o.tab=p;else if(p.startsWith("profile="))o.prof=decodeURIComponent(p.slice(8));else o.sec=p});return o}
 function hashOf(){let h="#"+tab;if(tab==="remap")h+="/profile="+encodeURIComponent(editing);if(sec[tab])h+="/"+sec[tab];return h}
 function syncHash(push){const h=hashOf();store("pb.loc",h);if(location.hash===h)return;
-  try{history[push?"pushState":"replaceState"](null,"",h)}catch(e){location.hash=h}}
+  try{history[push?"pushState":"replaceState"](push?null:history.state,"",h)}catch(e){location.hash=h}}
 const hh=()=>$("header").offsetHeight;
 function measure(){document.documentElement.style.setProperty("--hh",hh()+"px")}
 addEventListener("resize",measure);
@@ -724,10 +735,15 @@ function saveScroll(){scrolls[tab]=scrollY;sstore("pb.scroll",JSON.stringify(scr
 function restoreScroll(){const y=scrolls[tab];pinT=Date.now()+1200;
   if(y!=null){scrollTo({top:y,behavior:"auto"});setTimeout(()=>{if(Date.now()<pinT&&Math.abs(scrollY-y)>2)scrollTo({top:y,behavior:"auto"})},400);if(!sec[tab]){pinT=0;trackSec()}}
   else if(sec[tab])goSec(sec[tab],true);else{scrollTo({top:0,behavior:"auto"});pinT=0;trackSec()}}
-addEventListener("popstate",()=>applyLoc(parseHash(location.hash),false));
+addEventListener("popstate",()=>applyLoc(parseHash(history.state?.profileLocation||location.hash),false));
 async function applyLoc(l,push){
   if(!l.tab)return;
-  if(l.tab==="remap"&&l.prof&&l.prof!==editing&&profiles.some(p=>p.id===l.prof)){sec.remap=l.sec||sec.remap;if(!await load(l.prof,false,push))return}
+  if(l.tab==="remap"&&l.prof&&l.prof!==editing&&profiles.some(p=>p.id===l.prof)){
+    // Keep a pending history destination so Back can cancel it and Forward
+    // can retry it even while the visible hash reflects the committed editor.
+    if(!push)history.replaceState({profileLocation:"#"+l.tab+"/profile="+encodeURIComponent(l.prof)+(l.sec?"/"+l.sec:"")},"",location.hash);
+    if(!await load(l.prof,false,push))return;
+  }else{++navigationGeneration;selectionCommitted()}
   if(l.sec)sec[l.tab]=l.sec;
   if(l.tab!==tab){if(l.sec)delete scrolls[l.tab];showTab(l.tab,push)}else if(l.sec)goSec(l.sec,true)}
 
@@ -896,7 +912,7 @@ function renderTfxPresets(){const v=+cur.TRIGGER_FX;$$("#tfxPre button").forEach
 
 /* ── binding editor (Steam Input-style activators) ── */
 const ACTS=[["","Press","Sends these while held. Pick several for a combo."],
- [".long","Long press","Hold past the long-press time to send these. A quick tap still sends Press."],
+ [".long","Long press","Hold past the long-press time to send these. Turbo repeats Long after the threshold; Toggle latches Long once per qualifying hold. A quick tap still pulses Press. Double takes precedence for the second press; Shift uses its effective Press binding."],
  [".double","Double press","Press twice quickly: the second press sends these."],
  [".shift","Shift layer","Sent instead of Press while the Shift button is held."],
  [".full","Full pull","Extra output when the trigger clicks at the end of its travel."]];
@@ -971,47 +987,95 @@ document.addEventListener("keydown",e=>{
 /* ── profiles ── */
 const pname=id=>{const p=profiles.find(p=>p.id===id);return p?p.name:id};
 const plabel=p=>p.id==="default"?"Default (every game without its own)":`${p.name}${p.id!==p.name?" · "+p.id:""}`;
-async function load(id,force,push=true){
-  if(!force&&isDirty()&&!confirm("Discard unsaved changes?")){$("#prof").value=editing;syncHash(false);return false}
-  const loaded=serverProfile(await api("/api/profile?id="+encodeURIComponent(id),{cache:"no-store"}));
-  editing=id;cur=loaded;saved=fmt(cur);saveUnconfirmed=false;
-  $("#prof").value=id;$("#del").disabled=id==="default";render();syncHash(push);return true;
+function selectionCommitted(){ $("#prof").value=editing;syncHash(false) }
+function draftStamp(){return editing+"\0"+fmt(cur)}
+async function canLeaveProfile(){
+  if($("#sheet").classList.contains("show")){toast("Finish or cancel the button edit before switching profiles");return false}
+  if(!isDirty())return true;
+  if(!guardPromise){
+    const dialog=$("#profileGuard");
+    guardPromise=new Promise(resolve=>{
+      const finish=choice=>{dialog.close();resolve(choice)};
+      $("#guardSave").onclick=()=>finish("save");
+      $("#guardDiscard").onclick=()=>finish("discard");
+      $("#guardCancel").onclick=()=>finish("cancel");
+      dialog.oncancel=e=>{e.preventDefault();finish("cancel")};
+      dialog.showModal();
+    }).then(async choice=>choice==="discard"|| (choice==="save"&&await saveCurrent()&&!isDirty()))
+      .finally(()=>{guardPromise=null});
+  }
+  return guardPromise;
+}
+function operationCurrent(ticket,stamp){return ticket===navigationGeneration&&stamp===draftStamp()&&!$("#sheet").classList.contains("show")}
+async function loadAuthorized(id,ticket,stamp,push=true){
+  try{
+    const loaded=serverProfile(await api("/api/profile?id="+encodeURIComponent(id),{cache:"no-store"}));
+    if(!operationCurrent(ticket,stamp))return false;
+    ++editorGeneration;editing=id;cur=loaded;saved=fmt(cur);saveUnconfirmed=false;
+    $("#prof").value=id;$("#del").disabled=id==="default";render();
+    if(history.state?.profileLocation)history.replaceState(null,"",location.hash);
+    syncHash(push);return true;
+  }catch(e){if(ticket===navigationGeneration){selectionCommitted();toast("Profile load failed: "+e.message)}return false}
+}
+async function load(id,force=false,push=true){
+  const ticket=++navigationGeneration;selectionCommitted();
+  if(!force&&!await canLeaveProfile()){if(ticket===navigationGeneration)selectionCommitted();return false}
+  if(ticket!==navigationGeneration)return false;
+  return loadAuthorized(id,ticket,draftStamp(),push);
 }
 async function refreshList(){
-  profiles=JSON.parse(await api("/api/profiles"));
+  const ticket=++listGeneration,loaded=JSON.parse(await api("/api/profiles"));
+  if(ticket!==listGeneration)return;
+  profiles=loaded;
   profiles.sort((a,b)=>a.id==="default"?-1:b.id==="default"?1:a.name.localeCompare(b.name));
   $("#prof").innerHTML=profiles.map(p=>`<option value="${esc(p.id)}">${esc(plabel(p))}</option>`).join("");
+  // A deleted profile may still have a newer draft. Keep it selectable so the
+  // user can save/recreate it instead of falsely selecting a different editor.
+  if(!profiles.some(p=>p.id===editing))$("#prof").add(new Option(cur.name||editing,editing));
   $("#prof").value=editing;
   $("#mode").innerHTML=`<option value="">Automatic per game</option>`+profiles.map(p=>`<option value="${esc(p.id)}">Always ${esc(p.name)}</option>`).join("");
   $("#mode").value=status.override||"";
 }
 async function createFor(tid,name){
-  if(profiles.some(p=>p.id===tid)){switchTab("remap");await load(tid);return}
+  if(profiles.some(p=>p.id===tid)){if(await load(tid))switchTab("remap");return}
+  const ticket=++navigationGeneration;
+  if(!await canLeaveProfile()||ticket!==navigationGeneration)return;
   const nm=prompt("Name this profile",name||tid);if(nm===null)return;
-  const p={...parse(await api("/api/profile?id=default")),name:nm||tid};
-  await api("/api/profile?id="+encodeURIComponent(tid),{method:"POST",body:fmt(p)});
-  await refreshList();switchTab("remap");await load(tid,true);toast("Profile created from Default");
+  const stamp=draftStamp();
+  try{
+    const p={...serverProfile(await api("/api/profile?id=default",{cache:"no-store"})),name:nm||tid};
+    if(!operationCurrent(ticket,stamp))return;
+    await api("/api/profile?id="+encodeURIComponent(tid),{method:"POST",body:profileWrite(validatedProfile(p))});
+    await refreshList();
+    if(!operationCurrent(ticket,stamp))return;
+    if(await loadAuthorized(tid,ticket,stamp)){switchTab("remap");toast("Profile created from Default")}
+  }catch(e){if(ticket===navigationGeneration)toast("Profile creation failed: "+e.message)}
 }
 $("#prof").onchange=e=>load(e.target.value);
 $("#mode").onchange=async e=>{await api("/api/override?id="+encodeURIComponent(e.target.value),{method:"POST"});toast(e.target.value?"Locked to "+pname(e.target.value):"Switching automatically per game")};
 let saving=false;
-$("#save").onclick=async()=>{
-  if(saving)return;const id=editing;saving=true;$("#save").disabled=true;
-  try{
-    cur=validatedProfile(cur);const submitted=fmt(cur),path="/api/profile?id="+encodeURIComponent(id);
-    saveUnconfirmed=true;dirty();
-    await api(path,{method:"POST",body:profileWrite(cur)});
-    const canonical=serverProfile(await api(path,{cache:"no-store"})),applied=fmt(canonical);
-    if(editing===id){
-      // Preserve edits made while the request was pending; Saved refers only
-      // to the confirmed server snapshot, never the current mutable draft.
-      if(fmt(cur)===submitted)cur=canonical;
-      saved=applied;saveUnconfirmed=false;render();
-    }
-    await refreshList();toast(editing===id&&isDirty()?"Saved earlier changes; newer edits are unsaved":"Saved and confirmed");
-  }catch(e){dirty();toast("Save not confirmed: "+e.message)}
-  finally{saving=false;$("#save").disabled=false}
-};
+function saveCurrent(){
+  if(savePromise)return savePromise;
+  const id=editing,ticket=editorGeneration;
+  saving=true;$("#save").disabled=true;
+  savePromise=Promise.resolve().then(async()=>{
+    try{
+      cur=validatedProfile(cur);const submitted=fmt(cur),path="/api/profile?id="+encodeURIComponent(id);
+      saveUnconfirmed=true;dirty();
+      await api(path,{method:"POST",body:profileWrite(cur)});
+      const canonical=serverProfile(await api(path,{cache:"no-store"})),applied=fmt(canonical);
+      if(editing===id&&ticket===editorGeneration){
+        if(fmt(cur)===submitted)cur=canonical;
+        saved=applied;saveUnconfirmed=false;render();
+      }
+      await refreshList();toast(editing===id&&isDirty()?"Saved earlier changes; newer edits are unsaved":"Saved and confirmed");
+      return true;
+    }catch(e){if(editing===id&&ticket===editorGeneration){dirty();toast("Save not confirmed: "+e.message)}return false}
+    finally{saving=false;$("#save").disabled=false;savePromise=null}
+  });
+  return savePromise;
+}
+$("#save").onclick=()=>saveCurrent();
 $("#revert").onclick=()=>{cur=parse(saved);render();toast("Changes undone")};
 /* ── export / import ── */
 $("#exp").onclick=()=>{
@@ -1042,7 +1106,18 @@ $("#impFile").onchange=async e=>{
     cur=next;render();dirty();toast("Merged. Check the profile, then Save");
   }catch(error){toast("Import rejected: "+error.message)}
 };
-$("#del").onclick=async()=>{if(editing==="default"||!confirm(`Delete "${pname(editing)}"?`))return;await api("/api/delete?id="+encodeURIComponent(editing),{method:"POST"});await refreshList();await load("default",true);toast("Deleted")};
+$("#del").onclick=async()=>{
+  if(editing==="default"||!confirm(`Delete "${pname(editing)}"?`))return;
+  const ticket=++navigationGeneration,id=editing;
+  if(!await canLeaveProfile()||ticket!==navigationGeneration)return;
+  const stamp=draftStamp();
+  try{
+    await api("/api/delete?id="+encodeURIComponent(id),{method:"POST"});
+    await refreshList();
+    if(operationCurrent(ticket,stamp))await loadAuthorized("default",ticket,stamp);
+    toast("Deleted");
+  }catch(e){if(ticket===navigationGeneration){selectionCommitted();toast("Delete failed: "+e.message)}}
+};
 window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()){e.preventDefault();e.returnValue=""}});
 
 /* ── games ── */

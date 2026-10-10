@@ -12,7 +12,7 @@
 #define WEBUI_HTTP_ORIGIN_MAX 328
 #define WEBUI_HTTP_CONTENT_TYPE_MAX 64
 #define WEBUI_HTTP_HEADER_MAX 4096
-#define WEBUI_HTTP_BODY_MAX (16 * 1024)
+#define WEBUI_HTTP_BODY_MAX (32 * 1024)
 
 typedef struct {
     char method[WEBUI_HTTP_METHOD_MAX];

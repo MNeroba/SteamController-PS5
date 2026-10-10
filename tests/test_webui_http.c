@@ -5,6 +5,8 @@
 #include "webui_http.h"
 
 #include <fcntl.h>
+#include <errno.h>
+#include "webui_html.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -163,6 +165,40 @@ static void test_response_writes_all_chunks(void) {
     CHECK(result == WEBUI_HTTP_WRITE_OK);
     CHECK(sink.length == sizeof(expected) - 1);
     CHECK(memcmp(sink.data, expected, sizeof(expected) - 1) == 0);
+}
+
+typedef struct { uint64_t now; size_t sent; unsigned calls; int mode; char *data; size_t capacity; } delivery_t;
+static int delivery_clock(void *ctx, uint64_t *now) { *now = ((delivery_t *)ctx)->now; return 0; }
+static ssize_t delivery_send(void *ctx, const char *data, size_t length, unsigned wait) {
+    delivery_t *s = ctx; s->calls++; s->now += 1;
+    if (s->mode == 2 && s->sent > 1024) { errno = EPIPE; return -1; }
+    if (s->mode == 3) { s->now += wait; errno = EAGAIN; return -1; }
+    if (s->mode == 4) return 0;
+    if (s->calls % 5 == 1) { errno = EINTR; return -1; }
+    if (s->calls % 5 == 2) { errno = EAGAIN; return -1; }
+    size_t count = length > 997 ? 997 : length;
+    if (count > s->capacity - s->sent) return -1;
+    memcpy(s->data + s->sent, data, count); s->sent += count;
+    return (ssize_t)count;
+}
+static void test_embedded_delivery(void) {
+    char header[160];
+    int bytes = snprintf(header, sizeof(header), "HTTP/1.1 200 OK\r\nContent-Length: %u\r\nConnection: close\r\n\r\n", webui_html_len);
+    webui_http_chunk_t chunks[] = {{header, (size_t)bytes}, {(const char *)webui_html, webui_html_len}};
+    size_t total = (size_t)bytes + webui_html_len;
+    char *received = malloc(total); CHECK(received != NULL); if (!received) return;
+    delivery_t s = {0, 0, 0, 1, received, total};
+    CHECK(webui_http_write_chunks(&s, delivery_send, delivery_clock, 3000, chunks, 2) == WEBUI_HTTP_WRITE_OK);
+    CHECK(s.sent == total);
+    CHECK(memcmp(received, header, (size_t)bytes) == 0);
+    CHECK(memcmp(received + bytes, webui_html, webui_html_len) == 0);
+    for (int mode = 2; mode <= 4; mode++) {
+        s = (delivery_t){0, 0, 0, mode, received, total};
+        int rc = webui_http_write_chunks(&s, delivery_send, delivery_clock, 3000, chunks, 2);
+        CHECK(rc == (mode == 3 ? WEBUI_HTTP_WRITE_TIMEOUT : WEBUI_HTTP_WRITE_IO_ERROR));
+        CHECK(s.sent < total);
+    }
+    free(received);
 }
 
 static void test_request_uses_absolute_deadline(void) {
@@ -334,7 +370,7 @@ static void test_reject_invalid_request_lines_and_lengths(void) {
     const char bad_method[] = "DELETE /api/status HTTP/1.1\r\n\r\n";
     const char bad_length[] = "POST /api/profile HTTP/1.1\r\nContent-Length: +3\r\n\r\n";
     const char huge_length[] = "POST /api/profile HTTP/1.1\r\nContent-Length: 999999999999999999999999999999\r\n\r\n";
-    const char over_limit[] = "POST /api/profile HTTP/1.1\r\nContent-Length: 16385\r\n\r\n";
+    const char over_limit[] = "POST /api/profile HTTP/1.1\r\nContent-Length: 32769\r\n\r\n";
     const char get_with_body[] = "GET /api/status HTTP/1.1\r\nContent-Length: 1\r\n\r\nx";
     const char similar_header_name[] = "POST /api/profile HTTP/1.1\r\n"
                                        "Content-LengthX: 0\r\n\r\n";
@@ -416,6 +452,7 @@ int main(void) {
     test_body_uses_same_absolute_deadline();
     test_response_uses_one_absolute_deadline();
     test_response_writes_all_chunks();
+    test_embedded_delivery();
     test_valid_get();
     test_valid_post_and_spacing();
     test_profile_body_contract();

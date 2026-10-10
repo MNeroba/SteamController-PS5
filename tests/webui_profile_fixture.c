@@ -18,7 +18,7 @@ int sceLncUtilGetAppTitleId(uint32_t id, char *title) {
 }
 
 int main(void) {
-    char input[65538], output[8192];
+    char input[65538], output[SC2_PROFILE_CAPACITY];
     size_t length = fread(input, 1, sizeof(input) - 1, stdin);
     if (ferror(stdin) || !feof(stdin)) return 1;
     char *separator = memchr(input, '\0', length);
@@ -27,8 +27,8 @@ int main(void) {
     sc2_profile_t profile;
     sc2_profile_default(&profile);
     sc2_profile_parse(input, &profile);
-    sc2_profile_parse(separator + 1, &profile);
+    if (sc2_profile_parse_checked(separator + 1, &profile, 0) != 0) return 1;
     int bytes = sc2_profile_format(&profile, output, sizeof(output));
-    if (bytes < 0 || (size_t)bytes >= sizeof(output) - 1) return 1;
+    if (bytes < 0 || (size_t)bytes >= sizeof(output)) return 1;
     return fwrite(output, 1, (size_t)bytes, stdout) == (size_t)bytes ? 0 : 1;
 }
