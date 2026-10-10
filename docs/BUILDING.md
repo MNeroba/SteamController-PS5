@@ -84,3 +84,6 @@ This run produced ELF SHA-256 b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba
 ## Re-run after firmware-target update — 2026-10-10
 
 After removing the release check's fixed 13.60 requirement and updating the target to owner-reported FW 12.00, both host commands passed again: `make -C tests clean test` and `make -C tests clean sanitize`. The clean PS5 cross-build also passed with SDK v0.43 and Homebrew LLVM 18.1.8 using the environment documented above. The ELF SHA-256 is unchanged at `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`, with the same six expected SDK libraries. These tests validate source policy, host behavior, and compilation/linking only; no PS5 12.00 console or controller was tested, and compatibility is not claimed.
+
+
+GitHub Actions on the FW 12.00-target documentation/checker commit `81501afa53e2acd329db0298ffccdc533161e749` passed both [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/38053866134) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38053866148). The cross-build uploaded temporary artifact `ghost-control-ps5-cross-build` (ID `11670507757`, SHA-256 `7259c645662dcdd0e664c0d95d6ccde17fa453992fc81e032eb6d9b822b622ba`, expires 2027-01-08T12:57:22Z). It is not a release and does not establish console runtime or firmware compatibility.

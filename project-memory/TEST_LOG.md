@@ -809,3 +809,10 @@ Source evidence for the scanner fix is `payload/controller_sc2.c:101-104` and `t
 - `make -C tests clean sanitize` — PASS (exit 0), AddressSanitizer + UndefinedBehaviorSanitizer with the same suite and assertions. Darwin arm64, Apple clang 21.0.0.
 - PS5 cross-build: `LLVM_CONFIG=/opt/homebrew/opt/llvm@18/bin/llvm-config PS5_PAYLOAD_SDK="$PWD/.build-cache/ps5-payload-sdk-v0.43/ps5-payload-sdk" make -C payload clean`, then the same environment with `make -C payload` — PASS (exit 0), SDK v0.43 / Homebrew LLVM 18.1.8. ELF64 x86-64 SHA-256 `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`; `llvm-readobj` found the six expected PS5 libraries. Compile/link evidence only.
 - `python3 scripts/check_release_gate.py` — EXPECTED BLOCK (exit 1): H-01/H-02/H-03/H-04/H-05/H-09/H-12 have no verified hardware rows, and the reported firmware annotation is deliberately not accepted as an exact measured version. This is not a release pass.
+
+### M1-213 — Publish FW 12.00 target policy and confirm Actions — 2026-10-10
+
+- Published commit `81501afa53e2acd329db0298ffccdc533161e749` as direct fast-forward child of `c49df86ac2b8dd177aac5af28aa330aa2ce450ba`, tree `f0d36a61cae43cd848e943b12417a6c84aeb23ae`. GitHub readback confirms 232 recursive entries / 218 blobs, truncated=false, exactly 17 intended paths changed and no paths added or removed. All 17 new blob SHAs matched local `git hash-object` results before tree creation.
+- Host tests Actions run `38053866134` — PASS; job and portable host/sanitizer step succeeded.
+- PS5 cross-build Actions run `38053866148` — PASS; build and artifact-upload steps succeeded. Artifact `ghost-control-ps5-cross-build` ID `11670507757`, 621,602 bytes, SHA-256 `7259c645662dcdd0e664c0d95d6ccde17fa453992fc81e032eb6d9b822b622ba`, expires 2027-01-08T12:57:22Z. Temporary compile output only, not a release or hardware result.
+- No PR or Release was created. No PS5, controller, Puck, deployment, Bluetooth/HCI, or firmware/system operation was performed. FW 12.00 compatibility remains unverified.

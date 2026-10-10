@@ -1,8 +1,8 @@
 # Project memory — current status
 
-**Snapshot:** 2026-10-10 12:53 UTC; FW 12.00 target adaptation validated locally, direct-main publication pending.
+**Snapshot:** 2026-10-10 12:58 UTC; FW 12.00 target adaptation is published and Host/PS5 cross-build Actions pass.
 **Repository:** private GitHub repository MNeroba/SteamController-PS5; default branch main.
-**Latest source commit:** 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. **Latest finalized docs/status commit:** 6b727b6502585c90878944a00d3fc29d6ef2bc36 (tree 90cbdb9684484fb0e852e60b0c255f6491047de5), a documentation-only descendant of d2107fe1b0719e5878d468b0f0120580ce4f8a1e. It preserves the complete source tree.
+**Latest source commit:** 0b00c987d4c4e8ed80d52c9e2bbe723a1cd68b79. **Latest FW 12.00 target-validation commit:** 81501afa53e2acd329db0298ffccdc533161e749 (tree f0d36a61cae43cd848e943b12417a6c84aeb23ae), direct fast-forward child of c49df86ac2b8dd177aac5af28aa330aa2ce450ba. It preserves the complete 218-blob source tree.
 
 ## Current readiness
 
@@ -11,7 +11,7 @@
 - M1–M3 portable protocol, USB/session, mapping, motion/touch, profile, feedback, haptics, slot, lifecycle, and portal modules have broad host coverage; USB/Puck enumeration, gameplay, real haptics, and controller behavior remain unverified.
 - Native PS5 BLE is research-only. No active HCI/radio operation was performed. Edge/ShellUI identity and multiple SC2 sessions are not supported features.
 - The owner reports a PS5 on FW 12.00 and will not update it. This is the target, not a verified compatibility result. No PS5, Steam Controller, Puck, or DualSense runtime test has been performed. The release gate correctly blocks on H-01/H-02/H-03/H-04/H-05/H-09/H-12. No Release or installer is published. The Actions ELF artifact is temporary and is not a verified runtime binary.
-- The published main tree has 232 recursive entries / 218 blobs, not truncated; the local candidate file blobs were previously compared against all 218 main entries. The desktop checkout is an older dirty overlay (branch fix/p0-safety at 78460113ef7c48502c765a1f83ba34d53c977134). Never reset it or publish its entire working tree; publish only explicitly reviewed paths on top of the current GitHub main tree with an expected-head, fast-forward update.
+- The published main tree has 232 recursive entries / 218 blobs, not truncated; commit 81501af changed exactly the 17 reviewed target/checker/test/documentation/memory paths, with no additions/deletions. The desktop checkout is an older dirty overlay (branch fix/p0-safety at 78460113ef7c48502c765a1f83ba34d53c977134). Never reset it or publish its entire working tree; publish only explicitly reviewed paths on top of the current GitHub main tree with an expected-head, fast-forward update.
 
 ## Verification evidence
 
@@ -22,6 +22,7 @@
 - SDK archive SHA-256: a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb.
 - After target adaptation, `python3 -m unittest tests.test_release_gate` passes 9 checks, including exact FW 12.00 matching, proof that no specific firmware is pinned, and rejection of substring-only matches. The real release gate still exits 1 as expected: required hardware evidence is absent and the owner-reported FW is explicitly marked unverified in the matrix.
 - Repeated after the FW 12.00 adaptation: `make -C tests clean test` PASS; `make -C tests clean sanitize` PASS; SDK v0.43 / LLVM 18.1.8 clean cross-build PASS. Resulting ELF SHA-256 remains `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`; dependencies remain the same six expected PS5 SDK libraries. These are host and compile/link checks only.
+- GitHub Actions on published target-validation commit 81501afa53e2acd329db0298ffccdc533161e749: Host tests run 38053866134 PASS; PS5 cross-build run 38053866148 PASS. Temporary artifact 11670507757 (ZIP SHA-256 `7259c645662dcdd0e664c0d95d6ccde17fa453992fc81e032eb6d9b822b622ba`) expires 2027-01-08T12:57:22Z; it is not a release or runtime proof.
 
 ## Important open limits
 
@@ -42,4 +43,4 @@
 
 ## Exact next action
 
-Publish only the reviewed firmware-target, checker, test, documentation, and memory paths as a fast-forward child of GitHub main `c49df86ac2b8dd177aac5af28aa330aa2ce450ba`; verify the full tree has no deletions, then inspect Host and PS5 cross-build Actions. Do not update the PS5 or claim FW 12.00 compatibility without actual device/runtime evidence.
+No further safe host-side change is required for the firmware retarget. Keep the first-release gate blocked until real hardware records replace the owner-reported placeholders and pass H-01/H-02/H-03/H-04/H-05/H-09/H-12. Do not update the console, deploy the payload, or claim FW 12.00 compatibility without actual device/runtime evidence.

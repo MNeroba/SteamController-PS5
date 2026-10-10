@@ -884,3 +884,11 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Strengthened release validation: exact numeric firmware required; exactly one `Firmware:` line in that gate's anchored TEST_LOG section must equal the matrix value byte-for-byte. Nine checker tests pass, including no-version-pin and 12.00.1 prefix-collision cases. The live matrix correctly remains blocked.
 - Re-ran `make -C tests clean test` (PASS), `make -C tests clean sanitize` (PASS), and clean SDK v0.43/LLVM 18.1.8 cross-build (PASS; ELF SHA-256 `b78a4a5967921f463adbc54afecf866f6561f2d96108a1aeba475631c79249f7`). `git diff --check`/final review and exact main tree verification are pending.
 - No PS5/controller/Puck runtime test, deployment, active BLE/HCI, firmware update/write, or release was performed. No compatibility claim for FW 12.00. Next action: publish only the allowlisted target/checker/test/docs/memory files as a fast-forward to current main and inspect resulting Actions.
+
+### M1-213 — Publish and verify FW 12.00 adaptation — 2026-10-10
+
+- Rebased the reviewed 17-file firmware target/checker/test/docs/memory update on the current GitHub `main` snapshot `c49df86ac2b8dd177aac5af28aa330aa2ce450ba`, without resetting the dirty local checkout. Recursive comparison of the new tree found 232 entries / 218 blobs, no truncation, no additions/deletions, and exactly the allowlisted 17 blobs changed; every blob SHA matched the local Git object hash.
+- GitHub acknowledged fast-forward commit `81501afa53e2acd329db0298ffccdc533161e749`. Readback confirms that commit is main. No PR or release was created.
+- Actions passed: Host tests `38053866134`; PS5 cross-build `38053866148`. The uploaded artifact `11670507757` is temporary and not runtime proof.
+- Local `git diff --check` and whitespace audit across all 17 published files pass. Secret-pattern scan returned no matches. `scripts/check_release_gate.py` exits 1 as designed because H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain unverified and owner-reported FW is not measured evidence.
+- No console test, deployment, radio/HCI command, firmware/system write, or compatibility claim. Next action remains gated hardware validation; no update to 12.00 is needed or requested.
