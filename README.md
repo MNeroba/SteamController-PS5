@@ -33,6 +33,14 @@ Evidence labels used in the project: `VERIFIED_CODE`, `VERIFIED_HOST_TEST`, `VER
 
 For a per-feature view of what exists in source, what has host coverage, and what still needs console evidence, see [Steam Controller feature status](STEAM_CONTROLLER_2026.md).
 
+## Button remapping
+
+The **Remap → Buttons** screen now uses interactive Steam Controller and DualSense images, with front/back views, 24 inputs, 18 digital outputs, combo highlights and the existing game-profile editor. Desktop, mobile, keyboard and touch scenarios passed 99 browser checks against a local fixture; operation on a real PS5 remains unverified.
+
+![Image-based Steam Controller remapping](docs/images/remap-desktop.png)
+
+[UI guide, screenshots and reproducible checks](docs/WEBUI_REMAP.md)
+
 ## Default runtime safety mode
 
 At startup, the payload reads the optional local file

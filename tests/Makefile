@@ -57,6 +57,7 @@ test: $(TESTS)
 	python3 test_usb_detach_contract.py
 	python3 test_release_gate.py
 	python3 test_pid_file_contract.py
+	python3 test_webui_controllers.py
 
 sanitize:
 	$(MAKE) clean

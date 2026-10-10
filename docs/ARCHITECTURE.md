@@ -106,3 +106,7 @@ The assignment dialog gate remains a separate atomic lease token containing a sl
 ## Extension requirement
 
 A new controller in the future should require a new parser+capability adapter (and perhaps transport profile), **not** another slot manager, PS5 backend, web server, haptics router or pairing stack. A new transport should require a transport adapter, not a copy of the Steam report decoder or gyro engine. Prefer extending the best existing module rather than creating duplicate `*_v2` implementations.
+
+## Image remapping portal (ADR-048)
+
+Controller view geometry lives in `payload/web/controllers/layouts.json` and is embedded with four WebPs by the existing HTML generator. The web adapter maps reference shape IDs onto the existing `BITS` and `OUTS`; repeated front/back hotspots share one logical key. `buildPad` creates input/output/transaction-preview views, `paintPad` and `paintDestinations` derive highlights from current profile or active dialog draft, and `openSheet`/`closeSheet` retain the profile transaction boundary. The UI never mutates driver state directly. `render` refreshes assignments after load/import/undo, and the existing bearer-authenticated INI API handles persistence. Every asset participates in Make dependencies. No additional server, parser, remapping schema or PS5 ABI is introduced. Portable embedding contracts run in Host CI; a loopback browser fixture is distinct from console runtime evidence.

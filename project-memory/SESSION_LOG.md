@@ -892,3 +892,13 @@ For each subsequent session append: UTC timestamp; repo/branch/HEAD SHA; files c
 - Actions passed: Host tests `38053866134`; PS5 cross-build `38053866148`. The uploaded artifact `11670507757` is temporary and not runtime proof.
 - Local `git diff --check` and whitespace audit across all 17 published files pass. Secret-pattern scan returned no matches. `scripts/check_release_gate.py` exits 1 as designed because H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain unverified and owner-reported FW is not measured evidence.
 - No console test, deployment, radio/HCI command, firmware/system write, or compatibility claim. Next action remains gated hardware validation; no update to 12.00 is needed or requested.
+
+## Session — 2026-10-10 14:45 UTC: P1 image-based remapping
+
+Read the owner's pasted P1 specification and reference HTML as asset data, repository specification/docs/memory and live main/CI/PR state. Main `26efea56f2fe3f1a7d24db7d1b1f32ca9fe75795` had successful Host/PS5 Actions and no open PR; pre-edit UI/build generator files matched its full tree. Existing dirty checkout preserved; no destructive reset.
+
+Implemented paired Steam/DualSense images, front/back toggles and reference geometry normalization, mapped all existing keys, retained the existing transactional dialog/activators and authenticated INI profiles, added draft/current highlights and internal action badges, colored PlayStation symbols, keyboard focus return/trap, responsive layout and offline generation/build dependencies. Owner explicitly authorized publication of the supplied artwork. Assets/provenance, architecture, UI usage/browser reproduction, README screenshots and portable/browser regressions are updated.
+
+M1-214: full host and ASan/UBSan suites, seven portable embedding tests, 99 browser/touch checks and clean SDK v0.43 cross-build pass. ELF `667db8369ebe58163b9afe677d2873c62cd56df56ade62f8e6b334d978ed2b07`; imports unchanged. Browser negatives and the fixed focus-trap defect are preserved in TEST_LOG. Physical console H-09 and all existing release gates remain NOT_RUN.
+
+Next commands: inspect the allowlisted diff and `git diff --check`; overlay only this task's files on the verified full main tree, compare every returned blob SHA, ensure no paths removed and exactly the intended new files added, publish using `expected_sha`/`force=false`, then inspect push Actions and append acknowledgements. Never stage or publish the entire inherited dirty overlay. Do not deploy or Release the ELF.

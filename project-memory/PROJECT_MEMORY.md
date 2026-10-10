@@ -44,3 +44,7 @@
 ## Exact next action
 
 No further safe host-side change is required for the firmware retarget. Keep the first-release gate blocked until real hardware records replace the owner-reported placeholders and pass H-01/H-02/H-03/H-04/H-05/H-09/H-12. Do not update the console, deploy the payload, or claim FW 12.00 compatibility without actual device/runtime evidence.
+
+## Active P1 image remapping update (M1-214)
+
+Paired Steam Controller / DualSense artwork UI is implemented and locally verified: four exact user-provided WebPs, preserved SVG coordinates/front/back orientation, all 24 inputs and 18 digital outputs, transactional activators/profiles, combo highlights, keyboard/touch and responsive layout. Seven portable embedding tests and 99 Microsoft Edge fixture checks pass; full host and ASan/UBSan suites and SDK v0.43 build pass. Current local ELF SHA-256 `667db8369ebe58163b9afe677d2873c62cd56df56ade62f8e6b334d978ed2b07`. No firmware/security/USB/PS5 backend changes. Publication rights confirmed by owner; no new asset license invented. Source publication is pending remote acknowledgement. Actual FW 12.00 portal rendering/persistence/live input and all existing console gates remain NOT_RUN. See ADR-048/F095/P1-REMAP-UI-01 and `docs/WEBUI_REMAP.md`.

@@ -87,3 +87,7 @@ After removing the release check's fixed 13.60 requirement and updating the targ
 
 
 GitHub Actions on the FW 12.00-target documentation/checker commit `81501afa53e2acd329db0298ffccdc533161e749` passed both [Host tests](https://github.com/MNeroba/SteamController-PS5/actions/runs/38053866134) and [PS5 cross-build](https://github.com/MNeroba/SteamController-PS5/actions/runs/38053866148). The cross-build uploaded temporary artifact `ghost-control-ps5-cross-build` (ID `11670507757`, SHA-256 `7259c645662dcdd0e664c0d95d6ccde17fa453992fc81e032eb6d9b822b622ba`, expires 2027-01-08T12:57:22Z). It is not a release and does not establish console runtime or firmware compatibility.
+
+## Image remapping build — 2026-10-10
+
+After embedding four controller WebPs and their preserved geometry, the SDK v0.43 / Homebrew LLVM 18.1.8 clean build passed on Darwin 27.0.0 arm64. ELF SHA-256: `667db8369ebe58163b9afe677d2873c62cd56df56ade62f8e6b334d978ed2b07`. The six expected SDK runtime libraries are unchanged. The generated page is 672,184 bytes; Make tracks the WebP/layout/icon dependencies. `make -C tests clean test` and `make -C tests clean sanitize` pass, and seven embedding tests round-trip every asset and the declared response length. Browser checks: `docs/WEBUI_REMAP.md`. Compile/link and local-fixture browser evidence do not establish PS5 FW 12.00 loading or operation. No Release or console deployment occurred.

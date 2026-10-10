@@ -121,3 +121,9 @@ Record actual iterations and scenarios, not planned numbers. If no physical cons
   Evidence link / log filename:
   New issue or follow-up:
 ```
+
+## T-P59 — Image-based remapping portal
+
+`VERIFIED_HOST_TEST`: seven portable asset/generator contracts and 99 Microsoft Edge browser checks pass (M1-214). Verify four images, all 24 inputs/18 physical outputs, exact source/output IDs, unchanged back orientation/logical geometry, source and output clicks on both views, combo and activator highlights, QAM reservation, Cancel/Done, bearer-authenticated save/reload, profile load, keyboard focus and true touch emulation, and responsive layout at 1440/768/390 pixels. Commands and machine-readable browser results: `docs/WEBUI_REMAP.md`. The local fixture is not an implementation of the PS5 backend.
+
+`NOT_RUN`: actual PS5 FW 12.00 authenticated portal, live input, persisted profiles, target browser rendering and controller integration. Extend H-09 with the same UI scenario on the real portal; retain all existing release/hardware gates.

@@ -24,3 +24,7 @@ The automatic release workflow requires `VERIFIED_HARDWARE` for H-01, H-02, H-03
 For each required gate, the evidence cell must link to a matching heading such as `project-memory/TEST_LOG.md#h-01`. That heading must record the same PS5 model, exact firmware, controller model/firmware, transport, full payload commit SHA, and `Result: VERIFIED_HARDWARE`. The release checker rejects generic links or test-log mentions that do not match that row.
 
 H-06 through H-08 are feature-specific: do not claim motion, touch, or feedback as hardware-verified unless their rows pass. H-10 remains a separate, explicitly approved research track. H-11 is outside the first release scope until multi-controller sessions are implemented.
+
+### Image remapping UI follow-up (M1-214)
+
+A local Microsoft Edge fixture passed 99 interaction checks and seven portable embedding tests. This is host evidence only. Actual authenticated PS5 portal rendering, live button highlighting and on-console profile persistence remain NOT_RUN / BLOCKED_HARDWARE on the owner-reported FW 12.00 target. Add the image remapping scenario in `docs/WEBUI_REMAP.md` to H-09 when hardware becomes available; do not change any existing NOT_RUN row to PASS based on these browser tests.

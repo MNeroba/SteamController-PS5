@@ -17,7 +17,8 @@ SRC := gc_main.c runtime_control.c runtime_instance.c credential_guard.c credent
 
 all: $(TARGET)
 
-webui_html.h: web/index.html gen_html.py
+WEB_ASSETS := $(wildcard web/icons/*.png web/controllers/*.webp) web/controllers/layouts.json
+webui_html.h: web/index.html gen_html.py $(WEB_ASSETS)
 	python3 gen_html.py
 
 $(TARGET): $(SRC) webui_html.h
