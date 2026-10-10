@@ -374,3 +374,5 @@ ADR-049 publication acknowledgement: commit `408900592f50b1eb39b0003c357c95a1374
 - Evidence: M1-218/T-P60/F099; nine portable and 158 browser assertions, full normal/ASan/UBSan suites and SDK build pass. Target H-09 remains required. Replace Profile remains optional; current documented import contract is Merge.
 
 ADR-050 addendum: production C fixture proved editor-cleared activators were resurrected by the merge-based POST when omitted. Serialize explicit NONE/0 tombstones for a full editor Save without changing the established API or partial Merge-import contract. Require uncached, complete canonical GET; reject control characters in profile names and empty suffixes. Regression now passes162 assertions; clean final ELF `247a25a7962336ddc4b31c36ef8c251502b2c27cd7d158e35c69cd52c7a15564`.
+
+ADR-050 publication acknowledgement: `6914442f6b813f90d1156f93d18f532919ff13e8` / tree `4bff80b5c83f088da2fef77b826e22c9314c5607`; exact-head non-force main update verified, full 234-blob tree retained (one intentional fixture addition, no deletion). Host/Chromium/ASan-UBSan `38070068676` and PS5 cross-build `38070068771` PASS. Real H-09 remains unverified.

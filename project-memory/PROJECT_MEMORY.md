@@ -1,8 +1,8 @@
 # Project memory — current status
 
-**Snapshot:** 2026-10-10 14:49 UTC; image remapping is published and Host/PS5 cross-build Actions pass. FW 12.00 remains an unverified target.
+**Snapshot:** 2026-10-10; repeat Remap audit hardening is published and Host/Chromium/ASan-UBSan/PS5 Actions pass. FW 12.00 remains an unverified target.
 **Repository:** private GitHub repository MNeroba/SteamController-PS5; default branch main.
-**Latest source commit:** 4065ff41d51b86fdf3a60f972f72b2b24855c647 (tree 067061f1f7dba075d2e35f88dda9756fae9218c3; 233 blobs). **Latest FW 12.00 target-validation commit:** 81501afa53e2acd329db0298ffccdc533161e749 (tree f0d36a61cae43cd848e943b12417a6c84aeb23ae), direct fast-forward child of c49df86ac2b8dd177aac5af28aa330aa2ce450ba. It preserves the complete 218-blob source tree.
+**Latest source commit:** 6914442f6b813f90d1156f93d18f532919ff13e8 (tree 4bff80b5c83f088da2fef77b826e22c9314c5607; 234 blobs). Firmware target adaptation remains the previously verified source 81501afa53e2acd329db0298ffccdc533161e749; historical records below preserve earlier results.
 
 ## Current readiness
 
@@ -65,3 +65,7 @@ Run H-09 on an actual PS5 using its measured firmware, including image rendering
 ## Active repeat audit — M1-218 / ADR-050 (supersedes older current snapshots)
 
 Baseline main `799d301b8d8936244fe5ea50ab9967b21cccee2d`. Five confirmed Remap audit issues fixed: imported identifier/HTML safety, Shift/full-trigger consistency, geometric touch selection and disjoint outputs, JS/C Turbo/Toggle policy, canonical snapshot-aware Save readback. Mobile scroll cue added; fixture reuses production C parse/format. Local nine portable/162 browser assertions, full Host/ASan-UBSan and SDK v0.43 clean build pass (ELF `247a25a7962336ddc4b31c36ef8c251502b2c27cd7d158e35c69cd52c7a15564`). Publish the exact reviewed overlay and verify Actions next. History above retains prior results; physical H-09 and all firmware/USB/controller gates remain NOT_RUN. Optional Replace Profile remains P2; current supported import is Merge.
+
+## Latest acknowledged source and exact next action (M1-219)
+
+`6914442f6b813f90d1156f93d18f532919ff13e8` is on main, complete 234-blob tree, no removed paths. Host `38070068676` and PS5 cross-build `38070068771` PASS. Temporary ELF build artifact `11676088176` is available through the cross-build run; no Release. Local 162 browser assertions, nine portable contracts, normal/ASan-UBSan and SDK v0.43 clean build pass. P0 imported HTML safety and all audited Shift/touch/Turbo/Save/persistence issues are fixed at the host/build evidence level. Physical H-09 must repeat authenticated rendering, hostile rejection, canonical saved/cleared state after restart, Shift-trigger and boundary touch behavior on the exact installed FW. All PS5/USB/Puck/haptics/coexistence gates remain NOT_RUN. Optional Replace Profile is deferred P2; Merge is supported.

@@ -230,7 +230,24 @@
     }
   },
   "github_actions": {
-    "status": "PENDING_PUBLICATION"
+    "source_commit": "6914442f6b813f90d1156f93d18f532919ff13e8",
+    "host": {
+      "run_id": 38070068676,
+      "conclusion": "success",
+      "browser_minimum_checks": 162,
+      "browser_checks": 162
+    },
+    "cross_build": {
+      "run_id": 38070068771,
+      "conclusion": "success",
+      "artifact": {
+        "id": 11676088176,
+        "name": "ghost-control-ps5-cross-build",
+        "size_bytes": 942353,
+        "zip_sha256": "8de1f1c95ffd9dc12c7c3ea35e322b48c1f907c3e5186a229c3a3dedab6cc307",
+        "expires_at": "2027-01-08T17:01:55Z"
+      }
+    }
   },
   "fixture": "Loopback HTTP/RAM; production sc2_profile_parse/format via host stdin adapter; PS5 socket/filesystem/ABI NOT_RUN"
 }
