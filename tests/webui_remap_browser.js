@@ -297,7 +297,15 @@ async (page) => {
       const [a,b] = [...el.children].map(e=>e.getBoundingClientRect());
       return {ax:a.x,ay:a.y,bx:b.x,by:b.y,overflow:document.documentElement.scrollWidth>innerWidth};
     });
-    check(!layout.overflow, 'no horizontal overflow at ' + width);
+    check(!layout.overflow, 'no horizontal overflow at ' + width + ': ' + JSON.stringify(layout));
+    if(width===768){
+      // Wider system font metrics must not push navigation/status off screen.
+      await page.locator('header').evaluate(e=>e.style.fontSize='24px');
+      const head=await page.locator('.head').evaluate(e=>({width:innerWidth,scroll:document.documentElement.scrollWidth,items:[...e.children].map(c=>{const r=c.getBoundingClientRect();return {left:r.left,right:r.right}})}));
+      check(head.scroll<=head.width,'wide-font header has no overflow: '+JSON.stringify(head));
+      check(head.items.every(r=>r.left>=0&&r.right<=head.width),'all header controls remain reachable with wide fonts');
+      await page.locator('header').evaluate(e=>e.style.fontSize='');
+    }
     if(width===390)check(layout.by > layout.ay && Math.abs(layout.ax-layout.bx)<1, 'mobile controllers stack vertically');
     await open('A');check(await page.evaluate(()=>sheetKey==='A'), 'aligned clickable hotspot after resize ' + width);await page.locator('#cancel').click();
   }
