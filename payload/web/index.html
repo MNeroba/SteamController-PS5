@@ -270,6 +270,7 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
 .pick-grid [class^=g-PB_][aria-pressed=false]{color:var(--warn)}
 .editor-label{font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--muted);margin:14px 0 -8px}
 .sheet .foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;bottom:-20px;margin:0 -20px -20px;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
+.sheet .scrollhint{flex-basis:100%;color:var(--muted);font-size:.8rem}
 .acts-tabs{display:flex;gap:4px;margin:14px 0 0;flex-wrap:wrap}
 .acts-tabs button{min-height:36px;padding:6px 12px;font-size:.9rem;background:transparent;color:var(--muted)}
 .acts-tabs button[aria-selected=true]{background:var(--panel2);color:var(--text);font-weight:700;border-color:var(--line)}
@@ -447,7 +448,7 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
     <section class="sec" data-sec="timing" id="sec-timing">
       <div class="sech"><h2>Shift &amp; timing</h2><small>For the long press, double press, shift and turbo activators.</small></div>
       <div class="card"><div class="rows">
-        <label class="opt full"><span class="lbl">Shift button<small>While held, buttons use their Shift binding. The Shift button itself has no normal output.</small></span><select id="shiftSel" data-k="SHIFT"></select></label>
+        <label class="opt full"><span class="lbl">Shift button<small>While held, buttons use their Shift binding. The Shift input has no button output, including trigger Full pull.</small></span><select id="shiftSel" data-k="SHIFT"></select></label>
         <div data-sl="LONG_MS"><b>Long press time</b><small>Hold a button this long to trigger its long-press binding</small></div>
         <div data-sl="DOUBLE_MS"><b>Double press window</b><small>Two presses within this time count as a double press</small></div>
         <div data-sl="TURBO_MS" class="full"><b>Turbo speed</b><small>Time between repeats while a turbo button is held</small></div>
@@ -540,7 +541,7 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
       <label><input type="checkbox" class="box" id="optTurbo"> Turbo (repeats while held)</label>
       <label><input type="checkbox" class="box" id="optToggle"> Toggle (press on, press off)</label>
     </div>
-    <div class="foot"><button id="clear" class="ghost">Clear this tab</button><span class="btns"><button id="cancel" class="ghost">Cancel</button><button class="primary" id="done">Done</button></span></div>
+    <div class="foot"><small class="scrollhint" id="sheetScrollHint">Scroll for all output actions ↓</small><button id="clear" class="ghost">Clear this tab</button><span class="btns"><button id="cancel" class="ghost">Cancel</button><button class="primary" id="done">Done</button></span></div>
   </div>
 </div>
 <div class="toast" id="toast" role="status"></div>
@@ -579,9 +580,9 @@ const SL={
  GYRO_CURVE:{min:10,max:30,def:10,scale:10,unit:"×",pre:1,hint:v=>v>10?"":"Linear: stick moves exactly with the gyro"},
  FLICK_SPEED:{min:90,max:1440,step:10,def:360,unit:"°/s"},
  TRIGGER_FX:{min:0,max:200,step:5,def:100,unit:"%",after:()=>renderTfxPresets()},
- LONG_MS:{min:150,max:1500,step:50,def:400,unit:"ms"},
+ LONG_MS:{min:150,max:2000,step:50,def:400,unit:"ms"},
  DOUBLE_MS:{min:100,max:800,step:25,def:250,unit:"ms"},
- TURBO_MS:{min:20,max:300,step:10,def:60,unit:"ms"}};
+ TURBO_MS:{min:20,max:500,step:10,def:60,unit:"ms"}};
 
 /* Images and reference geometry are embedded by gen_html.py. Logical image
    dimensions deliberately differ from decoded WebP pixels; do not replace them. */
@@ -597,13 +598,61 @@ function outputLabel(k){return PS_SYMBOLS[k]|| (k==="TOUCHPAD"?"Touchpad click":
 function outputAccessibleLabel(k){return PS_SYMBOLS[k]?`${OUTNAME[k]} (${PS_SYMBOLS[k]})`:outputLabel(k)}
 function outputChoice(k){return PS_SYMBOLS[k]?esc(outputLabel(k)):`${outputIcon(k)}${esc(outputLabel(k))}`}
 
-let cur={}, saved="", editing="default", profiles=[], status={}, games=[], sheetKey=null;
+let cur={}, saved="", editing="default", profiles=[], status={}, games=[], sheetKey=null,saveUnconfirmed=false;
 const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
 const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
-function parse(t){const p={};t.split("\n").forEach(l=>{const i=l.indexOf("=");if(i>0)p[l.slice(0,i).trim()]=l.slice(i+1).trim()});return p}
+function parse(t){const p=Object.create(null);t.split("\n").forEach(l=>{const i=l.indexOf("=");if(i>0)p[l.slice(0,i).trim()]=l.slice(i+1).trim()});return p}
 function fmt(p){return Object.entries(p).map(([k,v])=>k+"="+v).join("\n")+"\n"}
-function combo(v){return !v||v==="NONE"?[]:v.split("+")}
+function combo(v){return typeof v!=="string"?[]:[...new Set(v.split("+").filter(k=>Object.hasOwn(OUTNAME,k)))]}
+function normalizeBindingFlags(p){
+  BITS.forEach(k=>{if(p[k+".toggle"]==="1")delete p[k+".turbo"]});return p;
+}
+const PROFILE_ENUMS={SHIFT:["NONE",...BITS.filter(k=>k!==RESERVED)],LPAD:PADS.map(v=>v[0]),RPAD:PADS.map(v=>v[0]),GYRO:["OFF","GRIP","GRIPS","RPAD","RSTICK","ALWAYS"],GYRO_AXIS:GAXES.map(v=>v[0]),RSTICK:RSTICKS.map(v=>v[0])};
+const PROFILE_FLAGS=["INVERT_LY","INVERT_RY","SWAP_STICKS","MOTION","GYRO_INVERT_X","GYRO_INVERT_Y"];
+function validatedProfile(p){
+  const next=Object.create(null);
+  Object.entries(p).forEach(([key,value])=>{
+    const [input,suffix,...rest]=key.split("."),binding=BITS.includes(input)&&!rest.length&&(key===input||!!suffix);
+    if(binding&&(!suffix||["long","double","shift","full"].includes(suffix))){
+      if(suffix==="full"&&input!=="LT"&&input!=="RT")throw new Error("Full pull is only valid for LT/RT");
+      const parts=value===""||value==="NONE"?[]:value.split("+");
+      if(parts.some(v=>!Object.hasOwn(OUTNAME,v)))throw new Error("Unknown output for "+key);
+      if(input===RESERVED&&parts.length)throw new Error("QAM is reserved");
+      const canonical=OUTS.map(v=>v[0]).filter(v=>parts.includes(v)).join("+");
+      next[key]=canonical||"NONE";
+    }else if((binding&&["turbo","toggle"].includes(suffix))||PROFILE_FLAGS.includes(key)){
+      if(value!=="0"&&value!=="1")throw new Error("Expected 0 or 1 for "+key);
+      if(input===RESERVED&&value==="1")throw new Error("QAM is reserved");next[key]=value;
+    }else if(Object.hasOwn(PROFILE_ENUMS,key)){
+      if(!PROFILE_ENUMS[key].includes(value))throw new Error("Invalid setting for "+key);next[key]=value;
+    }else if(Object.hasOwn(SL,key)){
+      if(!/^-?\d+$/.test(value)||!Number.isSafeInteger(Number(value)))throw new Error("Invalid number for "+key);
+      // The server remains authoritative for numeric range normalization.
+      next[key]=value;
+    }else if(key==="name"){
+      if(/[\r\n\0]/.test(value))throw new Error("Invalid profile name");next.name=value;
+    }
+    else throw new Error("Unknown profile key: "+key);
+  });
+  return normalizeBindingFlags(next);
+}
+function serverProfile(text){
+  const p=validatedProfile(parse(text));
+  if(!BITS.every(k=>Object.hasOwn(p,k))||!Object.hasOwn(p,"name"))throw new Error("Incomplete profile readback");
+  return p;
+}
+function profileWrite(p){
+  // The existing C POST route merges keys. A full editor save must therefore
+  // explicitly clear omitted optional activators and flags in that protocol.
+  const full={...p};
+  BITS.forEach(k=>{
+    ["long","double","shift"].forEach(a=>{full[k+"."+a]=p[k+"."+a]||"NONE"});
+    ["turbo","toggle"].forEach(a=>{full[k+"."+a]=p[k+"."+a]||"0"});
+  });
+  ["LT","RT"].forEach(k=>{full[k+".full"]=p[k+".full"]||"NONE"});
+  return fmt(full);
+}
 function comboText(v){const c=combo(v);return c.length?c.map(outputLabel).join(" + "):"Nothing"}
 function norm(v){return combo(v).sort().join("+")}
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2400)}
@@ -629,9 +678,9 @@ async function api(path,opt={}){
   if(r.status===401){portalTokenCache=null;try{sessionStorage.removeItem("pb.webuiToken")}catch(e){};throw new Error("Portal token rejected. Reload and enter the correct token.")}
   if(!r.ok)throw new Error(t);return t
 }
-function isDirty(){return saved!==""&&fmt(cur)!==saved}
+function isDirty(){return saveUnconfirmed||(saved!==""&&fmt(cur)!==saved)}
 function dirty(){const d=isDirty();$("#savebar").classList.toggle("show",d);$("#saveName").textContent=pname(editing);
-  const s=$("#pstate");s.textContent=d?"Unsaved changes":"Saved";s.classList.toggle("dirty",d)}
+  const s=$("#pstate");s.textContent=saveUnconfirmed?"Save not confirmed":d?"Unsaved changes":"Saved";s.classList.toggle("dirty",d)}
 
 /* ── storage (optional: the page works without it) ── */
 const store=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}, recall=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
@@ -692,6 +741,31 @@ function hotspot(s,parent){
   else e=svgEl("polygon",{points:s.pts.map(p=>p.join(",")).join(" ")},parent);
   e.setAttribute("class","s");if(s.rot)e.setAttribute("transform",`rotate(${s.rot} ${cx} ${cy})`);
 }
+function outputHit(svg,x,y){
+  const point=new DOMPoint(x,y),candidates=[];
+  svg.querySelectorAll(".destination").forEach(g=>{
+    const shape=g.querySelector(".s"),matrix=shape.getScreenCTM();if(!matrix)return;
+    const rect=shape.getBoundingClientRect();
+    if(Math.hypot(Math.max(rect.left-x,0,x-rect.right),Math.max(rect.top-y,0,y-rect.bottom))>16)return;
+    const local=point.matrixTransform(matrix.inverse()),inside=shape.isPointInFill(local),box=shape.getBBox();
+    const center=new DOMPoint(box.x+box.width/2,box.y+box.height/2).matrixTransform(matrix);
+    let distance=0;
+    if(!inside){
+      // Sample curved boundaries with <= 1 CSS px segments, then measure
+      // distance to each segment. getPointAtLength uses the actual SVG shape.
+      const length=shape.getTotalLength(),scale=Math.max(Math.hypot(matrix.a,matrix.b),Math.hypot(matrix.c,matrix.d));
+      const steps=Math.max(32,Math.ceil(length*scale)),segment=(a,b)=>{
+        const dx=b.x-a.x,dy=b.y-a.y,t=clamp(((x-a.x)*dx+(y-a.y)*dy)/(dx*dx+dy*dy||1),0,1);
+        return Math.hypot(x-a.x-t*dx,y-a.y-t*dy);
+      };
+      distance=Infinity;let previous=shape.getPointAtLength(0).matrixTransform(matrix);
+      for(let i=1;i<=steps;i++){const next=shape.getPointAtLength(length*i/steps).matrixTransform(matrix);distance=Math.min(distance,segment(previous,next));previous=next}
+    }
+    if(distance<=16)candidates.push({g,inside,distance,center:Math.hypot(x-center.x,y-center.y)});
+  });
+  candidates.sort((a,b)=>Number(b.inside)-Number(a.inside)||a.distance-b.distance||a.center-b.center);
+  return candidates[0]?.g.dataset.out||null;
+}
 function buildController(device,host,preview=false){
   const source=device==="steam",map=source?SOURCE_KEYS:OUTPUT_KEYS;
   ["front","back"].forEach(view=>{
@@ -710,12 +784,8 @@ function buildController(device,host,preview=false){
     });
     if(!source&&window.matchMedia("(pointer: coarse)").matches)svg.addEventListener("click",e=>{
       if(!e.detail)return;
-      const point={x:e.clientX,y:e.clientY},candidates=[...svg.querySelectorAll(".destination")].map(g=>{
-        const r=g.getBoundingClientRect(),dx=Math.max(r.left-point.x,0,point.x-r.right),dy=Math.max(r.top-point.y,0,point.y-r.bottom);
-        return {g,d:Math.hypot(dx,dy)};
-      }).filter(v=>v.d<=16).sort((a,b)=>a.d-b.d);
-      if(!candidates.length)return;
-      e.preventDefault();e.stopImmediatePropagation();const key=candidates[0].g.dataset.out;
+      const key=outputHit(svg,e.clientX,e.clientY);if(!key)return;
+      e.preventDefault();e.stopImmediatePropagation();
       if(preview)toggleOutput(key);
       else if(selectedKey&&selectedKey!==RESERVED)openSheet(selectedKey,{addOutput:key});
       else toast("Select a Steam Controller input first, then tap a DualSense output.");
@@ -732,38 +802,55 @@ function buildPad(){
   buildController("steam",$("#steamStage"));buildController("dual",$("#dualStage"));buildController("dual",$("#sheetDual"),true);
   $$(".viewswitch button").forEach(b=>b.onclick=()=>switchController(b.parentElement.dataset.controller,b.dataset.view));
 }
-function assignmentBadges(values){return values.length?values.map(k=>`<span class="chip c-${k}" aria-label="${esc(outputAccessibleLabel(k))}">${outputChoice(k)}</span>`).join(""):'<span class="chip none">Nothing</span>'}
+function assignmentBadges(values){values=values.filter(k=>Object.hasOwn(OUTNAME,k));return values.length?values.map(k=>`<span class="chip c-${k}" aria-label="${esc(outputAccessibleLabel(k))}">${outputChoice(k)}</span>`).join(""):'<span class="chip none">Nothing</span>'}
 function paintDestinations(){
-  const inSheet=$("#sheet").classList.contains("show"),values=inSheet?[...draft[act]]:selectedKey&&selectedKey!==RESERVED?combo(cur[selectedKey]):[];
+  const inSheet=$("#sheet").classList.contains("show"),values=inSheet?[...draft[act]]:selectedKey&&selectedKey!==RESERVED&&cur.SHIFT!==selectedKey?combo(cur[selectedKey]):[];
   $$(".destination").forEach(g=>{const on=values.includes(g.dataset.out);g.classList.toggle("assigned",on);g.setAttribute("aria-pressed",on);g.setAttribute("aria-label",`${outputAccessibleLabel(g.dataset.out)}${on?", assigned":""}`)});
-  $("#mappingBadges").innerHTML=selectedKey===RESERVED?'<span class="tag">Reserved system action</span>':selectedKey?assignmentBadges(values):"";
+  $("#mappingBadges").innerHTML=selectedKey===RESERVED?'<span class="tag">Reserved system action</span>':selectedKey===cur.SHIFT?'<span class="tag">Shift modifier</span>':selectedKey?assignmentBadges(values):"";
   $("#draftBadges").innerHTML=assignmentBadges(values);
 }
 function showCaption(k){
   const isShift=k!==RESERVED&&cur.SHIFT===k;
-  const text=k===RESERVED?RESERVED_TXT:isShift?"Shift modifier · ordinary output disabled":comboText(cur[k]);
+  const text=k===RESERVED?RESERVED_TXT:isShift?"Shift modifier · all button outputs disabled":comboText(cur[k]);
   if(selectedKey===k){
     const backHint=VIEW_STATE.dual==="back"?" · physical L is on the right; R is on the left":"";
-    $("#dualHint").textContent=(isShift?LABEL[k]+" is the Shift modifier; its ordinary output is disabled":LABEL[k]+" selected · tap an output to stage it, then confirm Done")+backHint;
+    $("#dualHint").textContent=(isShift?LABEL[k]+" is the Shift modifier; all its button outputs are disabled":LABEL[k]+" selected · tap an output to stage it, then confirm Done")+backHint;
   }
   if(selectedKey&&selectedKey!==k){$("#steamHint").textContent=`${LABEL[k]} → ${text}`;return}
   const x=k===RESERVED||isShift?[]:extras(k);$("#caption").innerHTML=`<b>${esc(LABEL[k])}</b> → ${esc(text)}${x.length?` <span>· ${esc(x.join(" · "))}</span>`:""}`;
 }
 function paintPad(){
   $$(".ctl").forEach(g=>{const k=g.dataset.k,reserved=k===RESERVED,isShift=!reserved&&cur.SHIFT===k;g.classList.toggle("sel",k===selectedKey);g.classList.toggle("changed",!reserved&&!isShift&&(norm(cur[k])!==norm(DEFAULTS[k])||extras(k).length>0));
-    const label=reserved?`${LABEL[k]}: ${RESERVED_TXT}`:isShift?`${LABEL[k]}: Shift modifier; ordinary output disabled`:`${LABEL[k]} → ${comboText(cur[k])}`;g.querySelector("title").textContent=label;g.setAttribute("aria-label",label)});
+    const label=reserved?`${LABEL[k]}: ${RESERVED_TXT}`:isShift?`${LABEL[k]}: Shift modifier; all button outputs disabled`:`${LABEL[k]} → ${comboText(cur[k])}`;g.querySelector("title").textContent=label;g.setAttribute("aria-label",label)});
   if(selectedKey)showCaption(selectedKey);paintDestinations();
 }
 function toggleOutput(k){if(!sheetKey||!$("#sheet").classList.contains("show"))return;const set=draft[act];set.has(k)?set.delete(k):set.add(k);renderActTabs();renderPick()}
 
 /* ── bindings list ── */
 function renderList(){
-  $("#list").innerHTML=GROUPS.map(([t,keys])=>`<div class="group"><h3>${t}</h3>${keys.map(k=>{const c=combo(cur[k]);
-    if(k===RESERVED)return `<div class="row reserved" data-k="${k}"><span class="phys">${ic("s_"+k)}${esc(LABEL[k])}</span><span class="chips"><span class="tag">${esc(RESERVED_TXT)}</span></span></div>`;
-    const isShift=cur.SHIFT===k;
-    return `<div class="row" tabindex="0" role="button" data-k="${k}"><span class="phys">${ic("s_"+k)}${esc(LABEL[k])}</span><span class="chips">${
-      isShift?'<span class="tag">Shift modifier · ordinary output disabled</span>':c.length?c.map(o=>`<span class="chip c-${o}" aria-label="${esc(outputAccessibleLabel(o))}">${outputChoice(o)}</span>`).join(""):'<span class="chip none">Nothing</span>'}${isShift?"":extras(k).map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</span></div>`}).join("")}</div>`).join("");
-  $$(".row").forEach(r=>{if(r.dataset.k===RESERVED){r.onmouseenter=()=>showCaption(RESERVED);return}r.onclick=()=>openSheet(r.dataset.k);r.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openSheet(r.dataset.k)}};r.onmouseenter=()=>showCaption(r.dataset.k)});
+  const list=$("#list");list.replaceChildren();
+  GROUPS.forEach(([title,keys])=>{
+    const group=document.createElement("div");group.className="group";
+    const heading=document.createElement("h3");heading.textContent=title;group.appendChild(heading);
+    keys.forEach(k=>{
+      const row=document.createElement("div"),reserved=k===RESERVED,isShift=cur.SHIFT===k;
+      row.className=reserved?"row reserved":"row";row.dataset.k=k;
+      const phys=document.createElement("span");phys.className="phys";phys.innerHTML=ic("s_"+k);phys.append(LABEL[k]);row.appendChild(phys);
+      const chips=document.createElement("span");chips.className="chips";row.appendChild(chips);
+      const tag=text=>{const span=document.createElement("span");span.className="tag";span.textContent=text;chips.appendChild(span)};
+      if(reserved)tag(RESERVED_TXT);
+      else if(isShift)tag("Shift modifier · all button outputs disabled");
+      else{
+        const outputs=combo(cur[k]);
+        if(!outputs.length){const span=document.createElement("span");span.className="chip none";span.textContent="Nothing";chips.appendChild(span)}
+        outputs.forEach(o=>{const span=document.createElement("span");span.classList.add("chip","c-"+o);span.setAttribute("aria-label",outputAccessibleLabel(o));span.innerHTML=outputChoice(o);chips.appendChild(span)});
+        extras(k).forEach(tag);
+      }
+      if(reserved)row.onmouseenter=()=>showCaption(k);
+      else{row.tabIndex=0;row.setAttribute("role","button");row.onclick=()=>openSheet(k);row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openSheet(k)}};row.onmouseenter=()=>showCaption(k)}
+      group.appendChild(row);
+    });list.appendChild(group);
+  });
 }
 
 /* ── slider component: range + editable number box, both live ── */
@@ -825,8 +912,13 @@ function openSheet(k,options={}){
   draft.turbo=cur[k+".turbo"]==="1";draft.toggle=cur[k+".toggle"]==="1";
   $$(".ctl").forEach(g=>g.classList.toggle("sel",g.dataset.k===k));
   act="";renderActTabs();renderPick();
-  $("#sheet").classList.add("show");paintPad();$("#pick button").focus();
+  $("#sheet").classList.add("show");paintPad();$("#pick button").focus();requestAnimationFrame(updateSheetScroll);
 }
+function updateSheetScroll(){
+  const box=$("#sheet > .box");
+  $("#sheetScrollHint").textContent=box.scrollHeight-box.scrollTop-box.clientHeight>24?"More output actions below ↓":"All output actions shown";
+}
+$("#sheet > .box").onscroll=updateSheetScroll;
 function renderActTabs(){
   $("#actTabs").innerHTML=actsFor(sheetKey).map(([a,l])=>`<button role="tab" data-a="${a}" aria-selected="${a===act}">${l}${a&&draft[a].size?'<span class="n"></span>':""}</button>`).join("");
   $$("#actTabs button").forEach(b=>b.onclick=()=>{act=b.dataset.a;renderActTabs();renderPick()});
@@ -846,7 +938,7 @@ function renderPick(){
       b.onclick=()=>toggleOutput(v);grid.appendChild(b)});
     section.appendChild(grid);p.appendChild(section);
   });
-  paintDestinations();
+  paintDestinations();requestAnimationFrame(updateSheetScroll);
 }
 function closeSheet(apply){
   if(apply){
@@ -854,7 +946,7 @@ function closeSheet(apply){
     ACTS.forEach(([a])=>{const v=ord(draft[a]);if(a==="")cur[k]=v||"NONE";else if(v)cur[k+a]=v;else delete cur[k+a]});
     if(draft.turbo)cur[k+".turbo"]="1";else delete cur[k+".turbo"];
     if(draft.toggle)cur[k+".toggle"]="1";else delete cur[k+".toggle"];
-    render();showCaption(k);
+    normalizeBindingFlags(cur);render();showCaption(k);
   }
   $("#sheet").classList.remove("show");sheetKey=null;sheetAddOutput=null;paintPad();
   const returnTo=sheetReturnFocus&&sheetReturnFocus.isConnected?sheetReturnFocus:$("#steamStage svg:not([hidden]) .ctl[data-k='"+selectedKey+"']");if(returnTo)returnTo.focus();
@@ -881,7 +973,8 @@ const pname=id=>{const p=profiles.find(p=>p.id===id);return p?p.name:id};
 const plabel=p=>p.id==="default"?"Default (every game without its own)":`${p.name}${p.id!==p.name?" · "+p.id:""}`;
 async function load(id,force,push=true){
   if(!force&&isDirty()&&!confirm("Discard unsaved changes?")){$("#prof").value=editing;syncHash(false);return false}
-  editing=id;cur=parse(await api("/api/profile?id="+encodeURIComponent(id)));saved=fmt(cur);
+  const loaded=serverProfile(await api("/api/profile?id="+encodeURIComponent(id),{cache:"no-store"}));
+  editing=id;cur=loaded;saved=fmt(cur);saveUnconfirmed=false;
   $("#prof").value=id;$("#del").disabled=id==="default";render();syncHash(push);return true;
 }
 async function refreshList(){
@@ -901,7 +994,24 @@ async function createFor(tid,name){
 }
 $("#prof").onchange=e=>load(e.target.value);
 $("#mode").onchange=async e=>{await api("/api/override?id="+encodeURIComponent(e.target.value),{method:"POST"});toast(e.target.value?"Locked to "+pname(e.target.value):"Switching automatically per game")};
-$("#save").onclick=async()=>{try{await api("/api/profile?id="+encodeURIComponent(editing),{method:"POST",body:fmt(cur)});saved=fmt(cur);dirty();await refreshList();toast("Saved")}catch(e){toast("Couldn't save: "+e.message)}};
+let saving=false;
+$("#save").onclick=async()=>{
+  if(saving)return;const id=editing;saving=true;$("#save").disabled=true;
+  try{
+    cur=validatedProfile(cur);const submitted=fmt(cur),path="/api/profile?id="+encodeURIComponent(id);
+    saveUnconfirmed=true;dirty();
+    await api(path,{method:"POST",body:profileWrite(cur)});
+    const canonical=serverProfile(await api(path,{cache:"no-store"})),applied=fmt(canonical);
+    if(editing===id){
+      // Preserve edits made while the request was pending; Saved refers only
+      // to the confirmed server snapshot, never the current mutable draft.
+      if(fmt(cur)===submitted)cur=canonical;
+      saved=applied;saveUnconfirmed=false;render();
+    }
+    await refreshList();toast(editing===id&&isDirty()?"Saved earlier changes; newer edits are unsaved":"Saved and confirmed");
+  }catch(e){dirty();toast("Save not confirmed: "+e.message)}
+  finally{saving=false;$("#save").disabled=false}
+};
 $("#revert").onclick=()=>{cur=parse(saved);render();toast("Changes undone")};
 /* ── export / import ── */
 $("#exp").onclick=()=>{
@@ -913,21 +1023,24 @@ $("#exp").onclick=()=>{
 };
 $("#imp").onclick=()=>{$("#impFile").value="";$("#impFile").click()};
 function mergeImportedProfile(current,incoming){
-  const next={...current};
-  Object.entries(incoming).forEach(([key,value])=>{
+  const checked=validatedProfile(incoming),next={...current};
+  Object.entries(checked).forEach(([key,value])=>{
     if(/\.(long|double|shift|full)$/.test(key)&&!combo(value).length)delete next[key];
-    else if(/\.(turbo|toggle)$/.test(key))next[key]=value==="1"?"1":"0";
     else next[key]=value;
   });
-  next.name=current.name;return next;
+  // Keep an explicit incoming toggle's precedence even after normalization
+  // omitted its turbo key; current state may already have turbo enabled.
+  next.name=current.name;return validatedProfile(next);
 }
 $("#impFile").onchange=async e=>{
   const f=e.target.files[0];if(!f)return;
   if(f.size>32768){toast("That file is too big to be a profile");return}
-  const p=parse(await f.text());
-  if(!BITS.some(k=>k in p)){toast("That doesn't look like a Puckbridge profile");return}
-  if(!confirm("Merge settings from "+f.name+" into \""+pname(editing)+"\"? Values present in the file replace current values; omitted settings stay unchanged. An empty or NONE activator clears only that activator. Review, then Save."))return;
-  cur=mergeImportedProfile(cur,p);render();dirty();toast("Merged. Check the profile, then Save");
+  try{
+    const p=parse(await f.text()),next=mergeImportedProfile(cur,p);
+    if(!BITS.some(k=>Object.hasOwn(p,k))){toast("That doesn't look like a Puckbridge profile");return}
+    if(!confirm("Merge settings from "+f.name+" into \""+pname(editing)+"\"? Values present in the file replace current values; omitted settings stay unchanged. An empty or NONE activator clears only that activator. Review, then Save."))return;
+    cur=next;render();dirty();toast("Merged. Check the profile, then Save");
+  }catch(error){toast("Import rejected: "+error.message)}
 };
 $("#del").onclick=async()=>{if(editing==="default"||!confirm(`Delete "${pname(editing)}"?`))return;await api("/api/delete?id="+encodeURIComponent(editing),{method:"POST"});await refreshList();await load("default",true);toast("Deleted")};
 window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()){e.preventDefault();e.returnValue=""}});

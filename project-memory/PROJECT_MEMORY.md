@@ -61,3 +61,7 @@ DualSense screenshot calibration and the attached Shift/import/output-picker aud
 ## Exact next action
 
 Run H-09 on an actual PS5 using its measured firmware, including image rendering/hotspots, live button highlighting, authenticated portal, and profile save/reload. Preserve all other hardware rows as NOT_RUN until their specified setups are available. Do not deploy or claim PS5 FW 12.00 compatibility before that evidence.
+
+## Active repeat audit — M1-218 / ADR-050 (supersedes older current snapshots)
+
+Baseline main `799d301b8d8936244fe5ea50ab9967b21cccee2d`. Five confirmed Remap audit issues fixed: imported identifier/HTML safety, Shift/full-trigger consistency, geometric touch selection and disjoint outputs, JS/C Turbo/Toggle policy, canonical snapshot-aware Save readback. Mobile scroll cue added; fixture reuses production C parse/format. Local nine portable/162 browser assertions, full Host/ASan-UBSan and SDK v0.43 clean build pass (ELF `247a25a7962336ddc4b31c36ef8c251502b2c27cd7d158e35c69cd52c7a15564`). Publish the exact reviewed overlay and verify Actions next. History above retains prior results; physical H-09 and all firmware/USB/controller gates remain NOT_RUN. Optional Replace Profile remains P2; current supported import is Merge.

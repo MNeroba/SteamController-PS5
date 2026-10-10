@@ -140,6 +140,24 @@ int main(void) {
     CHECK(sc2_bind_eval(&concurrent_state, &toggle_profile, 30,
                         (uint32_t)1u << IN_A, 0, 0, 12003) == SCE_PAD_BUTTON_CROSS);
 
+    /* A Shift trigger is a modifier at every stage of its travel. The other
+     * trigger's full pull remains independently usable. */
+    for (int shift = IN_LT; shift <= IN_RT; shift++) {
+        sc2_bind_state_t trigger_state = {0};
+        sc2_profile_t trigger_profile = other_profile;
+        trigger_profile.shift_in = (int8_t)shift;
+        trigger_profile.map[shift] = SCE_PAD_BUTTON_L2;
+        trigger_profile.full[0] = SCE_PAD_BUTTON_SQUARE;
+        trigger_profile.full[1] = SCE_PAD_BUTTON_CIRCLE;
+        trigger_profile.shf[IN_A] = SCE_PAD_BUTTON_TRIANGLE;
+        CHECK(sc2_bind_eval(&trigger_state, &trigger_profile, 40, 0, 0, 0, 13000) == 0);
+        CHECK(sc2_bind_eval(&trigger_state, &trigger_profile, 40,
+                            (1u << shift), shift == IN_LT, shift == IN_RT, 13001) == 0);
+        CHECK(sc2_bind_eval(&trigger_state, &trigger_profile, 40,
+                            (1u << shift) | (1u << IN_A), 1, 1, 13002) ==
+              (SCE_PAD_BUTTON_TRIANGLE | trigger_profile.full[shift == IN_LT]));
+    }
+
     printf("Steam binding transition checks passed (%d checks)\n", checks);
     return 0;
 }

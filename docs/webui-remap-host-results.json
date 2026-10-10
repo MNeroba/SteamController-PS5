@@ -1,7 +1,52 @@
 {
   "result": "PASS",
-  "checks": 114,
+  "checks": 162,
   "passed": [
+    "reject invalid imported identifier 0",
+    "reject invalid imported identifier 1",
+    "reject invalid imported identifier 2",
+    "reject invalid imported identifier 3",
+    "reject invalid imported identifier 4",
+    "reject invalid imported identifier 5",
+    "reject invalid imported identifier 6",
+    "reject invalid imported identifier 7",
+    "reject invalid imported identifier 8",
+    "rendering cannot create attributes from a corrupt binding",
+    "Shift modifier has no destination highlight",
+    "import Turbo/Toggle conflict normalized independent of order 0",
+    "import Turbo/Toggle conflict normalized independent of order 1",
+    "Save reads and displays server canonical state",
+    "file import rejected atomically before rendering",
+    "failed readback cannot report Saved or discard draft",
+    "incomplete canonical readback is rejected without overwriting draft",
+    "pending Save preserves newer edits and tracks the canonical saved snapshot",
+    "late save readback cannot replace a different profile",
+    "Save applies the shared Turbo/Toggle validation",
+    "Save persists cleared activators and flags through the production merge parser",
+    "all output fills disjoint across their full sampled geometry front:390",
+    "touch front:390 at 262,262 chooses L1",
+    "touch front:390 at 260,288 chooses L2",
+    "touch front:390 at 260,306 chooses L2",
+    "touch front:390 at 990,262 chooses R1",
+    "touch front:390 at 994,288 chooses R2",
+    "touch front:390 at 994,306 chooses R2",
+    "all output fills disjoint across their full sampled geometry back:390",
+    "touch back:390 at 980,300 chooses L1",
+    "touch back:390 at 975,380 chooses L2",
+    "touch back:390 at 274,300 chooses R1",
+    "touch back:390 at 279,380 chooses R2",
+    "all output fills disjoint across their full sampled geometry front:768",
+    "touch front:768 at 262,262 chooses L1",
+    "touch front:768 at 260,288 chooses L2",
+    "touch front:768 at 260,306 chooses L2",
+    "touch front:768 at 990,262 chooses R1",
+    "touch front:768 at 994,288 chooses R2",
+    "touch front:768 at 994,306 chooses R2",
+    "all output fills disjoint across their full sampled geometry back:768",
+    "touch back:768 at 980,300 chooses L1",
+    "touch back:768 at 975,380 chooses L2",
+    "touch back:768 at 274,300 chooses R1",
+    "touch back:768 at 279,380 chooses R2",
     "front L1/R1 target upper bumper buttons",
     "back L1/R1 target upper bumper buttons",
     "face-button overlays centered on source artwork",
@@ -110,6 +155,9 @@
     "aligned clickable hotspot after resize 390",
     "touch browser exposes coarse-pointer targets",
     "touch tap opens production editor",
+    "mobile editor indicates more output groups below",
+    "last Puckbridge action reachable in mobile dialog",
+    "last mobile output action selectable",
     "touch Cancel retains assignment",
     "enlarged touch target stages a nearby DualSense output {\"coarse\":true,\"selectedKey\":\"A\",\"sheetKey\":\"A\",\"act\":\"\",\"circleStaged\":true,\"rect\":{\"x\":302.50238037109375,\"y\":659.1436157226562,\"width\":20.925048828125,\"height\":20.925048828125,\"top\":659.1436157226562,\"right\":323.42742919921875,\"bottom\":680.0686645507812,\"left\":302.50238037109375}}",
     "touch back grip maps physical left input",
@@ -153,14 +201,14 @@
   ],
   "hardware": "NOT_RUN; loopback fixture only",
   "environment": {
+    "os": "macOS arm64",
+    "node": "24.11.0",
     "browser": "Microsoft Edge 152.0.4191.53",
     "playwright_cli": "0.1.22",
-    "node": "v24.11.0",
-    "host": "macOS arm64",
-    "fixture": "127.0.0.1:8765; in-memory profiles; preview-only bearer token"
+    "python": "3.14.3"
   },
-  "recorded_on": "2026-10-10",
-  "github_actions": {
+  "baseline_commit": "799d301b8d8936244fe5ea50ab9967b21cccee2d",
+  "previous_github_actions": {
     "commit": "408900592f50b1eb39b0003c357c95a137410f2f",
     "host_run": {
       "id": 38067268430,
@@ -180,5 +228,9 @@
       "artifact_sha256": "85add35acff842f0bee8670b7fa66ee949346409459c322fcdbfc3e5446025f1",
       "expires_at": "2027-01-08T16:20:34Z"
     }
-  }
+  },
+  "github_actions": {
+    "status": "PENDING_PUBLICATION"
+  },
+  "fixture": "Loopback HTTP/RAM; production sc2_profile_parse/format via host stdin adapter; PS5 socket/filesystem/ABI NOT_RUN"
 }

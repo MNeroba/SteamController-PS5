@@ -3,6 +3,7 @@
 import base64
 import hashlib
 import json
+import math
 import re
 import shutil
 import subprocess
@@ -89,6 +90,22 @@ class Controllers(unittest.TestCase):
             self.assertNotIn(key, mapping('SOURCE_KEYS'))
         self.assertIn('const RESERVED="QAM"', HTML)
         self.assertIn('if(k===RESERVED)', HTML)
+
+    def test_dualsense_shoulders_have_disjoint_fills(self):
+        # Rotation-aware vertical extents prove the ellipses cannot overlap;
+        # back polygons occupy separate y ranges. Browser tests additionally
+        # sample the actual SVG fills and exercise boundary touch coordinates.
+        for view in ('front', 'back'):
+            shapes = {s['id']: s for s in LAYOUTS['dual'][view]['shapes']}
+            for bumper, trigger in (('l1', 'l2'), ('r1', 'r2')):
+                a, b = shapes[bumper], shapes[trigger]
+                if view == 'front':
+                    def extent(s):
+                        angle = math.radians(s.get('rot', 0))
+                        return math.hypot(s['rx'] * math.sin(angle), s['ry'] * math.cos(angle))
+                    self.assertLess(a['cy'] + extent(a), b['cy'] - extent(b))
+                else:
+                    self.assertLess(max(p[1] for p in a['pts']), min(p[1] for p in b['pts']))
 
     def test_self_contained_generator_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp:

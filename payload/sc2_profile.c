@@ -221,6 +221,10 @@ void sc2_profile_parse(const char *text, sc2_profile_t *p) {
             int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 30) d = 30; p->gyro_steady = (uint8_t)d; }
         }
     }
+    /* Match the editor and binding engine: Toggle wins an ambiguous import,
+     * independently of line order. Format/save then emits canonical flags. */
+    for (int i = 0; i < SC2_IN_COUNT; i++)
+        if (p->toggle[i]) p->turbo[i] = 0;
     /* … is reserved for pause/resume: drop anything older profiles bound to it */
     p->map[IN_QAM] = p->lng[IN_QAM] = p->dbl[IN_QAM] = p->shf[IN_QAM] = 0;
     p->turbo[IN_QAM] = p->toggle[IN_QAM] = 0;

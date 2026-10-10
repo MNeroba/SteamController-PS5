@@ -17,9 +17,140 @@ async (page) => {
   await page.setViewportSize({width:1440, height:1050});
   await page.goto('http://127.0.0.1:8765/#remap/profile=default/buttons');
   await page.waitForFunction(() => saved !== '' && profiles.length === 2);
-  const base = await page.evaluate(() => 'name=Default\n' + Object.entries(DEFAULTS).map(([k,v])=>k+'='+v).join('\n') + '\nSHIFT=L4\n');
+  const base = await page.evaluate(() => 'name=Default\n' + Object.entries(DEFAULTS).map(([k,v])=>k+'='+v).join('\n') + '\nSHIFT=L4\nDEADZONE=9\n' + BITS.map(k=>['long','double','shift'].map(a=>k+'.'+a+'=NONE\n').join('')+k+'.turbo=0\n'+k+'.toggle=0\n').join('')+'LT.full=NONE\nRT.full=NONE\n');
   await page.request.post('http://127.0.0.1:8765/api/profile?id=default', {headers:{Authorization:'Bearer preview-only'},data:base});
   await page.reload();await page.waitForFunction(() => saved !== '' && cur.A === 'CROSS');
+  // Audit regressions: hostile profiles never reach HTML attributes or prototypes.
+  const auditFailures=[];
+  const auditCheck=(ok,name)=>{if(ok)passed.push(name);else auditFailures.push(name)};
+  const badImports=await page.evaluate(()=>{
+    const before=fmt(cur),bad=[
+      'A=CROSS" data-audit-injected="yes', 'A=CROSS+UNKNOWN',
+      'UNKNOWN=CROSS\nA=CROSS', 'A.full=PS', 'SHIFT=QAM\nA=CROSS',
+      '__proto__=CROSS\nA=CROSS', 'A.long=PS" autofocus="yes',
+      'A.=CROSS', 'name=bad\0name\nA=CROSS'
+    ];
+    return bad.map(text=>{try{const next=mergeImportedProfile(cur,parse(text));cur=next;render();return false}
+      catch(e){return fmt(cur)===before}finally{cur=parse(before);render()}});
+  });
+  badImports.forEach((ok,i)=>auditCheck(ok,'reject invalid imported identifier '+i));
+  const domSafe=await page.evaluate(()=>{
+    const original=cur.A;cur.A='CROSS" data-audit-injected="yes';render();
+    const safe=!document.querySelector('[data-audit-injected]');cur.A=original;render();return safe;
+  });
+  auditCheck(domSafe,'rendering cannot create attributes from a corrupt binding');
+  await view('steam','back');await source('L4').click();
+  auditCheck(!await selected('L3'),'Shift modifier has no destination highlight');
+  await view('steam','front');
+  const flags=await page.evaluate(()=>{
+    const a=mergeImportedProfile(cur,parse('A.turbo=1\nA.toggle=1\n'));
+    const b=mergeImportedProfile(cur,parse('A.toggle=1\nA.turbo=1\n'));
+    return [a['A.turbo']!=='1'&&a['A.toggle']==='1',b['A.turbo']!=='1'&&b['A.toggle']==='1'];
+  });
+  flags.forEach((ok,i)=>auditCheck(ok,'import Turbo/Toggle conflict normalized independent of order '+i));
+  // Fixture saves through production sc2_profile_parse/format on the host.
+  let profileGets=0;
+  await page.route('**/api/profile?id=default',async route=>{
+    if(route.request().method()==='GET'){
+      profileGets++;await route.continue();
+    }else await route.continue();
+  });
+  await page.evaluate(()=>{cur.DEADZONE='999';render()});
+  await page.locator('#save').click();await page.waitForFunction(()=>!isDirty());
+  auditCheck(profileGets>0&&await value('DEADZONE')==='40','Save reads and displays server canonical state');
+  await page.unroute('**/api/profile?id=default');
+  await page.evaluate(()=>{window.confirm=()=>true;cur.A='CROSS';render()});
+  const importBefore=await page.evaluate(()=>fmt(cur));
+  await page.locator('#impFile').setInputFiles({name:'hostile.ini',mimeType:'text/plain',buffer:Buffer.from('A=CROSS" data-audit-injected="yes\n')});
+  await page.waitForFunction(()=>document.querySelector('#toast').textContent.startsWith('Import rejected:'));
+  auditCheck(await page.evaluate(()=>fmt(cur))===importBefore&&!await page.locator('[data-audit-injected]').count(),'file import rejected atomically before rendering');
+  // Successful POST plus failed GET must retain the unsaved draft and error.
+  await page.route('**/api/profile?id=default',async route=>{
+    if(route.request().method()==='GET')await route.fulfill({status:500,body:'injected readback failure'});
+    else await route.continue();
+  });
+  await page.evaluate(()=>{cur.DEADZONE='22';render()});
+  await page.locator('#save').click();await page.waitForFunction(()=>!saving);
+  auditCheck(await page.evaluate(()=>isDirty()&&cur.DEADZONE==='22')&&(await page.locator('#toast').textContent()).startsWith('Save not confirmed:'),'failed readback cannot report Saved or discard draft');
+  await page.unroute('**/api/profile?id=default');
+  await page.route('**/api/profile?id=default',async route=>{
+    if(route.request().method()==='GET')await route.fulfill({status:200,body:'name=truncated\nA=CROSS\n'});
+    else await route.continue();
+  });
+  await page.locator('#save').click();await page.waitForFunction(()=>!saving);
+  auditCheck(await page.evaluate(()=>isDirty()&&cur.DEADZONE==='22')&&(await page.locator('#toast').textContent()).includes('Incomplete profile'),'incomplete canonical readback is rejected without overwriting draft');
+  await page.unroute('**/api/profile?id=default');
+  // Simulate a user editing while an actual canonical GET is pending.
+  let releaseGet;const getGate=new Promise(resolve=>releaseGet=resolve);
+  let getStarted;const getReady=new Promise(resolve=>getStarted=resolve);
+  await page.route('**/api/profile?id=default',async route=>{
+    if(route.request().method()==='GET'){getStarted();await getGate;await route.continue()}
+    else await route.continue();
+  });
+  await page.evaluate(()=>{cur.DEADZONE='999';render()});await page.locator('#save').click();await getReady;
+  await page.evaluate(()=>{cur.A='CIRCLE';render()});releaseGet();await page.waitForFunction(()=>!saving);
+  auditCheck(await page.evaluate(()=>cur.A==='CIRCLE'&&isDirty()&&parse(saved).DEADZONE==='40'),'pending Save preserves newer edits and tracks the canonical saved snapshot');
+  await page.unroute('**/api/profile?id=default');
+  // A late save result for Default must not replace another opened profile.
+  let releaseOther;const otherGate=new Promise(resolve=>releaseOther=resolve);
+  let otherStarted;const otherReady=new Promise(resolve=>otherStarted=resolve);
+  await page.route('**/api/profile?id=default',async route=>{
+    if(route.request().method()==='GET'){otherStarted();await otherGate;await route.continue()}
+    else await route.continue();
+  });
+  await page.locator('#save').click();await otherReady;
+  await page.evaluate(()=>load('PPSA00001',true));releaseOther();await page.waitForFunction(()=>!saving);
+  auditCheck(await page.evaluate(()=>editing==='PPSA00001'&&cur.A==='SQUARE'&&!isDirty()),'late save readback cannot replace a different profile');
+  await page.unroute('**/api/profile?id=default');await page.evaluate(()=>load('default',true));
+  // Production POST merges into the previous profile. Missing optional fields
+  // must be transmitted as explicit tombstones to persist an editor clear.
+  await page.evaluate(()=>{cur['B.long']='PS';cur['B.toggle']='1';cur['B.turbo']='1';cur['LT.full']='L1';render()});
+  await page.locator('#save').click();await page.waitForFunction(()=>!saving);
+  auditCheck(await page.evaluate(()=>cur['B.toggle']==='1'&&cur['B.turbo']!=='1'),'Save applies the shared Turbo/Toggle validation');
+  await page.locator('#impFile').setInputFiles({name:'clear.ini',mimeType:'text/plain',buffer:Buffer.from('B=CIRCLE\nB.long=NONE\nB.toggle=0\nB.turbo=0\nLT.full=NONE\n')});
+  await page.waitForFunction(()=>cur['B.long']===undefined);
+  await page.locator('#save').click();await page.waitForFunction(()=>!saving);
+  auditCheck(await page.evaluate(()=>!cur['B.long']&&!cur['B.toggle']&&!cur['B.turbo']&&!cur['LT.full']),'Save persists cleared activators and flags through the production merge parser');
+  // Real touch event at the former L1/L2 overlap, rather than hotspot centers.
+  const auditTouch=await page.context().browser().newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  try{
+    await auditTouch.addInitScript(()=>sessionStorage.setItem('pb.webuiToken','preview-only'));
+    const tp=await auditTouch.newPage();await tp.goto('http://127.0.0.1:8765/#remap/profile=default/buttons');
+    await tp.waitForFunction(()=>saved!=='');await tp.locator('#steamStage svg:not([hidden]) .ctl[data-k="A"]').tap();await tp.locator('#cancel').tap();
+    await tp.locator('#dualStage').scrollIntoViewIfNeeded();
+    for(const width of [390,768]){
+      await tp.setViewportSize({width,height:844});
+      for(const [v,points] of [
+        ['front',[[262,262,'L1'],[260,288,'L2'],[260,306,'L2'],[990,262,'R1'],[994,288,'R2'],[994,306,'R2']]],
+        ['back',[[980,300,'L1'],[975,380,'L2'],[274,300,'R1'],[279,380,'R2']]]
+      ]){
+        await tp.locator('.viewswitch[data-controller="dual"] [data-view="'+v+'"]').tap();
+        await tp.locator('#dualStage').scrollIntoViewIfNeeded();
+        const overlap=await tp.evaluate(()=>{
+          const svg=document.querySelector('#dualStage svg:not([hidden])'),hits=[...svg.querySelectorAll('.destination')];
+          const shapes=hits.map(g=>({key:g.dataset.out,shape:g.querySelector('.s'),box:g.querySelector('.s').getBBox()}));
+          for(let x=150;x<=1120;x+=2)for(let y=230;y<=690;y+=2){
+            const point=new DOMPoint(x,y).matrixTransform(svg.getScreenCTM());
+            const inside=shapes.filter(({shape,box})=>{
+              const p=point.matrixTransform(shape.getScreenCTM().inverse());
+              return p.x>=box.x&&p.x<=box.x+box.width&&p.y>=box.y&&p.y<=box.y+box.height&&shape.isPointInFill(p);
+            });
+            if(inside.length>1)return inside.map(s=>s.key).join('/');
+          }return null;
+        });
+        auditCheck(!overlap,'all output fills disjoint across their full sampled geometry '+v+':'+width);
+        for(const [x,y,key] of points){
+          const point=await tp.evaluate(([x,y])=>new DOMPoint(x,y).matrixTransform(document.querySelector('#dualStage svg:not([hidden])').getScreenCTM()).toJSON(),[x,y]);
+          await tp.touchscreen.tap(point.x,point.y);
+          auditCheck(await tp.evaluate(key=>sheetKey==='A'&&draft[''].has(key),key),'touch '+v+':'+width+' at '+x+','+y+' chooses '+key);
+          if(await tp.locator('#sheet.show').count())await tp.locator('#cancel').tap();
+        }
+      }
+    }
+  }finally{await auditTouch.close()}
+  if(auditFailures.length)throw new Error('Audit regressions: '+auditFailures.join('; '));
+  await page.request.post('http://127.0.0.1:8765/api/profile?id=default',{headers:{Authorization:'Bearer preview-only'},data:base});
+  await page.reload();await page.waitForFunction(()=>saved!==''&&cur.A==='CROSS');
   const calibrated = await page.evaluate(() => {
     const front=Object.fromEntries(SHAPES.dual.front.shapes.map(s=>[s.id,s]));
     const back=Object.fromEntries(SHAPES.dual.back.shapes.map(s=>[s.id,s]));
@@ -179,6 +310,11 @@ async (page) => {
     check(await touchPage.evaluate(()=>matchMedia('(pointer: coarse)').matches),'touch browser exposes coarse-pointer targets');
     await touchPage.locator('#steamStage svg:not([hidden]) .ctl[data-k="A"]').tap();
     check(await touchPage.locator('#sheet.show').count()===1,'touch tap opens production editor');
+    check(await touchPage.locator('#sheetScrollHint').isVisible()&&(await touchPage.locator('#sheetScrollHint').textContent()).includes('below'),'mobile editor indicates more output groups below');
+    await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').scrollIntoViewIfNeeded();
+    check(await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').isVisible(),'last Puckbridge action reachable in mobile dialog');
+    await touchPage.locator('#pick .g-PB_GYRO_TOGGLE').tap();
+    check(await touchPage.evaluate(()=>draft[''].has('PB_GYRO_TOGGLE')),'last mobile output action selectable');
     await touchPage.locator('#pick .g-CROSS').tap();await touchPage.locator('#cancel').tap();
     check(await touchPage.evaluate(()=>cur.A==='L1+R1'),'touch Cancel retains assignment');
     await touchPage.locator('#dualStage').scrollIntoViewIfNeeded();

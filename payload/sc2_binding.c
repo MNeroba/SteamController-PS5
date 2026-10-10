@@ -139,7 +139,8 @@ uint32_t sc2_bind_eval(sc2_bind_state_t *state, const sc2_profile_t *P,
         if (state->input[i].pulse_until > now) out |= state->input[i].pulse_mask;
     }
 
-    if (full_l) out |= P->full[0];
-    if (full_r) out |= P->full[1];
+    /* Shift inputs are modifiers only, including a trigger's hardware click. */
+    if (full_l && shift_in != IN_LT) out |= P->full[0];
+    if (full_r && shift_in != IN_RT) out |= P->full[1];
     return out;
 }

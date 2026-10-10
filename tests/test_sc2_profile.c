@@ -172,6 +172,12 @@ int main(void) {
     CHECK(p.long_ms == 2000);  /* outside int range is ignored */
     CHECK(p.turbo_ms == 20);   /* in-range signed values are clamped */
 
+    /* INI order cannot change the mutually exclusive Turbo/Toggle policy. */
+    sc2_profile_parse("B.turbo=1\nB.toggle=1\n", &p);
+    CHECK(p.toggle[IN_B] == 1 && p.turbo[IN_B] == 0);
+    sc2_profile_parse("X.toggle=1\nX.turbo=1\n", &p);
+    CHECK(p.toggle[IN_X] == 1 && p.turbo[IN_X] == 0);
+
     sc2_active_set(&p);
     sc2_active_get_versioned(&active_copy, &active_generation);
     CHECK(active_generation != 0);

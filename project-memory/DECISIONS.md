@@ -364,3 +364,13 @@ ADR-048 publication acknowledgement: source `4065ff41d51b86fdf3a60f972f72b2b2485
 
 
 ADR-049 publication acknowledgement: commit `408900592f50b1eb39b0003c357c95a137410f2f`, parent `78cc6f027e7a43a805d47e7bc3183e4274ee5dba`, tree `3fbd9e72cd5ffed4180112a28b0cf03dd3793404`; expected-head non-force update acknowledged. The complete tree retains 249 entries/233 blobs, all 23 intended blob hashes match and no paths were added or removed. Host/Chromium/normal/ASan-UBSan Actions `38067268430` and SDK cross-build `38067268427` pass.
+
+## ADR-050 — WebUI Remap security and edge-case hardening
+
+- Date/status: 2026-10-10; ACCEPTED; local host/browser/build verified, publication pending, PS5 unverified.
+- Baseline: main `799d301b8d8936244fe5ea50ab9967b21cccee2d` / tree `0f7768a27832e12adf6d08b30b7d65b3f5ba6836` / 233 blobs. User repeat audit confirmed five issues through source and expected-red regressions.
+- Decision: reject an invalid imported profile atomically using BITS/OUTS and setting allowlists; render assignment rows through DOM nodes and filter badge IDs defensively. Shift is button-modifier-only, including trigger Full pull; retain stored bindings and analog trigger axis behavior. Toggle wins Turbo conflicts in JS and C independent of order. Save rereads a complete canonical server snapshot, keeps later edits dirty and isolates results by profile ID. HTTP success without confirmed readback is not Saved. Coarse taps prioritize actual SVG fill then transformed boundary distance; remove intersecting shoulder/D-pad/triangle zones. Show a mobile scroll cue.
+- Reuse: production C parser/formatter in bounded host stdin fixture; no second parser/server/payload architecture. SDK v0.43, safe policy, USB/Puck unchanged.
+- Evidence: M1-218/T-P60/F099; nine portable and 158 browser assertions, full normal/ASan/UBSan suites and SDK build pass. Target H-09 remains required. Replace Profile remains optional; current documented import contract is Merge.
+
+ADR-050 addendum: production C fixture proved editor-cleared activators were resurrected by the merge-based POST when omitted. Serialize explicit NONE/0 tombstones for a full editor Save without changing the established API or partial Merge-import contract. Require uncached, complete canonical GET; reject control characters in profile names and empty suffixes. Regression now passes162 assertions; clean final ELF `247a25a7962336ddc4b31c36ef8c251502b2c27cd7d158e35c69cd52c7a15564`.

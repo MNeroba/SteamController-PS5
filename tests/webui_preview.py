@@ -6,6 +6,8 @@ the public fixture token `preview-only` via sessionStorage. State is RAM-only.
 """
 import json
 import re
+import subprocess
+import argparse
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -22,6 +24,7 @@ defaults = json.loads(re.sub(r'(\w+):', r'"\1":', defaults))
 BASE = ''.join(f'{k}={v}\n' for k, v in defaults.items()) + 'SHIFT=L4\n'
 PROFILES = {'default': 'name=Default\n' + BASE,
             'PPSA00001': 'name=Browser fixture\n' + BASE + 'A=SQUARE\n'}
+NORMALIZER = ROOT / 'tests/build/webui_profile_fixture'
 
 
 class Preview(BaseHTTPRequestHandler):
@@ -80,10 +83,23 @@ class Preview(BaseHTTPRequestHandler):
         key = parse_qs(url.query).get('id', ['default'])[0]
         if key not in PROFILES:
             return self.respond('Unknown fixture profile', code=404)
-        PROFILES[key] = self.rfile.read(length).decode()
+        body = self.rfile.read(length)
+        # Same load-existing -> parse-update -> format flow as the PS5 route,
+        # with production C and RAM-only storage. This is not socket/PS5 proof.
+        try:
+            result = subprocess.run([str(NORMALIZER)],
+                input=PROFILES[key].encode() + b'\0' + body,
+                capture_output=True, check=True, timeout=5)
+            PROFILES[key] = result.stdout.decode()
+        except (subprocess.SubprocessError, OSError, UnicodeError):
+            return self.respond('Host profile normalization failed', code=500)
         self.respond('OK', 'text/plain')
 
 
 if __name__ == '__main__':
-    print('Browser fixture: http://127.0.0.1:8765 (no hardware)', flush=True)
-    ThreadingHTTPServer(('127.0.0.1', 8765), Preview).serve_forever()
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--port', type=int, default=8765)
+    args = parser.parse_args()
+    subprocess.run(['make', '-C', str(ROOT / 'tests'), 'browser-fixture'], check=True)
+    print(f'Browser fixture: http://127.0.0.1:{args.port} (production parser, no hardware)', flush=True)
+    ThreadingHTTPServer(('127.0.0.1', args.port), Preview).serve_forever()
