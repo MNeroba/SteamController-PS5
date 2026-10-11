@@ -36,3 +36,7 @@ Log sc-dev2-final-host.log SHA256 355e448e327f15d8154cea60db7251d4b74317658fbc56
 Log sc-dev2-fresh-browser.log SHA256 e07432da1efe8efed1ae240783c141159c2da16aaf88916003aa020e68e10ee9.
 
 Log browser.json SHA256 2fe105a9719a6178d940bf3d65c9403fad0b25ff551cea859ac9c8a9b18752fe.
+
+## M1-232 — dev.3 complete-source software validation
+
+Verified main baseline2a2fb9, all255 blobs SHA-matched. Explicit40-path overlay exports266 files/all43 productionC/no deletion and no generated headers in source. Fresh normal40 C/Python suites, ASan-UBSan and Chromium214 PASS; final targeted native-adapter normal/sanitizer check and SDKv0.43/LLVM18 rebuild also PASS. Local fresh ELF SHA256d96cda4f013eaa3c159904944de8523637c1993277feaf25e04b1a1d08e677d8; exact embedded icon/metadata and checksum packaging verified, distinct from any future published Linux artifact hash. Negative results and paths remain in TEST_LOG M1-232. Source main0a3dacb453d6ea925a36888cd5c5784e68f26b6f/tree72458c460507610fd925b1368b477463e10205f2 acknowledged; push/release results recorded separately. No physical operation performed. FW13.60 and H-13 remain NOT_RUN, stable gate unchanged.

@@ -26,3 +26,7 @@ Owner now reports FW13.60. This supersedes the earlier refusal to update; it is 
 ## dev.3 in progress — M1-232
 
 Single ELF now embeds the supplied icon and optional Media settings tile installer. Pair, choose Settings & help → PS5 tile, confirm installation; tile opens loopback8090 while payload runs. Local40 C/normal/sanitizer/Chromium214/SDK build gates PASS. Current firmware policy13.60 owner-reported/unverified, SDKv0.43 unchanged. Fresh complete-source validation, remote push checks and dev.3 publication are next; no new release is claimed yet. H-13 tile registration/browser/navigation/removal remains NOT_RUN, alongside existing console gates.
+
+## M1-233 — release candidate refinement
+
+Initial tile source0a3dacb is superseded by lazy installer loading: missing AppInstUtil/API cannot impose a new controller-payload startup dependency. Full fresh normal40 C, sanitizer, Chromium214, SDK build and ELF dependency/package checks PASS; DEV contract suite now7. Feature/status/navigation updated. Select only the follow-up full source SHA for dev.3 after its own Host/PS5 push checks pass. Previous queued jobs had runner_id0/no steps for over10min. No dev.3 release/tag/assets are claimed yet. H-13 remains NOT_RUN.

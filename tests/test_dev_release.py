@@ -15,6 +15,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / 'scripts'))
 from package_dev_release import package, validate_policy, validate_elf, validate_identifiers, WARNING
 from check_browser_result import validate as validate_browser
+from check_settings_tile_elf import validate_dynamic_output
 
 
 class DevRelease(unittest.TestCase):
@@ -95,6 +96,15 @@ class DevRelease(unittest.TestCase):
                       {'result': 'PASS', 'checks': 201}, {'result': 'PASS', 'checks': True}]:
             with self.assertRaises(ValueError):
                 validate_browser(value)
+
+    def test_optional_installer_dependency(self):
+        validate_dynamic_output('Dynamic section\n(NEEDED) Shared library: [libScePad.sprx]')
+        for output in ['', 'not an ELF', 'Dynamic section\n(NEEDED) Shared library: [libSceAppInstUtil.sprx]']:
+            with self.assertRaises(ValueError):
+                validate_dynamic_output(output)
+        for name in ['dev-release.yml','ps5-cross-build.yml']:
+            self.assertIn('check_settings_tile_elf.py', (ROOT / '.github/workflows' / name).read_text())
+        self.assertNotIn('-lSceAppInstUtil', (ROOT / 'payload/Makefile').read_text())
 
     def test_stable_gate_separate(self):
         workflow = (ROOT / '.github/workflows/dev-release.yml').read_text()

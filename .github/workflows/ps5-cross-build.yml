@@ -36,6 +36,7 @@ jobs:
           python3 gen_html.py
           make clean
           make
+          python3 ../scripts/check_settings_tile_elf.py ghost-control-ps5.elf
           sha256sum ghost-control-ps5.elf | tee ghost-control-ps5.elf.sha256
 
       - name: Verify checksum

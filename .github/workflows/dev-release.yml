@@ -113,6 +113,7 @@ jobs:
           sha256sum --check "$RUNNER_TEMP/generated.sha256"
           make -C payload clean
           make -C payload
+          python3 scripts/check_settings_tile_elf.py payload/ghost-control-ps5.elf
           sha256sum --check "$RUNNER_TEMP/generated.sha256"
       - name: Package DEV ELF with exact source, checksum and notices
         run: |
