@@ -4,6 +4,7 @@
 #include <stdint.h>
 
 #define USB_RESOURCES_MAX_ENDPOINTS 32
+#define USB_RESOURCES_FRAME_CAPACITY 64
 
 typedef struct {
     int fd;
@@ -11,6 +12,12 @@ typedef struct {
     int fs_initialized;
     uint32_t opened_endpoints;
     uint32_t active_transfers;
+    /* Stable until session cleanup closes the device. Failed STOP/CLOSE may
+     * retain kernel references; neither payload bytes nor frame metadata can
+     * point into a helper's stack or be overwritten while the endpoint is busy. */
+    uint8_t frame_data[USB_RESOURCES_MAX_ENDPOINTS][USB_RESOURCES_FRAME_CAPACITY];
+    void *frame_buffer[USB_RESOURCES_MAX_ENDPOINTS][1];
+    uint32_t frame_length[USB_RESOURCES_MAX_ENDPOINTS][1];
 } usb_resources_t;
 
 typedef struct {

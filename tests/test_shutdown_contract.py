@@ -62,6 +62,21 @@ class ShutdownContractTests(unittest.TestCase):
         if "pthread_detach" in main:
             self.fail("manager, USB, and klog threads must be joinable")
 
+    def test_closed_klog_does_not_spin(self):
+        main = self.sources["gc_main"]
+        start = main.index("static void *klog_capture_thread")
+        stop = main.index("/* ── VDI", start)
+        self.assertIn('if (len == 0) { gp_log("klog: capture stream closed', main[start:stop])
+        self.assertIn('break; }', main[start:stop])
+
+    def test_valid_input_watchdog_uses_owned_cleanup(self):
+        main = self.sources["gc_main"]
+        self.assertIn("usb_input_watchdog_expired(&input_watchdog", main)
+        self.assertIn("usb_completed_frame_valid(&eps[0], sizeof(buf))", main)
+        refresh = main.index("usb_input_watchdog_refresh(&input_watchdog")
+        self.assertIn("STEAM_REPORT_INPUT", main[refresh-230:refresh])
+        self.assertIn("owns_session && sc2_haptic_session_is_owner(slot_token)", main)
+
     def test_owned_vda_is_neutralized_before_delete(self) -> None:
         main = self.sources["gc_main"]
         self.require("neutralize_vda_handle", main,

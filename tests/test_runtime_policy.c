@@ -13,6 +13,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/stat.h>
 
 static int all_disabled(const runtime_policy_t *p)
 {
@@ -25,7 +26,7 @@ static void test_defaults_are_safe(void)
     runtime_policy_t p;
     memset(&p, 0xff, sizeof(p));
     runtime_policy_defaults(&p);
-    assert(all_disabled(&p));
+    assert(p.enable_webui && !p.enable_bridge_probe && !p.enable_game_hooks && !p.enable_ds_handoff);
 }
 
 static void test_explicit_opt_ins(void)
@@ -75,7 +76,7 @@ static void test_empty_and_oversize(void)
 {
     runtime_policy_t p;
     assert(runtime_policy_parse("", 0, &p) == 0);
-    assert(all_disabled(&p));
+    assert(p.enable_webui && !p.enable_game_hooks);
     char oversized[RUNTIME_POLICY_MAX_BYTES + 1];
     memset(oversized, ' ', sizeof(oversized));
     assert(runtime_policy_parse(oversized, sizeof(oversized), &p) != 0);
@@ -110,7 +111,12 @@ static void test_file_loader_fails_closed(void)
 
     runtime_policy_t p;
     memset(&p, 0xff, sizeof(p));
-    assert(runtime_policy_load_file(config, &p) != 0);
+    assert(runtime_policy_load_file(config, &p) == 1);
+    assert(p.enable_webui && !p.enable_game_hooks);
+
+    static const char disabled[] = "ENABLE_WEBUI=0\n";
+    write_file(config, disabled, sizeof(disabled)-1);
+    assert(runtime_policy_load_file(config, &p) == 0);
     assert(all_disabled(&p));
 
     static const char valid[] = "ENABLE_WEBUI=1\n";
@@ -133,6 +139,9 @@ static void test_file_loader_fails_closed(void)
     memset(&p, 0xff, sizeof(p));
     assert(runtime_policy_load_file(directory, &p) != 0);
     assert(all_disabled(&p));
+    assert(unlink(link_path) == 0);
+    assert(mkfifo(link_path, 0600) == 0);
+    assert(runtime_policy_load_file(link_path, &p) < 0 && all_disabled(&p));
     assert(unlink(link_path) == 0);
     assert(unlink(config) == 0);
     assert(rmdir(directory) == 0);

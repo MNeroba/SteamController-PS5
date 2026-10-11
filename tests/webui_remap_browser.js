@@ -5,6 +5,8 @@ async (page) => {
   page = await page.context().newPage(); // Fresh document; never discard a user's open page.
   const passed = [];
   const check = (ok, name) => { if (!ok) throw new Error(name); passed.push(name); };
+  const waitForFunction=page.waitForFunction.bind(page);
+  page.waitForFunction=async(...args)=>{try{return await waitForFunction(...args)}catch(error){throw new Error(error.message+"; last check: "+passed.at(-1)+"; predicate: "+args[0])}};
   const value = k => page.evaluate(k => cur[k], k);
   const source = k => page.locator(`#steamStage svg:not([hidden]) .ctl[data-k="${k}"]`);
   const view = (name, v) => page.locator(`.viewswitch[data-controller="${name}"] button[data-view="${v}"]`).click();
@@ -427,6 +429,81 @@ async (page) => {
   await page.evaluate(()=>history.forward());await page.waitForFunction(()=>editing==='PPSA00001');
   check(await page.evaluate(()=>document.querySelector('#prof').value==='PPSA00001'&&location.hash.includes('profile=PPSA00001')),'Forward commits profile, dropdown and URL together');
   await page.evaluate(()=>load('default',true));
+  // First-run presentation: no filesystem access and no token prompt.
+  const paired = await page.context().newPage();
+  await paired.setViewportSize({width:390,height:844});
+  await paired.addInitScript(()=>{sessionStorage.removeItem('pb.webuiToken');window.prompt=()=>{throw new Error('Token prompt forbidden')}});
+  await paired.goto('http://127.0.0.1:8765/');
+  await paired.locator('#pairing[open]').waitFor();
+  check(await paired.locator('#steamStage svg').count()===2,'public interface and controller artwork initialize before pairing');
+  check((await paired.locator('#conn').textContent())==='Pairing required','first launch clearly asks for pairing');
+  check(await paired.evaluate(()=>document.documentElement.scrollWidth<=390),'pairing screen fits a mobile viewport');
+  await paired.locator('#pairCode').fill('00000000');await paired.locator('#pairSubmit').click();
+  await paired.waitForFunction(()=>document.querySelector('#pairMessage').textContent.includes('rejected'));
+  check(await paired.locator('#pairing[open]').count()===1,'rejected pairing retains integrated screen');
+  await paired.locator('#pairCode').fill('12345678');await paired.locator('#pairSubmit').click();
+  await paired.waitForFunction(()=>saved!==''&&!document.querySelector('#pairing').open);
+  check(await paired.evaluate(()=>sessionStorage.getItem('pb.webuiToken')==='42'.repeat(32)),'pairing establishes a strong session bearer');
+  check((await paired.locator('#conn').textContent())==='Controller not connected','paired disconnected-controller state is useful');
+  // Remove only the new page's startup token-clearing script for reload.
+  await paired.close();
+  const restored=await page.context().newPage();
+  await restored.addInitScript(()=>sessionStorage.setItem('pb.webuiToken','42'.repeat(32)));
+  await restored.goto('http://127.0.0.1:8765/');await restored.waitForFunction(()=>saved!=='');
+  await restored.reload();await restored.waitForFunction(()=>saved!=='');
+  check(await restored.locator('#pairing[open]').count()===0,'browser reload restores the existing browser credential');
+  await restored.evaluate(()=>{cur.A='CIRCLE';render()});
+  let rejected=false;
+  await restored.route('**/api/status',async route=>{if(!rejected){rejected=true;await route.fulfill({status:401,body:'rejected'})}else await route.continue()});
+  await restored.locator('#pairing[open]').waitFor();
+  check(await restored.evaluate(()=>sessionStorage.getItem('pb.webuiToken')===null&&cur.A==='CIRCLE'&&isDirty()),'rejected credential clears authentication and preserves the unsaved profile');
+  await restored.locator('#pairing details summary').click();
+  await restored.locator('#recoveryToken').fill('1'.repeat(64));await restored.locator('#tokenForm button').click();
+  await restored.waitForFunction(()=>document.querySelector('#pairMessage').textContent.includes('rejected'));
+  check(await restored.locator('#pairing[open]').count()===1,'invalid advanced token cannot dismiss pairing');
+  await restored.locator('#recoveryToken').fill('42'.repeat(32));await restored.locator('#tokenForm button').click();
+  await restored.waitForFunction(()=>!document.querySelector('#pairing').open);
+  check(await restored.evaluate(()=>cur.A==='CIRCLE'&&isDirty()),'advanced recovery preserves the unsaved draft');
+  await restored.unroute('**/api/status');
+  await restored.route('**/api/status',route=>route.abort());
+  await restored.waitForFunction(()=>document.querySelector('#conn').textContent==='Backend offline');
+  check(await restored.locator('#pairing[open]').count()===0,'backend-offline state does not erase valid credentials');
+  await restored.unroute('**/api/status');
+  await restored.waitForFunction(()=>document.querySelector('#conn').textContent==='Controller not connected');
+  check(await restored.evaluate(()=>portalTokenCache==='42'.repeat(32)),'backend reconnect reuses authenticated session');
+  await restored.evaluate(()=>{cur=parse(saved);render()});await restored.close();
+  // Game metadata must remain literal text in bridge diagnostics.
+  await page.route('**/api/bridge',route=>route.fulfill({status:200,body:JSON.stringify({title:'PPSA00001',state:3,result:2,scan:0})}));
+  const safeBridge=await page.evaluate(async()=>{
+    games=[{id:'PPSA00001',name:'<img data-audit-title="injected">'}];lastBridge='';await paintBridge();
+    return !document.querySelector('[data-audit-title]')&&document.querySelector('#bridgeOut').textContent.includes('<img data-audit-title="injected">');
+  });
+  check(safeBridge,'bridge game titles cannot create HTML elements');await page.unroute('**/api/bridge');
+  // Icons use the same authenticated fetch path, then only local blob URLs.
+  let iconBearer=false;
+  await page.route('**/api/icon?*',async route=>{iconBearer=!!route.request().headers().authorization;await route.continue()});
+  await page.evaluate(async()=>{clearIconUrls();await refreshGames();switchTab("games")});
+  await page.waitForFunction(()=>Array.from(document.querySelectorAll('#games img')).some(img=>img.src.startsWith('blob:')&&img.naturalWidth===1));
+  check(iconBearer,'game icon request carries bearer authentication');
+  check(await page.evaluate(()=>!Array.from(document.querySelectorAll('img')).some(img=>img.getAttribute('src')?.startsWith('/api/icon'))),'protected icon URLs are never assigned directly to native images');
+  await page.unroute('**/api/icon?*');await page.evaluate(()=>switchTab('remap'));
+  // Only a corrupt server Default offers explicit recovery, with auth and confirmation.
+  await page.evaluate(()=>{cur=parse(saved);render()});
+  let recovered=false,recoveryAuthenticated=false;
+  await page.route('**/api/profile?id=default',async route=>{
+    if(route.request().method()==='GET'&&!recovered)await route.fulfill({status:500,body:'corrupt stored profile'});
+    else await route.continue();
+  });
+  await page.route('**/api/recover-default',async route=>{recoveryAuthenticated=!!route.request().headers().authorization;recovered=true;await route.fulfill({status:200,body:'OK'})});
+  await page.evaluate(()=>load('default',true));
+  check(await page.locator('#profileRecovery').isVisible(),'corrupt Default presents an explicit recovery control');
+  await page.evaluate(()=>window.confirm=()=>false);await page.locator('#recoverDefault').click();
+  check(!recovered,'canceling corrupt Default recovery makes no mutation');
+  await page.evaluate(()=>window.confirm=()=>true);await page.locator('#recoverDefault').click();
+  await page.waitForFunction(()=>document.querySelector('#profileRecovery').hidden);
+  check(recoveryAuthenticated,'Default recovery uses the authenticated mutation API');
+  check(await page.evaluate(()=>editing==='default'&&!isDirty()),'Default recovery confirms canonical saved readback');
+  await page.unroute('**/api/profile?id=default');await page.unroute('**/api/recover-default');
   check(errors.length===0, 'no JavaScript runtime errors');
   return {result:'PASS',checks:passed.length,passed,decoded,hardware:'NOT_RUN; loopback fixture only'};
 }

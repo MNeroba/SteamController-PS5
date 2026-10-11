@@ -8,9 +8,9 @@ on:
         required: true
         type: string
       version:
-        description: Experimental version (v0.1.0-dev.1)
+        description: Experimental version (v0.1.0-dev.2)
         required: true
-        default: v0.1.0-dev.1
+        default: v0.1.0-dev.2
         type: string
 
 permissions:

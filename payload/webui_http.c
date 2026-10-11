@@ -297,10 +297,11 @@ int webui_http_write_chunks(void *context, webui_http_send_fn send,
     return WEBUI_HTTP_WRITE_OK;
 }
 
-int webui_http_read_request(void *context, webui_http_recv_fn receive,
+int webui_http_read_request_checked(void *context, webui_http_recv_fn receive,
                             webui_http_clock_fn clock, unsigned timeout_ms,
                             char *buffer, size_t capacity,
-                            webui_http_request_t *request, char **body) {
+                            webui_http_request_t *request, char **body,
+                            webui_http_admit_fn admit, void *admit_context) {
     size_t got = 0, total;
     uint64_t request_started_ms;
     int parsed = 0, result;
@@ -334,6 +335,9 @@ int webui_http_read_request(void *context, webui_http_recv_fn receive,
         if (parsed < 0) return WEBUI_HTTP_READ_MALFORMED;
     }
 
+    if (admit && (result = admit(admit_context, request)) != WEBUI_HTTP_READ_OK)
+        return result;
+
     if (request->header_length > capacity - 1 ||
         request->content_length > capacity - 1 - request->header_length)
         return WEBUI_HTTP_READ_TOO_LARGE;
@@ -366,4 +370,11 @@ int webui_http_read_request(void *context, webui_http_recv_fn receive,
     *body = buffer + request->header_length;
     (*body)[request->content_length] = '\0';
     return WEBUI_HTTP_READ_OK;
+}
+
+int webui_http_read_request(void *context, webui_http_recv_fn receive,
+    webui_http_clock_fn clock, unsigned timeout_ms, char *buffer, size_t capacity,
+    webui_http_request_t *request, char **body) {
+    return webui_http_read_request_checked(context, receive, clock, timeout_ms,
+        buffer, capacity, request, body, NULL, NULL);
 }

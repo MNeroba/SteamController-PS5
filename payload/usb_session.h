@@ -61,3 +61,11 @@ int usb_session_stop_transfer(usb_resources_t *resources,
 int usb_session_cleanup(usb_resources_t *resources,
                         const usb_session_ops_t *ops,
                         void *context);
+
+/* Validated INPUT frames alone refresh this transport watchdog. Battery,
+ * unknown/empty frames and failed operations never extend the lease. */
+typedef struct { uint64_t last_input_ms; } usb_input_watchdog_t;
+void usb_input_watchdog_init(usb_input_watchdog_t *watchdog, uint64_t now_ms);
+void usb_input_watchdog_refresh(usb_input_watchdog_t *watchdog, uint64_t now_ms);
+int usb_input_watchdog_expired(const usb_input_watchdog_t *watchdog,
+                               uint64_t now_ms, unsigned timeout_ms);

@@ -25,6 +25,7 @@
 #include <unistd.h>
 #include <errno.h>
 #include <pthread.h>
+#include <stdatomic.h>
 #include <sys/socket.h>
 #include <sys/time.h>
 #include <sys/select.h>
@@ -39,12 +40,29 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 #endif
 
 #define REQ_MAX (WEBUI_HTTP_HEADER_MAX + WEBUI_HTTP_BODY_MAX)
+#ifndef WEBUI_AUTH_DIRECTORY
+#define WEBUI_AUTH_DIRECTORY "/data/ghostpad"
+#endif
 #define WEBUI_TOKEN_PATH "/data/ghostpad/webui.token"
 #define WEBUI_RESPONSE_TIMEOUT_MS 5000u
 
 static char g_webui_token[WEBUI_TOKEN_HEX_LENGTH + 1];
 static pthread_t g_webui_thread;
 static int g_webui_thread_started;
+static int g_listener = -1;
+static atomic_int g_webui_stopping;
+static webui_pairing_t g_pairing;
+#define WEBUI_CLIENT_MAX 4
+typedef struct { pthread_t thread; int fd; int started; int done; } webui_client_t;
+static webui_client_t g_clients[WEBUI_CLIENT_MAX];
+static pthread_mutex_t g_clients_lock = PTHREAD_MUTEX_INITIALIZER;
+/* Preserve the existing serialized API dispatch contract. Network framing
+ * and pairing are independent, so an unauthenticated slow body cannot hold
+ * this lock. Menu/profile store concurrency is handled by the shared store. */
+static pthread_mutex_t g_dispatch_lock = PTHREAD_MUTEX_INITIALIZER;
+static int webui_stopping(void) {
+    return atomic_load(&g_webui_stopping) || runtime_is_stopping();
+}
 
 static void send_response_chunks(int fd, const webui_http_chunk_t *chunks,
                                  size_t chunk_count);
@@ -70,7 +88,7 @@ static void reply(int fd, int code, const char *type, const char *body, size_t n
 
 static int initialize_webui_auth(void) {
     int created = 0;
-    if (webui_auth_load_or_create("/data/ghostpad", g_webui_token, &created) != 0)
+    if (webui_auth_load_or_create(WEBUI_AUTH_DIRECTORY, g_webui_token, &created) != 0)
         return -1;
     if (created) LOG("webui: generated a private portal token at %s\n", WEBUI_TOKEN_PATH);
     return 0;
@@ -117,6 +135,7 @@ static ssize_t webui_socket_receive(void *context, char *buffer, size_t capacity
                                     unsigned wait_ms) {
     int fd = *(int *)context;
     struct timeval timeout;
+    if (webui_stopping()) { errno = ECANCELED; return -1; }
     if (wait_ms == 0) { errno = EAGAIN; return -1; }
     if (wait_ms > WEBUI_IDLE_TIMEOUT_MS) wait_ms = WEBUI_IDLE_TIMEOUT_MS;
     timeout.tv_sec = (time_t)(wait_ms / 1000u);
@@ -130,6 +149,7 @@ static ssize_t webui_socket_send(void *context, const char *buffer, size_t lengt
                                  unsigned wait_ms) {
     int fd = *(int *)context;
     struct timeval timeout;
+    if (webui_stopping()) { errno = ECANCELED; return -1; }
     if (wait_ms == 0) { errno = EAGAIN; return -1; }
     if (wait_ms > WEBUI_IDLE_TIMEOUT_MS) wait_ms = WEBUI_IDLE_TIMEOUT_MS;
     timeout.tv_sec = (time_t)(wait_ms / 1000u);
@@ -159,59 +179,42 @@ static void send_response_chunks(int fd, const webui_http_chunk_t *chunks,
         LOG("webui: incomplete response (%d); closing client\n", result);
 }
 
-static void handle(int fd) {
-    static char req[REQ_MAX + 1];
-    webui_http_request_t request;
-    char *body = NULL;
-    char *path;
-    char id[SC2_ID_MAX + 1];
+static int admit_request(void *context, const webui_http_request_t *request) {
+    (void)context;
+    if (!webui_http_origin_matches_host(request)) return WEBUI_HTTP_READ_FORBIDDEN;
     webui_route_request_t route;
-    int is_post;
-    int read_result;
+    if (webui_route_parse(request->target, &route) != 0) return WEBUI_HTTP_READ_MALFORMED;
+    if (route.id == WEBUI_ROUTE_PAIR) {
+        if (strcmp(request->method, "POST") || !request->has_host ||
+            request->content_length != WEBUI_PAIR_CODE_LENGTH ||
+            !webui_http_profile_body_valid(request, "12345678"))
+            return WEBUI_HTTP_READ_MALFORMED;
+        return WEBUI_HTTP_READ_OK;
+    }
+    if (route.id == WEBUI_ROUTE_INDEX && !strcmp(request->method, "GET"))
+        return WEBUI_HTTP_READ_OK;
+    if (!webui_auth_path_allows(request->target, request->authorization, g_webui_token))
+        return WEBUI_HTTP_READ_UNAUTHORIZED;
+    if (strncmp(request->target, "/api/", 5)) return WEBUI_HTTP_READ_MALFORMED;
+    return WEBUI_HTTP_READ_OK;
+}
 
-    read_result = webui_http_read_request(&fd, webui_socket_receive,
-                                         webui_monotonic_ms,
-                                         WEBUI_REQUEST_TIMEOUT_MS,
-                                         req, sizeof(req), &request, &body);
-    if (read_result != WEBUI_HTTP_READ_OK) {
-        if (read_result == WEBUI_HTTP_READ_TIMEOUT)
-            REPLY_TXT(fd, 408, "request timed out");
-        else if (read_result == WEBUI_HTTP_READ_TOO_LARGE)
-            REPLY_TXT(fd, 413, "request too large");
-        else if (read_result == WEBUI_HTTP_READ_MALFORMED)
-            REPLY_TXT(fd, 400, "malformed request");
-        else
-            REPLY_TXT(fd, 400, "incomplete request");
-        return;
-    }
-    if (!webui_http_origin_matches_host(&request)) {
-        REPLY_TXT(fd, 403, "request origin does not match host");
-        return;
-    }
-    path = request.target;
-    is_post = strcmp(request.method, "POST") == 0;
-    if (!webui_auth_path_allows(path, request.authorization, g_webui_token)) {
-        REPLY_TXT(fd, 401, "portal token required");
-        return;
-    }
-    if (webui_route_parse(path, &route) != 0) {
-        REPLY_TXT(fd, 400, "malformed route");
-        return;
-    }
-    if (route.id == WEBUI_ROUTE_NOT_FOUND) {
-        REPLY_TXT(fd, 404, "not found");
-        return;
-    }
+static int patch_profile(sc2_profile_t *p, void *text) {
+    return sc2_profile_parse_checked(text,p,0);
+}
+static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body,
+                     webui_route_request_t route) {
+    webui_http_request_t request = *request_ptr;
+    char *path = request.target;
+    char id[SC2_ID_MAX + 1];
+    int is_post = strcmp(request.method, "POST") == 0;
     if (!webui_route_method_allowed(route.id, is_post)) {
-        REPLY_TXT(fd, 405, "method not allowed");
-        return;
+        REPLY_TXT(fd, 405, "method not allowed"); return;
     }
     if (!is_post && strchr(path, '?') &&
         (route.id == WEBUI_ROUTE_GAMEHOOKS || route.id == WEBUI_ROUTE_DUALSENSE)) {
-        REPLY_TXT(fd, 400, "mutation parameters require POST");
-        return;
+        REPLY_TXT(fd, 400, "mutation parameters require POST"); return;
     }
-
     if (route.id == WEBUI_ROUTE_INDEX) {
         reply(fd, 200, "text/html; charset=utf-8", (const char *)webui_html, webui_html_len);
         return;
@@ -224,7 +227,7 @@ static void handle(int fd) {
         sc2_select_status(t, a, ov);
         sc2_select_title_name(tn, sizeof(tn));
         sc2_select_active_name(pn, sizeof(pn));
-        static char out[1024]; sb_t sb; webui_json_writer_init(&sb, out, sizeof(out));
+        char out[1024]; sb_t sb; webui_json_writer_init(&sb, out, sizeof(out));
         sb_put(&sb, "{\"title\":"); json_str(&sb, t);
         sb_put(&sb, ",\"title_name\":"); json_str(&sb, tn);
         sb_put(&sb, ",\"active\":"); json_str(&sb, a);
@@ -250,18 +253,21 @@ static void handle(int fd) {
         if (get_id(&route, iid) != 1 || gc_game_icon_path(iid, ip, sizeof(ip)) != 0) {
             REPLY_TXT(fd, 404, "no icon"); return;
         }
-        static char img[2 * 1024 * 1024];
+        const size_t img_capacity = 2 * 1024 * 1024;
+        char *img = malloc(img_capacity);
+        if (!img) { REPLY_TXT(fd, 500, "icon allocation failed"); return; }
         FILE *f = fopen(ip, "rb");
-        if (!f) { REPLY_TXT(fd, 404, "no icon"); return; }
-        size_t n = fread(img, 1, sizeof(img), f);
+        if (!f) { free(img); REPLY_TXT(fd, 404, "no icon"); return; }
+        size_t n = fread(img, 1, img_capacity, f);
         fclose(f);
         char h[256];
         int hl = snprintf(h, sizeof(h),
             "HTTP/1.1 200 OK\r\nContent-Type: image/png\r\nContent-Length: %zu\r\n"
             "Cache-Control: max-age=86400\r\nConnection: close\r\n\r\n", n);
-        if (hl < 0 || (size_t)hl >= sizeof(h)) return;
+        if (hl < 0 || (size_t)hl >= sizeof(h)) { free(img); return; }
         webui_http_chunk_t chunks[] = {{h, (size_t)hl}, {img, n}};
         send_response_chunks(fd, chunks, sizeof(chunks) / sizeof(chunks[0]));
+        free(img);
         return;
     }
     if (route.id == WEBUI_ROUTE_HAPTIC) {
@@ -284,13 +290,17 @@ static void handle(int fd) {
         return;
     }
     if (route.id == WEBUI_ROUTE_PROFILES) {
-        static char out[8192]; sb_t s; webui_json_writer_init(&s, out, sizeof(out));
+        char out[8192]; sb_t s; webui_json_writer_init(&s, out, sizeof(out));
         sb_put(&s, "[");
         sc2_store_list(list_cb, &s);
         sb_put(&s, "]");
         if (s.failed) REPLY_TXT(fd, 500, "profiles response overflow");
         else reply(fd, 200, "application/json", out, s.length);
         return;
+    }
+    if (route.id == WEBUI_ROUTE_RECOVER_DEFAULT) {
+        if (sc2_store_recover_default()!=0) { REPLY_TXT(fd,400,"Default recovery failed or profile is already valid");return; }
+        sc2_select_reload();REPLY_TXT(fd,200,"Default backed up and reset");return;
     }
     if (route.id == WEBUI_ROUTE_PROFILE) {
         if (get_id(&route, id) != 1) { REPLY_TXT(fd, 400, "bad id"); return; }
@@ -300,16 +310,15 @@ static void handle(int fd) {
                 REPLY_TXT(fd, 400, "profile requires a non-empty text/plain UTF-8 body");
                 return;
             }
-            int loaded = sc2_store_load(id, &p);
-            if (loaded == SC2_STORE_NOT_FOUND) sc2_profile_default(&p);
-            else if (loaded != 0) { REPLY_TXT(fd, 400, "existing profile unreadable; repair or delete it explicitly"); return; }
-            if (sc2_profile_parse_checked(body, &p, 0) != 0) { REPLY_TXT(fd, 400, "invalid profile"); return; }
-            if (sc2_store_save(id, &p) != 0) { REPLY_TXT(fd, 400, "save failed"); return; }
+            if (sc2_store_update(id,patch_profile,body) != 0) {
+                REPLY_TXT(fd,400,"profile update failed; check storage or recover corrupt Default explicitly");return;
+            }
             sc2_select_reload();
             REPLY_TXT(fd, 200, "saved");
         } else {
-            if (sc2_store_load(id, &p) != 0) { REPLY_TXT(fd, 404, "no such profile"); return; }
-            static char out[SC2_PROFILE_CAPACITY]; int n = sc2_profile_format(&p, out, sizeof(out));
+            int loaded = sc2_store_load(id, &p);
+            if (loaded != 0) { REPLY_TXT(fd, loaded == SC2_STORE_NOT_FOUND ? 404 : 500, "profile unavailable or corrupt"); return; }
+            char out[SC2_PROFILE_CAPACITY]; int n = sc2_profile_format(&p, out, sizeof(out));
             if (n < 0 || (size_t)n >= sizeof(out)) REPLY_TXT(fd, 500, "profile response overflow");
             else reply(fd, 200, "text/plain", out, (size_t)n);
         }
@@ -328,9 +337,9 @@ static void handle(int fd) {
         return;
     }
     if (route.id == WEBUI_ROUTE_GAMES) {
-        static gc_game_t games[256];
+        gc_game_t games[256];
         int n = gc_game_list(games, 256);
-        static char out[64 * 1024]; sb_t s; webui_json_writer_init(&s, out, sizeof(out));
+        char out[64 * 1024]; sb_t s; webui_json_writer_init(&s, out, sizeof(out));
         sb_put(&s, "[");
         for (int i = 0; i < n; i++) {
             if (i) sb_put(&s, ",");
@@ -363,8 +372,9 @@ static void handle(int fd) {
             if (hv == 1) v = vibration[0] - '0';
             if (ha == 1) a = audio[0] - '0';
             if (hm == 1) m = mode[0] - '0';
-            if (ha == 1) game_hooks_set_audio(a);
-            game_hooks_set(i, v, m);
+            if (game_hooks_configure(i, v, m, ha == 1 ? a : -1)) {
+                REPLY_TXT(fd, 500, "settings persistence failed"); return;
+            }
         }
         char out[512]; int n = game_hooks_json(out, sizeof(out));
         if (n < 0 || (size_t)n >= sizeof(out)) REPLY_TXT(fd, 500, "game hook response overflow");
@@ -406,7 +416,7 @@ static void handle(int fd) {
         return;
     }
     if (route.id == WEBUI_ROUTE_LOG) {
-        static char out[48 * 1024];
+        char out[48 * 1024];
         size_t n = 0;
         char previous[8];
         int has_previous = webui_route_param(&route, "prev", previous, sizeof(previous));
@@ -432,82 +442,171 @@ static void handle(int fd) {
     REPLY_TXT(fd, 404, "not found");
 }
 
+static void handle(int fd) {
+    char req[REQ_MAX + 1];
+    webui_http_request_t request;
+    char *body = NULL;
+    int result = webui_http_read_request_checked(&fd, webui_socket_receive,
+        webui_monotonic_ms, WEBUI_REQUEST_TIMEOUT_MS, req, sizeof(req),
+        &request, &body, admit_request, NULL);
+    if (result != WEBUI_HTTP_READ_OK) {
+        if (result == WEBUI_HTTP_READ_UNAUTHORIZED) REPLY_TXT(fd, 401, "pairing required");
+        else if (result == WEBUI_HTTP_READ_FORBIDDEN) REPLY_TXT(fd, 403, "request origin does not match host");
+        else if (result == WEBUI_HTTP_READ_TIMEOUT) REPLY_TXT(fd, 408, "request timed out");
+        else if (result == WEBUI_HTTP_READ_TOO_LARGE) REPLY_TXT(fd, 413, "request too large");
+        else REPLY_TXT(fd, 400, "malformed or incomplete request");
+        return;
+    }
+    webui_route_request_t route;
+    if (webui_route_parse(request.target, &route) != 0) {
+        REPLY_TXT(fd, 400, "malformed route"); return;
+    }
+    if (route.id == WEBUI_ROUTE_PAIR) {
+        uint64_t now;
+        if (webui_monotonic_ms(NULL, &now) != 0 ||
+            !webui_pairing_redeem(&g_pairing, body, now)) {
+            REPLY_TXT(fd, 403, "Pairing unavailable or code rejected. Use the recovery token or reload the payload locally to obtain a new code.");
+            return;
+        }
+        /* The short-lived local code authorizes this response. Never return
+         * credentials to a request authenticated only by LAN/Origin. */
+        char response[96];
+        int n = snprintf(response, sizeof(response), "{\"token\":\"%s\"}", g_webui_token);
+        reply(fd, 200, "application/json", response, (size_t)n);
+        memset(response, 0, sizeof(response));
+        return;
+    }
+    if (route.id == WEBUI_ROUTE_INDEX) { dispatch(fd, &request, body, route); return; }
+    pthread_mutex_lock(&g_dispatch_lock);
+    if (!webui_stopping()) dispatch(fd, &request, body, route);
+    pthread_mutex_unlock(&g_dispatch_lock);
+}
+
+static void *client_thread(void *arg) {
+    webui_client_t *client = arg;
+    int fd = client->fd;
+    if (!webui_stopping()) handle(fd);
+    pthread_mutex_lock(&g_clients_lock);
+    close(fd);
+    client->fd = -1;
+    client->done = 1;
+    pthread_mutex_unlock(&g_clients_lock);
+    return NULL;
+}
+
 static void *server_thread(void *arg) {
     (void)arg;
-    int s = socket(AF_INET, SOCK_STREAM, 0);
-    if (s < 0) { LOG("webui: socket fail %d\n", errno); return NULL; }
-    int one = 1; setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one));
-    struct sockaddr_in a; memset(&a, 0, sizeof(a));
-    a.sin_family = AF_INET; a.sin_port = htons(WEBUI_PORT); a.sin_addr.s_addr = htonl(INADDR_ANY);
-    if (bind(s, (struct sockaddr *)&a, sizeof(a)) != 0 || listen(s, 8) != 0) {
-        LOG("webui: bind/listen :%d fail errno=%d\n", WEBUI_PORT, errno);
-        close(s); return NULL;
-    }
-    LOG("webui: listening on :%d\n", WEBUI_PORT);
-    while (!runtime_is_stopping()) {
-        if (s >= FD_SETSIZE) {
-            LOG("webui: listener descriptor exceeds select capacity\n");
-            break;
+    int s = g_listener;
+    while (!webui_stopping()) {
+        /* Join completed workers before reusing any slot; no detached worker
+         * can outlive pairing state, credentials or service shutdown. */
+        for (int i = 0; i < WEBUI_CLIENT_MAX; ++i) {
+            pthread_mutex_lock(&g_clients_lock);
+            int done = g_clients[i].started && g_clients[i].done;
+            pthread_mutex_unlock(&g_clients_lock);
+            if (done && pthread_join(g_clients[i].thread, NULL) == 0)
+                g_clients[i].started = 0;
         }
         fd_set readable;
-        FD_ZERO(&readable);
-        FD_SET(s, &readable);
-        struct timeval wait = { 0, 200000 };
+        FD_ZERO(&readable); FD_SET(s, &readable);
+        struct timeval wait = {0, 200000};
         int ready = select(s + 1, &readable, NULL, NULL, &wait);
         if (ready == 0) continue;
         if (ready < 0) {
             if (errno == EINTR) continue;
-            LOG("webui: select failed errno=%d\n", errno);
-            break;
+            LOG("webui: select failed errno=%d\n", errno); break;
         }
-        if (runtime_is_stopping()) break;
+        if (webui_stopping()) break;
         struct sockaddr_in peer;
         socklen_t peer_length = sizeof(peer);
         int c = accept(s, (struct sockaddr *)&peer, &peer_length);
         if (c < 0) {
-            if (errno == EINTR || errno == EAGAIN || errno == EWOULDBLOCK) continue;
-            LOG("webui: accept failed errno=%d\n", errno);
+            if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)
+                LOG("webui: accept failed errno=%d\n", errno);
             continue;
         }
         if (peer_length < sizeof(peer) || peer.sin_family != AF_INET ||
-            !webui_peer_ipv4_is_lan(peer.sin_addr.s_addr)) {
-            LOG("webui: rejected peer outside local IPv4 ranges\n");
-            close(c);
-            continue;
-        }
+            !webui_peer_ipv4_is_lan(peer.sin_addr.s_addr)) { close(c); continue; }
 #ifdef SO_NOSIGPIPE
-        int no_sigpipe = 1;
-        if (setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &no_sigpipe, sizeof(no_sigpipe)) != 0) {
-            LOG("webui: cannot protect client socket from SIGPIPE\n");
+        int one = 1;
+        if (setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one)) != 0) {
             close(c); continue;
         }
 #endif
-        struct timeval tv = { 2, 0 };
-        setsockopt(c, SOL_SOCKET, SO_RCVTIMEO, &tv, sizeof(tv));
-        setsockopt(c, SOL_SOCKET, SO_SNDTIMEO, &tv, sizeof(tv));
-        if (!runtime_is_stopping()) handle(c);
-        close(c);
+        int slot = 0;
+        while (slot < WEBUI_CLIENT_MAX && g_clients[slot].started) ++slot;
+        if (slot == WEBUI_CLIENT_MAX) { close(c); continue; }
+        webui_client_t *client = &g_clients[slot];
+        client->fd = c; client->done = 0;
+        int r = pthread_create(&client->thread, NULL, client_thread, client);
+        if (r != 0) { close(c); client->fd = -1; LOG("webui: client thread failed (%d)\n", r); }
+        else client->started = 1;
     }
+    atomic_store(&g_webui_stopping, 1);
+    pthread_mutex_lock(&g_clients_lock);
+    for (int i = 0; i < WEBUI_CLIENT_MAX; ++i)
+        if (g_clients[i].started && g_clients[i].fd >= 0) shutdown(g_clients[i].fd, SHUT_RDWR);
+    pthread_mutex_unlock(&g_clients_lock);
+    for (int i = 0; i < WEBUI_CLIENT_MAX; ++i)
+        if (g_clients[i].started && pthread_join(g_clients[i].thread, NULL) == 0)
+            g_clients[i].started = 0;
     close(s);
     return NULL;
 }
 
-void webui_start(void) {
-    if (initialize_webui_auth() != 0) {
-        LOG("webui: disabled; cannot create/read a private token at %s\n", WEBUI_TOKEN_PATH);
-        return;
+int webui_start(webui_notify_fn notify) {
+    if (g_webui_thread_started) return -1;
+    if (!notify || initialize_webui_auth() != 0) {
+        LOG("webui: disabled; private token storage or local notification unavailable\n");
+        if (notify) notify("SteamController-PS5 — WebUI unavailable: token storage error");
+        return -1;
     }
-    LOG("webui: private bearer token ready; retrieve %s through local console file access\n",
-        WEBUI_TOKEN_PATH);
-    int r = pthread_create(&g_webui_thread, NULL, server_thread, NULL);
-    if (r == 0) g_webui_thread_started = 1;
-    else LOG("webui: failed to start server thread (%d)\n", r);
+    uint64_t now;
+    char code[WEBUI_PAIR_CODE_LENGTH + 1];
+    if (webui_monotonic_ms(NULL, &now) != 0 || webui_pairing_init(&g_pairing, now, code) != 0) {
+        notify("SteamController-PS5 — WebUI unavailable: secure pairing initialization failed");
+        memset(g_webui_token, 0, sizeof(g_webui_token)); return -1;
+    }
+    int s = socket(AF_INET, SOCK_STREAM, 0);
+    int one = 1;
+    struct sockaddr_in address;
+    memset(&address, 0, sizeof(address));
+    address.sin_family = AF_INET; address.sin_port = htons(WEBUI_PORT);
+    address.sin_addr.s_addr = htonl(INADDR_ANY);
+    if (s < 0 || s >= FD_SETSIZE ||
+        setsockopt(s, SOL_SOCKET, SO_REUSEADDR, &one, sizeof(one)) != 0 ||
+        bind(s, (struct sockaddr *)&address, sizeof(address)) != 0 || listen(s, 8) != 0) {
+        LOG("webui: listener initialization failed errno=%d\n", errno);
+        if (s >= 0) close(s);
+        webui_pairing_destroy(&g_pairing);
+        memset(code, 0, sizeof(code)); memset(g_webui_token, 0, sizeof(g_webui_token));
+        notify("SteamController-PS5 — WebUI unavailable: socket/bind/listen failed"); return -1;
+    }
+    memset(g_clients, 0, sizeof(g_clients));
+    g_listener = s;
+    atomic_store(&g_webui_stopping, 0);
+    int result = pthread_create(&g_webui_thread, NULL, server_thread, NULL);
+    if (result != 0) {
+        close(s); g_listener = -1; webui_pairing_destroy(&g_pairing);
+        memset(code, 0, sizeof(code)); memset(g_webui_token, 0, sizeof(g_webui_token));
+        LOG("webui: server thread failed (%d)\n", result);
+        notify("SteamController-PS5 — WebUI unavailable: server thread failed"); return -1;
+    }
+    g_webui_thread_started = 1;
+    char message[160];
+    snprintf(message, sizeof(message), "SteamController-PS5 — WebUI ready on port %d. Pairing code: %s (5 min)", WEBUI_PORT, code);
+    notify(message); /* Local UI only: never pass this message to LOG. */
+    memset(code, 0, sizeof(code)); memset(message, 0, sizeof(message));
+    LOG("webui: listener ready on port %d; local pairing enabled\n", WEBUI_PORT);
+    return 0;
 }
 
 int webui_stop(void) {
     if (!g_webui_thread_started) return 0;
-    int result = pthread_join(g_webui_thread, NULL);
-    if (result != 0) return -1;
-    g_webui_thread_started = 0;
+    atomic_store(&g_webui_stopping, 1);
+    if (pthread_join(g_webui_thread, NULL) != 0) return -1;
+    g_webui_thread_started = 0; g_listener = -1;
+    webui_pairing_destroy(&g_pairing);
+    memset(g_webui_token, 0, sizeof(g_webui_token));
     return 0;
 }

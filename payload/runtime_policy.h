@@ -14,15 +14,16 @@ typedef struct runtime_policy {
     int enable_webui;
 } runtime_policy_t;
 
-/* All optional/system-facing features are off unless explicitly allowed. */
+/* Authenticated WebUI is on; intrusive/system-facing features are off. */
 void runtime_policy_defaults(runtime_policy_t *policy);
 
 /* Strict parser. Invalid or ambiguous input resets every option to safe-off. */
 int runtime_policy_parse(const char *text, size_t length,
                          runtime_policy_t *policy);
 
-/* Loads a bounded regular file without following symlinks. Any error leaves
- * all optional services disabled and returns -1. */
+#define RUNTIME_POLICY_MISSING 1
+/* 0: valid file, 1: missing file with first-launch defaults, -1: invalid,
+ * unsafe or inaccessible storage with every optional service disabled. */
 int runtime_policy_load_file(const char *path, runtime_policy_t *policy);
 
 #endif

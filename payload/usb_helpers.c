@@ -30,17 +30,24 @@ int usb_send_out(usb_resources_t *resources, const usb_session_ops_t *ops,
                  const uint8_t *data, uint32_t length, const char *tag,
                  uint32_t poll_interval_us, uint32_t max_polls,
                  void *context) {
-    if (!resources || !ops || !endpoint || !data || length == 0 ||
+    if (!resources || !ops || !endpoint || !data || length == 0 || length > USB_RESOURCES_FRAME_CAPACITY ||
         endpoint_index >= USB_RESOURCES_MAX_ENDPOINTS || max_polls == 0 ||
         poll_interval_us > 1000000u) {
         errno = EINVAL;
         return -EINVAL;
     }
 
-    void *buffers[1] = { (void *)data };
-    uint32_t lengths[1] = { length };
-    endpoint->ppBuffer = buffers;
-    endpoint->pLength = lengths;
+    /* Refuse before mutating metadata referenced by an earlier START. */
+    uint32_t bit = UINT32_C(1) << endpoint_index;
+    if (resources->fd < 0 || !resources->fs_initialized ||
+        !(resources->opened_endpoints & bit) || resources->active_transfers & bit) {
+        errno = EBUSY; return -EBUSY;
+    }
+    memcpy(resources->frame_data[endpoint_index], data, length);
+    resources->frame_buffer[endpoint_index][0] = resources->frame_data[endpoint_index];
+    resources->frame_length[endpoint_index][0] = length;
+    endpoint->ppBuffer = resources->frame_buffer[endpoint_index];
+    endpoint->pLength = resources->frame_length[endpoint_index];
     endpoint->nFrames = 1;
     endpoint->timeout = 150;
     endpoint->flags = 0;

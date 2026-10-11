@@ -15,6 +15,9 @@ void game_hooks_start(void);
 int  game_hooks_stop(void);                /* joins after bounded rollback; see result */
 void game_hooks_feed(const ScePadData *pad, int connected);   /* from the SC2 thread */
 int  game_hooks_input_active(void);    /* hooks installed and merging input */
-void game_hooks_set(int input_on, int vibe_on, int mode);   /* -1 = unchanged */
+int game_hooks_set(int input_on, int vibe_on, int mode);   /* -1 = unchanged */
 int  game_hooks_json(char *out, size_t n);
-void game_hooks_set_audio(int on);
+int game_hooks_set_audio(int on);
+
+/* Persist the complete candidate atomically before applying to RAM. */
+int game_hooks_configure(int input_on, int vibe_on, int mode, int audio_on);

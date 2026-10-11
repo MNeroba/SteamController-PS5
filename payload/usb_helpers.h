@@ -20,3 +20,12 @@ int usb_send_cmd(usb_resources_t *resources, const usb_session_ops_t *ops,
                  struct usb_fs_endpoint *endpoint, uint8_t endpoint_index,
                  uint8_t first, uint8_t second, uint32_t poll_interval_us,
                  uint32_t max_polls, void *context);
+
+/* Validate one completed frame before interpreting any bytes. */
+static inline int usb_completed_frame_valid(const struct usb_fs_endpoint *endpoint,
+                                             uint32_t capacity) {
+    return endpoint && endpoint->status == 0 && endpoint->nFrames == 1 &&
+        endpoint->aFrames == 1 && endpoint->ppBuffer && endpoint->ppBuffer[0] &&
+        endpoint->pLength && endpoint->pLength[0] > 0 &&
+        endpoint->pLength[0] <= capacity;
+}

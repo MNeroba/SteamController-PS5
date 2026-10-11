@@ -10,7 +10,7 @@ M0 is complete: PuckbridgePS5 `78460113ef7c48502c765a1f83ba34d53c977134` selecte
 
 ## Evidence and safety
 
-Host hardening and reusable protocol/USB/slot/profile/motion/touch/feedback/UI components are implemented and covered. Main runtime commit79f92cb has green Host/Chromium and SDK Actions (M1-221). SDK v0.43 archive SHA-256 a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb; LLVM18. Physical PS5, controller/Puck, Prospero ioctls/ABI and FW12.00 behavior have never been tested here.
+Host hardening and reusable protocol/USB/slot/profile/motion/touch/feedback/UI components are implemented and covered. Main sourceffff5e0 has green normal/ASan-UBSan/183Chromium and SDK Actions (M1-225). SDK v0.43 archive SHA-256 a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb; LLVM18. Physical PS5, controller/Puck, Prospero ioctls/ABI and FW12.00 behavior have never been tested here.
 
 Safe defaults disable bridge probe, game hooks, DualSense handoff and WebUI. Restricted USB policy, owned devices, credential rollback and coordinated cleanup have host tests. Stock DualSense must remain usable; no built-in Bluetooth/HCI or active firmware/system experiment without separate physical evidence/approval.
 
@@ -20,8 +20,14 @@ The owner explicitly authorized an experimental DEV prerelease on2026-10-10. Fol
 
 Desktop checkout: old fix/p0-safety at upstream78460113 with inherited dirty/untracked overlay. GitHub main/full tree is authoritative. All234 local baseline files matched main79f92cb before cleanup. Never reset/stage/push the whole desktop overlay. Publish reviewed allowlisted blobs on complete parent tree, verify all retained hashes and intentional moves/deletion, update expected parent force=false, read back source/CI.
 
-GitHub connector works for Git objects and read-only Actions, not manual workflow dispatch. Edge permission was rejected; in-app GitHub browser needs login. Do not harvest credentials. Keep this access blocker distinct from hardware gates.
+GitHub connector works for Git objects and read-only Actions, not manual workflow dispatch. Edge permission was rejected; authenticated in-app GitHub access subsequently resolved the blocker. Description update and manual DEV dispatch acknowledged; no credentials copied.
 
 ## Next safe action
 
-Finish consolidation validation from an explicit fresh source export without generated header, publish reviewed source/docs/workflows on main, verify Actions, manually dispatch the tested SHA for experimental prerelease if authentication becomes available. Update CURRENT_STATUS/TEST_LOG/SESSION_LOG with actual acknowledgement and checksum. Preserve history; no rewrite is proposed.
+First-launch and 16-item static audit remediation implemented (ADR-053/M1-227). Fresh-export Chromium202 and scoped diff/secret checks PASS; publish complete reviewed tree on verified main with expected_sha/force=false, then require Host/SDK push Actions for exact SHA. Dispatch dev-release.yml on main with version v0.1.0-dev.2 and that tested SHA; verify prerelease/tag/six assets/ELF digest. Update current status and append acknowledgement. No physical FW12.00 result exists.
+
+## M1-226 — Audit remediation and first-launch task intake — 2026-10-11
+
+Main ffff5e08905d394b67a7da070fcf4657a250f070 unchanged; no open PRs. DEV workflow 38075764498 succeeded and GitHub confirms dev/v0.1.0-dev.1 prerelease with six assets. Published ELF SHA-256 c908a67cfbe3fb0596b94ef472bc578062ee0a0bb024e683d3242e5f78354aaa. New audit: eight P1/eight P2 confirmed static findings registered in docs/development/STATIC_AUDIT.md, critical code defects added to DEV gate. New owner task FIRST_LAUNCH_TASK.md authorizes automatic authenticated WebUI and dev.2 after all gates. Physical firmware/notification/USB/PS5 remains NOT_RUN. Implementation and new gates pending; no dev.2 published.
+
+M1-227: automatic authenticated WebUI, local notification pairing and 16 static audit findings remediated. Normal, ASan/UBSan and SDK gates PASS on full 255-file source export; Chromium202 PASS on the matching portal, clean-export browser repeat PASS. DEV policy blocks newly discovered critical defects; no hardware or release claim before acknowledgement.

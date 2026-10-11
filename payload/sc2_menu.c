@@ -96,20 +96,22 @@ static void close_menu(const char *why) {
     if (why) say("%s", why);
 }
 
+typedef struct { int from; uint32_t mask; } menu_remap_t;
+static int update_remap(sc2_profile_t *p, void *context) {
+    menu_remap_t *change=context;p->map[change->from]=change->mask;return 0;
+}
 static void do_remap(int from, int to) {
     sc2_profile_t def; sc2_profile_default(&def);
     uint32_t mask = def.map[to];               /* "press what it should act as" */
 
     char id[SC2_ID_MAX + 1];
     sc2_select_edit_target(id);
-    sc2_profile_t p;
-    if (sc2_store_load(id, &p) != 0) sc2_active_get(&p);
-    p.map[from] = mask;
-    if (sc2_store_save(id, &p) != 0) {
-        sc2_haptic_tick();
-        say("Could not save profile \"%s\"\nCheck storage and retry", p.name);
-        return;
+    menu_remap_t change={from,mask};
+    if(sc2_store_update(id,update_remap,&change)!=0){
+        sc2_haptic_tick();say("Could not save profile %s\nCheck storage or recover corrupt Default in WebUI",id);return;
     }
+    sc2_profile_t p;
+    if(sc2_store_load(id,&p)!=0)sc2_profile_default(&p);
     sc2_select_reload();
 
     char what[64]; sc2_combo_name(mask, what, sizeof(what));

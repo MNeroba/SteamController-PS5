@@ -89,16 +89,26 @@ static int json_title_buffer(const char *buf, char *out, size_t outsz) {
     t = strchr(t + 11, ':'); if (!t) return -1;
     t = strchr(t, '"');      if (!t) return -1;
     t++;
+    const char *end = buf + strlen(buf);
     size_t o = 0;
-    while (*t && *t != '"' && o + 1 < outsz) {
-        if (*t == '\\' && t[1]) {                 /* keep it simple: drop escapes */
-            t++;
-            if (*t == 'u') { t += 4; if (*t) t++; continue; }
+    if (!outsz) return -1;
+    while (t < end && *t != '"') {
+        if (*t == '\\') {
+            if (++t == end) return -1;
+            if (*t == 'u') {
+                if ((size_t)(end - t) < 5) return -1;
+                for (size_t i = 1; i <= 4; ++i)
+                    if (!isxdigit((unsigned char)t[i])) return -1;
+                t += 5;
+                continue; /* Preserve the existing minimal-label policy. */
+            }
+            if (!strchr("\"\\/bfnrt", *t)) return -1;
         }
-        out[o++] = *t++;
+        if (o + 1 < outsz) out[o++] = *t;
+        ++t;
     }
     out[o] = 0;
-    return o ? 0 : -1;
+    return t < end && *t == '"' && o ? 0 : -1;
 }
 
 static int json_title(const char *path, char *out, size_t outsz) {

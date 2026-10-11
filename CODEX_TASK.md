@@ -21,9 +21,13 @@ Details: [current status](project-memory/CURRENT_STATUS.md), [feature table](STE
 
 ## Current execution order
 
+- **Active P1: first launch and v0.1.0-dev.2** — [full owner task](docs/development/FIRST_LAUNCH_TASK.md). Automatic authenticated WebUI, notification pairing, integrated browser enrollment, all software gates. Other intrusive features stay off.
+- **Audit remediation P0–P3** — [confirmed findings](docs/development/STATIC_AUDIT.md). Resolve the listed code defects before DEV publication; preserve critical-blocker checks. New first-launch work does not establish hardware compatibility.
+
+
 1. Finish file-by-file consolidation without deleting production modules/tests/notices. Keep a complete tree and [audit](docs/development/REPOSITORY_AUDIT.md); generated assets must build from a clean checkout.
 2. Keep the concise landing page, documentation index, contributor rules and current memory accurate. Preserve full historical evidence and negative results.
-3. For the explicitly authorized **experimental DEV prerelease**, follow [DEV_RELEASE](docs/development/DEV_RELEASE.md). Exact tested SHA, pinned SDK, normal host, ASan/UBSan, Chromium, artwork/determinism, fresh SDK build and checksum are mandatory. Block known critical code defects. Use `dev/v0.1.0-dev.1`, experimental warning, source/SDK/checksum/notices and real ELF only. No hardware claim.
+3. For the explicitly authorized **experimental DEV prerelease**, follow [DEV_RELEASE](docs/development/DEV_RELEASE.md). Exact tested SHA, pinned SDK, normal host, ASan/UBSan, Chromium, artwork/determinism, fresh SDK build and checksum are mandatory. Block known critical code defects. Use `dev/v0.1.0-dev.2`, experimental warning, source/SDK/checksum/notices and real ELF only. No hardware claim.
 4. Stable `v*` publication still requires H-01/H-02/H-03/H-04/H-05/H-09/H-12, exact measured firmware and matching TEST_LOG evidence. Do not weaken its checker/workflow. DEV authorization does not authorize console deployment or active platform experiments.
 5. When real PS5/controller/Puck access exists: execute the [test plan](docs/TEST_PLAN.md) and record each transport, model, firmware, SHA and outcome. Confirm VDA handle semantics, privilege rollback, cancellation/neutralization, native DualSense, gameplay, motion/touch/haptics and portal. Keep unrun rows NOT_RUN.
 6. Native BLE stays passive/evidence-gated; Edge/custom ShellUI identity and multi-SC2 feedback are separate research. Complete feasibility gates before adding a BLE stack. Keep safe USB/Puck work independent of research.

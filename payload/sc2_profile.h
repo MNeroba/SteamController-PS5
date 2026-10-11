@@ -97,6 +97,12 @@ enum { SC2_STORE_NOT_FOUND = -1, SC2_STORE_INVALID = -2, SC2_STORE_IO_ERROR = -3
 int  sc2_store_load(const char *id, sc2_profile_t *p);
 /* Save/delete mutations serialize process-wide; save replaces the complete file atomically. */
 int  sc2_store_save(const char *id, const sc2_profile_t *p);
+typedef int (*sc2_profile_update_fn)(sc2_profile_t *, void *);
+/* One serialized load -> change -> atomic replace; malformed files are never
+ * silently replaced. Callback must not re-enter the store. */
+int sc2_store_update(const char *id, sc2_profile_update_fn update, void *context);
+/* Explicit corrupt-default recovery preserves up to 16 exact backups. */
+int sc2_store_recover_default(void);
 int  sc2_store_delete(const char *id);
 /* Calls cb for every saved profile id. */
 void sc2_store_list(void (*cb)(const char *id, const char *name, void *u), void *u);

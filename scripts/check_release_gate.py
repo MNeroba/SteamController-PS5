@@ -3,6 +3,8 @@
 from pathlib import Path
 import argparse
 import re
+import os
+import subprocess
 import sys
 
 
@@ -32,7 +34,19 @@ def test_log_sections(text):
     return sections
 
 
-def validate_matrix(text, test_log_text=None):
+PRODUCTION_PATHS = ("payload", "scripts", "tests", ".github/workflows")
+
+def source_matches(tested, released, repository):
+    """Only exact source or its descendant with unchanged build/test inputs."""
+    if tested == released:
+        return True
+    def git(*args):
+        return subprocess.run(["git", "-C", str(repository), *args],
+                              stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    return (git("merge-base", "--is-ancestor", tested, released).returncode == 0 and
+            git("diff", "--quiet", tested, released, "--", *PRODUCTION_PATHS).returncode == 0)
+
+def validate_matrix(text, test_log_text=None, expected_sha=None, repository=None):
     rows = {}
     errors = []
     sections = test_log_sections(test_log_text or "")
@@ -64,6 +78,8 @@ def validate_matrix(text, test_log_text=None):
                 errors.append(f"{gate}: {label} contains a placeholder")
         if not COMMIT.search(columns[6]):
             errors.append(f"{gate}: payload commit / SDK must include a full commit SHA")
+        if "SDK v0.43" not in columns[6]:
+            errors.append(f"{gate}: pinned SDK v0.43 is required")
         evidence_match = EVIDENCE.fullmatch(columns[8])
         if not evidence_match:
             errors.append(f"{gate}: evidence must link to a test-log entry")
@@ -85,6 +101,11 @@ def validate_matrix(text, test_log_text=None):
             (columns[4], "controller model/firmware"),
             (columns[5], "transport"),
         )
+        if "SDK: v0.43" not in section.splitlines():
+            errors.append(f"{gate}: test-log entry must record SDK: v0.43")
+        if commit_match and expected_sha is not None:
+            if not COMMIT.fullmatch(expected_sha) or not source_matches(commit_match.group(0), expected_sha, repository):
+                errors.append(f"{gate}: hardware-tested source does not match released production source")
         if commit_match:
             required_evidence += ((commit_match.group(0), "payload commit SHA"),)
         for value, label in required_evidence:
@@ -101,7 +122,15 @@ def main(argv=None):
         default=Path(__file__).resolve().parents[1] / "project-memory/HARDWARE_MATRIX.md",
         help="hardware matrix path (used by the Actions release gate)",
     )
+    parser.add_argument("--source-sha", default=os.environ.get("GITHUB_SHA"))
     args = parser.parse_args(argv)
+    repository = Path(__file__).resolve().parents[1]
+    expected_sha = args.source_sha
+    if not expected_sha:
+        result = subprocess.run(["git", "-C", str(repository), "rev-parse", "HEAD"], text=True, capture_output=True)
+        if result.returncode:
+            print("release gate: cannot determine release source SHA", file=sys.stderr); return 2
+        expected_sha = result.stdout.strip()
     try:
         text = args.matrix.read_text(encoding="utf-8")
     except OSError as error:
@@ -113,7 +142,7 @@ def main(argv=None):
     except OSError as error:
         print(f"release gate: cannot read {test_log}: {error}", file=sys.stderr)
         return 2
-    errors = validate_matrix(text, test_log_text)
+    errors = validate_matrix(text, test_log_text, expected_sha, repository)
     if errors:
         for error in errors:
             print(f"release gate: {error}", file=sys.stderr)

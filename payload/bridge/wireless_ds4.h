@@ -223,6 +223,9 @@ typedef struct {
  * Hold it around any kernel_* / shellui_pad_* call made outside the bridge. */
 void pb_kernel_lock(void);
 void pb_kernel_unlock(void);
+/* Install result 2 retains a failed transaction for owner-checked rollback.
+ * The caller must keep pid/args (args can be 0 for pending unused mapping). */
+#define PB_HOOKS_INSTALL_PENDING 2
 int pb_hooks_install(int want_input, int want_vibe, int want_audio, pid_t *out_pid, intptr_t *out_args,
                      char *why, size_t why_n);
 int pb_hooks_publish(pid_t pid, intptr_t args_addr, const PbPublishFrame *f, int enabled,

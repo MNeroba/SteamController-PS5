@@ -5,5 +5,5 @@
   "firmware_verified": false,
   "sdk": "v0.43",
   "critical_code_blockers": [],
-  "review": "Host code defects resolved through M1-220; hardware-dependent risks remain in ISSUES.md and HARDWARE_MATRIX.md. This is an experimental build authorization, not hardware clearance."
+  "review": "2026-10-11: all 16 confirmed static findings remediated with recorded code/host/browser/build evidence (STATIC_AUDIT.md, M1-227, ADR-053); no known unresolved critical code blocker identified. Native runtime and FW 12.00 remain unverified."
 }

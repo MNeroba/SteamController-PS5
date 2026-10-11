@@ -6,6 +6,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 void (*sc2_notify_fn)(const char *msg) = NULL;
 static unsigned long long checks;
@@ -44,6 +46,11 @@ int main(void) {
     assert(ds_handoff_set_enabled(1) != 0);
     ds_handoff_start();
     assert(ds_handoff_set_enabled(1) == 0);
+    assert(mkdir("build/handoff-settings/dualsense.ini.tmp",0700) == 0);
+    assert(ds_handoff_set_enabled(0) != 0);
+    char settings_json[128]; ds_handoff_json(settings_json,sizeof(settings_json));
+    assert(strstr(settings_json,"\"enabled\":1"));
+    assert(rmdir("build/handoff-settings/dualsense.ini.tmp") == 0);
     pthread_t writer, readers[3];
     void *result = NULL;
 

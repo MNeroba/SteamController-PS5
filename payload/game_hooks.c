@@ -1,5 +1,13 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+
 /* game_hooks.c — installs the in-game hooks when a game runs and feeds them.
  * Settings persist in /data/ghostpad/settings.ini. */
+#include "private_file.h"
 #include "game_hooks.h"
 #include "bridge/wireless_ds4.h"
 #include "sc2_profile.h"
@@ -49,6 +57,11 @@ static struct {
     PbStatus st;
 } g;
 
+static void hook_sleep_us(long microseconds) {
+    struct timespec remaining = {microseconds / 1000000, (microseconds % 1000000) * 1000};
+    while (nanosleep(&remaining, &remaining) != 0 && errno == EINTR) {}
+}
+
 static int64_t now_ms(void) {
     struct timespec ts; clock_gettime(CLOCK_MONOTONIC, &ts);
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
@@ -84,7 +97,7 @@ static int parse_settings_integer(const char *text, long *value) {
 }
 
 static void load_settings(void) {
-    FILE *f = fopen(GAME_HOOKS_SETTINGS_PATH, "r"); if (!f) return;
+    FILE *f = private_text_read(GAME_HOOKS_SETTINGS_PATH); if (!f) return;
     GameHookSettings settings = { 0, 0, 2, 1 };
     char l[128];
     long value;
@@ -108,16 +121,6 @@ static void load_settings(void) {
     pthread_mutex_unlock(&g_lock);
 }
 
-static void save_settings(void) {
-    pthread_mutex_lock(&g_settings_io_lock);
-    GameHookSettings settings = settings_snapshot();
-    FILE *f = fopen(GAME_HOOKS_SETTINGS_PATH, "w");
-    if (!f) { pthread_mutex_unlock(&g_settings_io_lock); return; }
-    fprintf(f, "GAME_INPUT=%d\nGAME_VIBRATION=%d\nGAME_PRIORITY=%d\nGAME_AUDIO_HAPTICS=%d\n",
-            settings.input_on ? 1 : 0, settings.vibe_on ? 1 : 0, settings.mode, settings.audio_on ? 1 : 0);
-    fclose(f);
-    pthread_mutex_unlock(&g_settings_io_lock);
-}
 static void set_state(int st, const char *why) {
     pthread_mutex_lock(&g_lock);
     g.state = st; snprintf(g.why, sizeof(g.why), "%s", why ? why : "");
@@ -229,7 +232,7 @@ static void *hooks_thread(void *arg) {
         if (rollback_pending) {
             if (unhook("retrying incomplete rollback") != 0) {
                 set_state(2, "hook removal pending; retrying safely");
-                usleep(100000);
+                hook_sleep_us(100000);
                 continue;
             }
             rollback_pending = 0;
@@ -238,26 +241,27 @@ static void *hooks_thread(void *arg) {
 
         if ((!want_in && !want_vib) || !cur[0]) {
             if (g.state != 0) set_state(0, !cur[0] ? "no game running" : "off");
-            usleep(250000); continue;
+            hook_sleep_us(250000); continue;
         }
 
         if (g.state != 2) {
-            if (g.state == 3 && tries >= 12) { usleep(250000); continue; }
+            if (g.state == 3 && tries >= 12) { hook_sleep_us(250000); continue; }
             if (tries >= 40) { set_state(3, "gave up: game never finished loading its pad library"); tries = 12; continue; }
             if (now - title_since < 1500 || now < next_try) {
                 if (g.state != 1) set_state(1, "waiting for the game to finish loading");
-                usleep(100000); continue;
+                hook_sleep_us(100000); continue;
             }
             pid_t pid; intptr_t args; char why[96];
             int r = pb_hooks_install(want_in, want_vib, settings.audio_on, &pid, &args, why, sizeof(why));
             tries++;
             LOG("game hooks: install on %s (input=%d vibration=%d) → %d (%s)\n", cur, want_in, want_vib, r, why);
-            if (r == 1) {
+            if (r == 1 || r == PB_HOOKS_INSTALL_PENDING) {
                 pthread_mutex_lock(&g_lock);
                 g.pid = pid; g.args = args; g.state = 2;
                 snprintf(g.why, sizeof(g.why), "%s", why);
                 pthread_mutex_unlock(&g_lock);
-                active_set(want_in);
+                active_set(r == 1 && want_in);
+                if (r == PB_HOOKS_INSTALL_PENDING) { rollback_pending = 1; continue; }
             } else {
                 set_state(r == -4 ? 1 : 3, why);
                 next_try = now + (r == -4 ? 1000 : 5000);
@@ -266,7 +270,7 @@ static void *hooks_thread(void *arg) {
         }
 
         if (kill(g.pid, 0) != 0) {                  /* game process gone */
-            if (errno != ESRCH) { usleep(100000); continue; }
+            if (errno != ESRCH) { hook_sleep_us(100000); continue; }
             if (rumbling) { sc2_haptic_rumble_set(0, 0); rumbling = 0; }
             active_set(0); g.pid = -1; g.args = 0; title_since = now; tries = 0;
             last_tseq = 0; sc2_trigfx_clear(); sc2_trigfx_enable(0);
@@ -357,7 +361,7 @@ static void *hooks_thread(void *arg) {
             pthread_mutex_lock(&g_lock); g.st = st; pthread_mutex_unlock(&g_lock);
         }
         if (now >= next_stat) next_stat = now + 500;
-        usleep(8000);
+        hook_sleep_us(8000);
     }
     if (rumbling) sc2_haptic_rumble_set(0, 0);
     sc2_trigfx_clear();
@@ -379,7 +383,7 @@ static void *hooks_thread(void *arg) {
         failed_attempts++;
         g_shutdown_rollback_pending = 1;
         if (!game_hook_shutdown_retry(failed_attempts)) break;
-        usleep(100000);
+        hook_sleep_us(100000);
     }
     active_set(0);
     if (g_shutdown_rollback_pending) {
@@ -393,14 +397,18 @@ static void *hooks_thread(void *arg) {
 }
 
 void game_hooks_start(void) {
+    if (g_hooks_thread_started || g_shutdown_rollback_pending) {
+        LOG("game hooks: restart refused while worker or rollback ownership is retained\n");
+        return;
+    }
+#ifdef GAME_HOOKS_TEST
+    atomic_store_explicit(&g_test_stop, 0, memory_order_relaxed);
+#endif
     load_settings();
     g.pid = -1;
     g_shutdown_rollback_pending = 0;
     int r = pthread_create(&g_hooks_thread, NULL, hooks_thread, NULL);
     if (r == 0) {
-#ifdef GAME_HOOKS_TEST
-        atomic_store_explicit(&g_test_stop, 0, memory_order_relaxed);
-#endif
         g_hooks_thread_started = 1;
     }
     else LOG("game hooks: worker thread failed (%d)\n", r);
@@ -426,23 +434,31 @@ void game_hooks_test_stop(void) {
 }
 #endif
 
-void game_hooks_set_audio(int on) {
-    pthread_mutex_lock(&g_lock);
-    g_settings.audio_on = on ? 1 : 0;
-    pthread_mutex_unlock(&g_lock);
-    save_settings();
-    LOG("game hooks: DualSense audio haptics/speaker handling %s\n", on ? "on" : "off");
+int game_hooks_configure(int input_on, int vibe_on, int mode, int audio_on) {
+    pthread_mutex_lock(&g_settings_io_lock);
+    GameHookSettings candidate = settings_snapshot();
+    if (input_on >= 0) candidate.input_on = input_on ? 1 : 0;
+    if (vibe_on >= 0) candidate.vibe_on = vibe_on ? 1 : 0;
+    if (mode >= 0 && mode <= 2) candidate.mode = mode;
+    if (audio_on >= 0) candidate.audio_on = audio_on ? 1 : 0;
+    char text[128];
+    int n = snprintf(text, sizeof(text),
+        "GAME_INPUT=%d\nGAME_VIBRATION=%d\nGAME_PRIORITY=%d\nGAME_AUDIO_HAPTICS=%d\n",
+        candidate.input_on, candidate.vibe_on, candidate.mode, candidate.audio_on);
+    int result = n > 0 && (size_t)n < sizeof(text) ?
+        private_text_replace(GAME_HOOKS_SETTINGS_PATH, text, (size_t)n) : -1;
+    if (!result) {
+        pthread_mutex_lock(&g_lock);
+        g_settings = candidate;
+        pthread_mutex_unlock(&g_lock);
+    }
+    pthread_mutex_unlock(&g_settings_io_lock);
+    if (result) LOG("game hooks: settings persistence failed; previous settings retained\n");
+    return result;
 }
-
-void game_hooks_set(int input_on, int vibe_on, int mode) {
-    pthread_mutex_lock(&g_lock);
-    if (input_on >= 0) g_settings.input_on = input_on ? 1 : 0;
-    if (vibe_on  >= 0) g_settings.vibe_on  = vibe_on ? 1 : 0;
-    if (mode >= 0 && mode <= 2) g_settings.mode = mode;
-    GameHookSettings settings = g_settings;
-    pthread_mutex_unlock(&g_lock);
-    save_settings();
-    LOG("game hooks: input %s, vibration %s\n", settings.input_on ? "on" : "off", settings.vibe_on ? "on" : "off");
+int game_hooks_set_audio(int on) { return game_hooks_configure(-1, -1, -1, on); }
+int game_hooks_set(int input_on, int vibe_on, int mode) {
+    return game_hooks_configure(input_on, vibe_on, mode, -1);
 }
 
 int game_hooks_json(char *out, size_t n) {

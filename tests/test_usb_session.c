@@ -236,6 +236,14 @@ int main(void) {
     CHECK(resources.active_transfers == 0);
     CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
 
+    usb_input_watchdog_t watchdog;
+    usb_input_watchdog_init(&watchdog, 1000);
+    CHECK(!usb_input_watchdog_expired(&watchdog, 1499, 500));
+    CHECK(usb_input_watchdog_expired(&watchdog, 1500, 500));
+    usb_input_watchdog_refresh(&watchdog, 2000);
+    CHECK(!usb_input_watchdog_expired(&watchdog, 2499, 500));
+    CHECK(usb_input_watchdog_expired(&watchdog, 2500, 500));
+    CHECK(usb_input_watchdog_expired(&watchdog, 1999, 500));
     printf("USB session fault-injection checks passed (%d checks)\n", checks);
     return 0;
 }

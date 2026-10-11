@@ -15,6 +15,7 @@
 #include "sc2_trigfx.h"
 #include "sc2_flick.h"
 #include "runtime_control.h"
+#include "usb_helpers.h"
 #include "steam_protocol.h"
 #include "steam_mapping.h"
 #include <time.h>
@@ -124,9 +125,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
                        const uint8_t *addrs, int n, int timeout_ms,
                        sc2_scan_cancel_fn should_cancel,
                        void *cancel_context) {
-    uint8_t bufs[SC2_MAX_EPS][64];
-    void    *bp[SC2_MAX_EPS][1];
-    uint32_t bl[SC2_MAX_EPS][1];
+
     int opened[SC2_MAX_EPS] = {0}, started[SC2_MAX_EPS] = {0};
     int found = 0, first_error = 0;
     if (!resources || resources->fd != fd || !resources->fs_initialized ||
@@ -166,8 +165,11 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             continue;
         }
         opened[i] = 1;
-        bp[i][0] = bufs[i]; bl[i][0] = 64;
-        eps[i].ppBuffer = bp[i]; eps[i].pLength = bl[i]; eps[i].nFrames = 1;
+        memset(resources->frame_data[i], 0, USB_RESOURCES_FRAME_CAPACITY);
+        resources->frame_buffer[i][0] = resources->frame_data[i];
+        resources->frame_length[i][0] = USB_RESOURCES_FRAME_CAPACITY;
+        eps[i].ppBuffer = resources->frame_buffer[i];
+        eps[i].pLength = resources->frame_length[i]; eps[i].nFrames = 1;
         eps[i].timeout = 100;
         eps[i].flags = USB_FS_FLAG_SINGLE_SHORT_OK | USB_FS_FLAG_MULTI_SHORT_OK;
     }
@@ -178,7 +180,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             if (should_cancel && should_cancel(cancel_context)) break;
             if (!opened[i]) continue;
             if (!started[i]) {
-                bl[i][0] = 64; eps[i].aFrames = 0; eps[i].status = 0;
+                resources->frame_length[i][0] = USB_RESOURCES_FRAME_CAPACITY; eps[i].aFrames = 0; eps[i].status = 0;
                 struct usb_fs_start s; memset(&s, 0, sizeof(s)); s.ep_index = i;
                 errno = 0;
                 int start_result = usb_session_start_transfer(resources, ops,
@@ -205,8 +207,8 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             if (i >= 0 && i < n && opened[i] && started[i]) {
                 started[i] = 0;
                 steam_report_t report;
-                if (bl[i][0] > 0 &&
-                    steam_report_decode(bufs[i], bl[i][0], &report) == 1 &&
+                if (usb_completed_frame_valid(&eps[i], USB_RESOURCES_FRAME_CAPACITY) &&
+                    steam_report_decode(resources->frame_data[i], resources->frame_length[i][0], &report) == 1 &&
                     report.kind == STEAM_REPORT_INPUT) {
                     LOG("sc2: controller active on ep 0x%02x\n", addrs[i]);
                     found = addrs[i];

@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 
 static int checks;
 
@@ -27,6 +28,8 @@ typedef struct {
     int close_fd_calls;
     uint8_t completed[4];
     int completion_count;
+    struct usb_fs_endpoint *endpoint;
+    const void *observed_buffer;
 } fake_usb_t;
 
 static int fake_start(int fd, void *configuration, void *opaque) {
@@ -35,6 +38,7 @@ static int fake_start(int fd, void *configuration, void *opaque) {
     uint8_t endpoint = ((struct usb_fs_start *)configuration)->ep_index;
     CHECK(endpoint == 1 || endpoint == 2);
     fake->start_calls++;
+    if (fake->endpoint) fake->observed_buffer = fake->endpoint->ppBuffer[0];
     if (fake->fail_start_once) {
         fake->fail_start_once = 0;
         errno = EIO;
@@ -143,15 +147,27 @@ int main(void) {
     CHECK(resources.active_transfers == 0);
     CHECK(fake.stop_calls == 0);
 
-    fake = (fake_usb_t){ .fail_complete_once = 1, .fail_stop_once = 1 };
+    fake = (fake_usb_t){ .fail_complete_once = 1, .fail_stop_once = 1, .endpoint = &endpoints[1] };
     init_session(&resources, 1);
     CHECK(usb_send_out(&resources, &ops, &endpoints[1], 1, report,
                        sizeof(report), "stop-retry", 0, 2, &fake) == -EIO);
+    CHECK(fake.observed_buffer != report); /* The caller may return immediately. */
     CHECK(resources.active_transfers == (UINT32_C(1) << 1));
     CHECK(fake.start_calls == 1 && fake.stop_calls == 1);
     CHECK(usb_send_out(&resources, &ops, &endpoints[1], 1, report,
                        sizeof(report), "owned-transfer", 0, 2, &fake) == -EBUSY);
     CHECK(fake.start_calls == 1 && fake.stop_calls == 1);
+    CHECK(endpoints[1].ppBuffer[0] == fake.observed_buffer);
+    CHECK(memcmp(fake.observed_buffer, report, sizeof(report)) == 0);
+    CHECK(endpoints[1].pLength[0] == sizeof(report));
+    endpoints[1].aFrames = 1;
+    CHECK(usb_completed_frame_valid(&endpoints[1], 64));
+    endpoints[1].status = EPIPE;
+    CHECK(!usb_completed_frame_valid(&endpoints[1], 64));
+    endpoints[1].status = 0; endpoints[1].aFrames = 0;
+    CHECK(!usb_completed_frame_valid(&endpoints[1], 64));
+    endpoints[1].aFrames = 1; endpoints[1].pLength[0] = 65;
+    CHECK(!usb_completed_frame_valid(&endpoints[1], 64));
     CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
     CHECK(fake.stop_calls == 2 && resources.fd == -1);
 

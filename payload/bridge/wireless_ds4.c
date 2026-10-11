@@ -6743,7 +6743,7 @@ game_cache_find_table(
  * shared page is valid and fresh. If the payload stops publishing, input
  * frames age out after ~0.5 s of reads and audio silence expires after a
  * bounded number of output callbacks. Hook code remains inside game memory;
- * process exit releases it, while a live game's hooks are reused on restart.
+ * process exit releases it. Retained pages require a game restart before reinstall.
  * ═══════════════════════════════════════════════════════════════════════ */
 
 #define PB_MAGIC       0x42505550u   /* "PUPB" */
@@ -7161,6 +7161,29 @@ static const struct { unsigned kind; uintptr_t stub; int rcx; } k_pb_hooks[] = {
 };
 #define PB_N_KINDS (sizeof(k_pb_hooks) / sizeof(k_pb_hooks[0]))
 
+#if defined(__PROSPERO__)
+static pid_t g_pb_pending_map_pid;
+static intptr_t g_pb_pending_map;
+static size_t g_pb_pending_map_size;
+static int pb_install_read_slot(void *context,uint64_t slot,uint64_t *value) {
+    return game_bridge_process_read(*(pid_t *)context,(intptr_t)slot,value,sizeof(*value));
+}
+static int pb_install_write_slot(void *context,uint64_t slot,uint64_t value,int protection) {
+    int64_t status[9];
+    return poords4_remote_cow_write(*(pid_t *)context,(intptr_t)slot,&value,sizeof(value),protection,status);
+}
+static int pb_cleanup_unused_map(pid_t pid) {
+    if (!g_pb_pending_map) return 0;
+    if (pid != g_pb_pending_map_pid) return -1;
+    if (kill(pid,0) != 0 && errno == ESRCH) {
+        g_pb_pending_map=0;g_pb_pending_map_size=0;g_pb_pending_map_pid=0;return 0;
+    }
+    if (poords4_remote_unmap(pid,g_pb_pending_map,g_pb_pending_map_size) != 0) return -1;
+    g_pb_pending_map=0;g_pb_pending_map_size=0;g_pb_pending_map_pid=0;
+    return 0;
+}
+#endif
+
 static int
 pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *out_pid, intptr_t *out_args,
                  char *why, size_t why_n)
@@ -7170,6 +7193,10 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
 #else
     pid_t pids[8];
     *out_pid = -1; *out_args = 0; why[0] = 0;
+    if (g_pb_pending_map && pb_cleanup_unused_map(g_pb_pending_map_pid) != 0) {
+        *out_pid=g_pb_pending_map_pid;
+        snprintf(why,why_n,"unused mapping cleanup pending");return PB_HOOKS_INSTALL_PENDING;
+    }
     size_t count = find_pids("eboot.bin", pids, 8);
     if (count != 1) { snprintf(why, why_n, count ? "several game processes" : "no game process"); return -2; }
     pid_t target = pids[0];
@@ -7197,21 +7224,14 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
     memset(hooks, 0, sizeof(hooks));
     g_gb_kind_limit = GB_KINDS;
     /* allow_nonoriginal=1: also list slots that already point elsewhere, so
-     * hooks left by an earlier Puckbridge run can be found and reused. */
+     * hooks left by an earlier Puckbridge run can be detected and refused. */
     int scan = game_bridge_collect_import_hooks(target, base, originals, hooks, &hook_count, -1, 1, 0);
     g_gb_kind_limit = 7u;
     if (scan != 0) { snprintf(why, why_n, "import scan failed (game still loading?)"); return -4; }
 
-    /* Hooks from an earlier Puckbridge run may still be in this game (a new
-     * payload kills the old one without unhooking). Decide what to do by
-     * looking at any slot that points to one of our gateways:
-     *   - same layout version  → the stub code is identical; re-use the page.
-     *   - different version     → old stub code; strip every one of our hooks
-     *                             (restore the slot to the original export we
-     *                             already resolved) and install fresh below.
-     * Detection reads only magic+version at offset 0 of the old page, so it
-     * does not depend on the old page's field layout. */
-    int pb_found = 0; uint32_t pb_ver = 0; intptr_t pb_args = 0;
+    /* Detect retained gateway pages read-only. Matching layout versions do
+     * not prove capability coverage or code identity; reuse is refused. */
+    int pb_found = 0; uint32_t pb_ver = 0;
     for (uint32_t i = 0; i < hook_count; i++) {
         uint64_t cur = 0; uint8_t gwb[16];
         if (game_bridge_process_read(target, hooks[i].slot, &cur, sizeof(cur)) != 0) continue;
@@ -7222,71 +7242,16 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
         intptr_t old_args = (intptr_t)cur + 7 + rel;
         uint32_t hdr[2] = {0, 0};
         if (game_bridge_process_read(target, old_args, hdr, sizeof(hdr)) == 0 && hdr[0] == PB_MAGIC) {
-            pb_found = 1; pb_ver = hdr[1]; pb_args = old_args; break;
+            pb_found = 1; pb_ver = hdr[1]; break;
         }
-    }
-    if (pb_found && pb_ver == PB_LAYOUT_VERSION) {
-        *out_args = pb_args;
-        snprintf(why, why_n, "re-using hooks from an earlier Puckbridge run");
-        return 1;
     }
     if (pb_found) {
-        /* The v5 and v6 prefixes keep these fields at identical offsets.
-         * Disable old input/audio behavior before touching any import slot. */
-        uint32_t off = 0, silence = 0;
-        if (game_bridge_process_write(
-                target, pb_args + (intptr_t)offsetof(PbArgs, in_enabled),
-                &off, sizeof(off)) != 0 ||
-            game_bridge_process_write(
-                target, pb_args + (intptr_t)offsetof(PbArgs, a_silence),
-                &silence, sizeof(silence)) != 0) {
-            snprintf(why, why_n,
-                     "could not disable an earlier Puckbridge hook page");
-            return -14;
-        }
-        uint32_t stripped = 0, strip_failed = 0;
-        for (uint32_t i = 0; i < hook_count; i++) {
-            uint64_t cur = 0; uint8_t gwb[16];
-            if (game_bridge_process_read(target, hooks[i].slot, &cur, sizeof(cur)) != 0) {
-                strip_failed++;
-                continue;
-            }
-            if (cur == (uint64_t)hooks[i].original) continue;
-            if (game_bridge_process_read(target, (intptr_t)cur, gwb, sizeof(gwb)) != 0) {
-                strip_failed++;
-                continue;
-            }
-            if (gwb[1] != 0x8d || gwb[7] != 0xe9) continue;
-            int32_t rel; memcpy(&rel, gwb + 3, 4);
-            uint32_t magic = 0;
-            if (game_bridge_process_read(target, (intptr_t)cur + 7 + rel,
-                                         &magic, sizeof(magic)) != 0) {
-                strip_failed++;
-                continue;
-            }
-            if (magic != PB_MAGIC)
-                continue;
-            uint64_t current = 0;
-            if (game_bridge_process_read(target, hooks[i].slot,
-                                         &current, sizeof(current)) != 0 ||
-                current != cur) {
-                strip_failed++;
-                continue;
-            }
-            uint64_t orig = (uint64_t)hooks[i].original; int64_t st[9];
-            if (poords4_remote_cow_write(target, hooks[i].slot, &orig, sizeof(orig), (int)hooks[i].protection, st) == 0)
-                stripped++;
-            else
-                strip_failed++;
-        }
-        if (strip_failed) {
-            snprintf(why, why_n,
-                     "could not safely remove %u prior hook slot(s)",
-                     strip_failed);
-            return -14;
-        }
-        /* re-read slots so the filter below sees the restored originals */
-        snprintf(why, why_n, "replaced hooks from an older Puckbridge build (%u)", stripped);
+        /* A matching layout cannot prove matching imports or stub bytes.
+         * Do not reuse, upgrade or overwrite retained pages during restart.
+         * Keep virtual input active; the tester must restart the game for a
+         * fresh optional hook installation. Existing leases expire normally. */
+        snprintf(why,why_n,"earlier hook page (v%u) retained; restart game before enabling hooks",pb_ver);
+        return -14;
     }
     /* keep only untouched slots from here on; never stack on someone else's hook */
     {
@@ -7310,7 +7275,7 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
             sel[ns++] = hooks[i]; n_in += is_in; n_vib += is_vib; n_aud += is_aud;
         }
     }
-    if (ns == 0) { snprintf(why, why_n, "no matching pad imports in this game"); return -7; }
+    if (ns == 0 || (want_input && !n_in) || (want_vibe && !n_vib) || (want_audio && !n_aud)) { snprintf(why, why_n, "no matching pad imports in this game"); return -7; }
 
     uintptr_t sb = (uintptr_t)pb_read_state_stub, se = (uintptr_t)pb_stub_end;
     for (unsigned i = 0; i < PB_N_KINDS; i++)
@@ -7328,7 +7293,7 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
     if (poords4_remote_map(target, code_map + args_map, &map) != 0) { snprintf(why, why_n, "map failed"); return -9; }
     intptr_t code = map, args_addr = map + (intptr_t)code_map;
 
-    if (game_bridge_process_write(target, code, (const void *)sb, stub_size) != 0) { snprintf(why, why_n, "code write failed"); return -10; }
+    if (game_bridge_process_write(target, code, (const void *)sb, stub_size) != 0) { snprintf(why, why_n, "code write failed"); goto unused_map; }
     intptr_t gw_for_kind[GB_KINDS] = {0};
     for (unsigned i = 0; i < PB_N_KINDS; i++) {
         intptr_t gw = code + (intptr_t)gw_off + (intptr_t)i * 16;
@@ -7336,12 +7301,12 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
         uint8_t gwb[16];
         if (game_bridge_make_gateway(gwb, gw, args_addr, stub, k_pb_hooks[i].rcx) != 0 ||
             game_bridge_process_write(target, gw, gwb, sizeof(gwb)) != 0) {
-            snprintf(why, why_n, "gateway write failed"); return -10;
+            snprintf(why, why_n, "gateway write failed"); goto unused_map;
         }
         gw_for_kind[k_pb_hooks[i].kind] = gw;
     }
     uint64_t prot_args[6] = { (uint64_t)code, (uint64_t)code_map, PROT_READ | PROT_EXEC, 0, 0, 0 };
-    if (poords4_remote_syscall(target, SYS_mprotect, prot_args) != 0) { snprintf(why, why_n, "mprotect failed"); return -11; }
+    if (poords4_remote_syscall(target, SYS_mprotect, prot_args) != 0) { snprintf(why, why_n, "mprotect failed"); goto unused_map; }
 
     static PbArgs a; memset(&a, 0, sizeof(a));   /* ~33 KB: static, installs are serialized */
     a.magic = PB_MAGIC; a.version = PB_LAYOUT_VERSION;
@@ -7353,32 +7318,40 @@ pb_hooks_install_locked(int want_input, int want_vibe, int want_audio, pid_t *ou
         a.hook_gateway[i] = (uint64_t)gw_for_kind[sel[i].kind];
         a.hook_prot[i] = sel[i].protection;
     }
-    if (game_bridge_process_write(target, args_addr, &a, sizeof(a)) != 0) { snprintf(why, why_n, "args write failed"); return -12; }
+    if (game_bridge_process_write(target, args_addr, &a, sizeof(a)) != 0) { snprintf(why, why_n, "args write failed"); goto unused_map; }
 
-    uint32_t patched = 0;
-    for (uint32_t i = 0; i < ns; i++) {
-        uint64_t cur = 0; int64_t st[9];
-        if (game_bridge_process_read(target, sel[i].slot, &cur, sizeof(cur)) != 0 ||
-            cur != (uint64_t)sel[i].original) { snprintf(why, why_n, "import slot changed"); goto rollback; }
-        intptr_t g = gw_for_kind[sel[i].kind];
-        if (!g || poords4_remote_cow_write(target, sel[i].slot, &g, sizeof(g), (int)sel[i].protection, st) != 0) {
-            snprintf(why, why_n, "import slot write failed"); goto rollback;
-        }
-        patched++;
+    game_hook_change_t changes[PB_MAX_HOOKS];
+    for (uint32_t i=0;i<ns;++i)
+        changes[i]=(game_hook_change_t){a.hook_slot[i],a.hook_orig[i],a.hook_gateway[i],(int)a.hook_prot[i]};
+    int result=game_hook_apply_slots(changes,ns,pb_install_read_slot,pb_install_write_slot,&target);
+    if (result==GAME_HOOK_INSTALL_UNUSED) {
+        snprintf(why,why_n,"import slot changed before install");goto unused_map;
     }
-    *out_args = args_addr;
-    if (pb_found) snprintf(why, why_n, "replaced older build: hooked %u input, %u vibration/trigger, %u audio slot(s)", n_in, n_vib, n_aud);
-    else snprintf(why, why_n, "hooked %u input, %u vibration/trigger, %u audio import slot(s)", n_in, n_vib, n_aud);
+    /* Once any import write was attempted, a callback may still reference
+     * these pages even after rollback. Keep them mapped until game exit. */
+    if (result==GAME_HOOK_INSTALL_PENDING) {
+        *out_args=args_addr;
+        snprintf(why,why_n,"install rollback pending; retaining target ownership");
+        return PB_HOOKS_INSTALL_PENDING;
+    }
+    if (result!=GAME_HOOK_INSTALL_OK) {
+        snprintf(why,why_n,"install failed; owned imports rolled back");return -13;
+    }
+    *out_args=args_addr;
+    snprintf(why,why_n,"hooked %u input, %u vibration/trigger, %u audio slot(s)",n_in,n_vib,n_aud);
     return 1;
 
-rollback:
-    while (patched > 0) {
-        uint32_t i = --patched; int64_t st[9];
-        if (poords4_remote_cow_write(target, sel[i].slot, &sel[i].original, sizeof(sel[i].original),
-                                     (int)sel[i].protection, st) != 0)
-            (void)game_bridge_process_write(target, sel[i].slot, &sel[i].original, sizeof(sel[i].original));
+unused_map:
+    /* No import ever referenced this mapping, so unmapping is safe. Retain
+     * failed reclamation for the worker's existing bounded rollback path. */
+    if (poords4_remote_unmap(target,map,code_map+args_map)!=0) {
+        g_pb_pending_map_pid=target;g_pb_pending_map=map;
+        g_pb_pending_map_size=code_map+args_map;
+        *out_args=0;
+        snprintf(why,why_n,"unused mapping cleanup pending");
+        return PB_HOOKS_INSTALL_PENDING;
     }
-    return -13;
+    return -10;
 #endif
 }
 
@@ -7457,6 +7430,8 @@ pb_hooks_remove_locked(pid_t pid, intptr_t args_addr)
 #if !defined(__PROSPERO__)
     (void)pid; (void)args_addr; return -1;
 #else
+    if (args_addr==0 && g_pb_pending_map)
+        return pb_cleanup_unused_map(pid)==0?0:PB_HOOKS_REMOVE_RETRY;
     static PbArgs a;   /* only the header part is read (not the silence buffer) */
     if (game_bridge_process_read(pid, args_addr, &a, offsetof(PbArgs, zero)) != 0 || a.magic != PB_MAGIC) return -1;
     if (a.hook_count > PB_MAX_HOOKS) return -1;

@@ -4,10 +4,12 @@
 Run `python3 payload/gen_html.py` first, then this script. Browser tests enroll
 the public fixture token `preview-only` via sessionStorage. State is RAM-only.
 """
+import base64
 import json
 import re
 import subprocess
 import argparse
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlsplit
@@ -22,6 +24,9 @@ PAGE = embedded_page()
 defaults = re.search(r'const DEFAULTS=(\{.*?\});', PAGE.decode()).group(1)
 defaults = json.loads(re.sub(r'(\w+):', r'"\1":', defaults))
 BASE = ''.join(f'{k}={v}\n' for k, v in defaults.items()) + 'SHIFT=L4\n'
+PAIR_LOCK = threading.Lock()
+PAIR_USED = False
+PAIR_TOKEN = '42' * 32  # Public fixture credential, never a console token.
 PROFILES = {'default': 'name=Default\n' + BASE,
             'PPSA00001': 'name=Browser fixture\n' + BASE + 'A=SQUARE\n'}
 NORMALIZER = ROOT / 'tests/build/webui_profile_fixture'
@@ -57,9 +62,11 @@ class Preview(BaseHTTPRequestHandler):
         elif url.path == '/api/profile':
             key = parse_qs(url.query).get('id', ['default'])[0]
             return self.respond(PROFILES.get(key, 'No such profile'), 'text/plain', 200 if key in PROFILES else 404)
+        elif url.path == '/api/icon':
+            return self.respond(base64.b64decode('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR4nGNwavj/HwAFigLBdPZbVAAAAABJRU5ErkJggg=='), 'image/png')
         elif url.path == '/api/games':
-            value = [{'id': 'PPSA00001', 'name': 'Browser fixture', 'icon': False},
-                     {'id': 'PPSA00002', 'name': 'New game fixture', 'icon': False}]
+            value = [{'id': 'PPSA00001', 'name': 'Browser fixture', 'icon': True},
+                     {'id': 'PPSA00002', 'name': 'New game fixture', 'icon': True}]
         elif url.path in ('/api/gamehooks', '/api/dualsense', '/api/bridge'):
             value = {}  # No hardware services are simulated.
         else:
@@ -67,12 +74,25 @@ class Preview(BaseHTTPRequestHandler):
         self.respond(json.dumps(value))
 
     def authorized(self):
-        if self.headers.get('Authorization') == 'Bearer preview-only':
+        if self.headers.get('Authorization') in ('Bearer preview-only', 'Bearer ' + PAIR_TOKEN):
             return True
         self.respond('Fixture token required', 'text/plain', 401)
         return False
 
     def do_POST(self):
+        global PAIR_USED
+        if self.path == '/pair':
+            # Browser presentation fixture only. Production pairing/security is
+            # independently covered by test_webui_http and test_webui_server.
+            length = int(self.headers.get('Content-Length', '0'))
+            if length != 8:
+                return self.respond('Bad fixture code', 'text/plain', 400)
+            code = self.rfile.read(length)
+            with PAIR_LOCK:
+                if PAIR_USED or code != b'12345678':
+                    return self.respond('Pairing unavailable or code rejected', 'text/plain', 403)
+                PAIR_USED = True
+                return self.respond(json.dumps({'token': PAIR_TOKEN}))
         if not self.authorized():
             return
         url = urlsplit(self.path)

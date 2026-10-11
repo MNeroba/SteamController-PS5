@@ -23,8 +23,10 @@ enum {
 void
 runtime_policy_defaults(runtime_policy_t *policy)
 {
-    if (policy)
+    if (policy) {
         memset(policy, 0, sizeof(*policy));
+        policy->enable_webui = 1;
+    }
 }
 
 static char *
@@ -61,7 +63,7 @@ runtime_policy_parse(const char *text, size_t length,
 {
     if (!policy)
         return -1;
-    runtime_policy_defaults(policy);
+    memset(policy, 0, sizeof(*policy));
     if ((!text && length) || length > RUNTIME_POLICY_MAX_BYTES ||
         (text && memchr(text, '\0', length) != NULL))
         return -1;
@@ -71,6 +73,7 @@ runtime_policy_parse(const char *text, size_t length,
         memcpy(buffer, text, length);
     buffer[length] = '\0';
 
+    runtime_policy_defaults(policy);
     unsigned seen = 0;
     size_t offset = 0;
     while (offset < length) {
@@ -113,7 +116,7 @@ runtime_policy_parse(const char *text, size_t length,
     return 0;
 
 invalid:
-    runtime_policy_defaults(policy);
+    memset(policy, 0, sizeof(*policy));
     return -1;
 }
 
@@ -122,13 +125,32 @@ runtime_policy_load_file(const char *path, runtime_policy_t *policy)
 {
     if (!policy)
         return -1;
-    runtime_policy_defaults(policy);
+    memset(policy, 0, sizeof(*policy));
     if (!path || !*path)
         return -1;
 
-    int fd = open(path, O_RDONLY | O_NOFOLLOW);
-    if (fd < 0)
+    int fd = open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
+    if (fd < 0) {
+        /* ENOENT also occurs for dangling parent symlinks. Never treat an
+         * unsafe/inaccessible existing path as a fresh installation. */
+        struct stat missing;
+        if (errno == ENOENT && lstat(path, &missing) != 0 && errno == ENOENT) {
+            char parent[4096];
+            size_t n = strlen(path);
+            if (n >= sizeof(parent)) return -1;
+            memcpy(parent, path, n + 1);
+            char *slash = strrchr(parent, '/');
+            if (slash) {
+                if (slash == parent) slash[1] = 0; else *slash = 0;
+                if (lstat(parent, &missing) == 0) {
+                    if (!S_ISDIR(missing.st_mode)) return -1;
+                } else if (errno != ENOENT) return -1;
+            }
+            runtime_policy_defaults(policy);
+            return RUNTIME_POLICY_MISSING;
+        }
         return -1;
+    }
 
     struct stat st;
     if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) ||
@@ -155,7 +177,7 @@ runtime_policy_load_file(const char *path, runtime_policy_t *policy)
     close(fd);
     if (failed || used > RUNTIME_POLICY_MAX_BYTES ||
         runtime_policy_parse(text, used, policy) != 0) {
-        runtime_policy_defaults(policy);
+        memset(policy, 0, sizeof(*policy));
         return -1;
     }
     return 0;

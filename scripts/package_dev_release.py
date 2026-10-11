@@ -27,7 +27,7 @@ def validate_identifiers(source_sha, version):
     if not re.fullmatch(r'[0-9a-f]{40}', source_sha):
         raise ValueError('Select a full lowercase source commit SHA')
     if not re.fullmatch(r'v\d+\.\d+\.\d+-dev\.\d+', version):
-        raise ValueError('Version must have the form v0.1.0-dev.1')
+        raise ValueError('Version must have the form v0.1.0-dev.2')
 
 
 def validate_elf(data):
@@ -69,12 +69,16 @@ def package(source_sha, version, elf, output):
              '- SDK: PS5 Payload SDK v0.43 / LLVM 18\n'
              f'- SDK archive SHA-256: `{SDK_SHA}`\n'
              f'- Payload: `{asset}`\n- ELF SHA-256: `{digest}`\n\n'
-             'Required workflow gates: normal host, ASan/UBSan, 181+ Chromium assertions, '
+             'Required workflow gates: normal host, ASan/UBSan, 202+ Chromium assertions, '
              'nine image/embedding contracts, deterministic asset generation, clean PS5 cross-build '
              'and checksum verification. These establish software/build evidence only.\n\n'
              'USB-C/Puck, virtual DualSense, motion/touch/haptics and shutdown remain physically unverified. '
              'One active Steam Controller 2026 session. Native BLE and Edge identity are research only. '
-             'Game hooks, bridge probing, DualSense handoff and WebUI are disabled by default.\n\n'
+             'Game hooks, bridge probing and DualSense handoff are disabled by default. '
+             'An absent runtime policy starts WebUI on port 8090. Pair with the eight-digit '
+             'console notification code (five minutes, five attempts, one redemption); '
+             'protected APIs keep bearer authentication. No FTP or manual INI is required. '
+             'Use a trusted isolated LAN only; HTTP is plaintext.\n\n'
              'Read LOADING.md and NOTICES.md before testing. Verify the checksum before sending '
              'the ELF through an independently confirmed compatible development loader. '
              'There is no PKG/FPKG or persistent installer. The stable hardware release gate remains blocked.\n')

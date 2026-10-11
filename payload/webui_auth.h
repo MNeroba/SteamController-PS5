@@ -1,6 +1,9 @@
 #ifndef WEBUI_AUTH_H
 #define WEBUI_AUTH_H
 
+#include <pthread.h>
+#include <stdint.h>
+
 #define WEBUI_TOKEN_HEX_LENGTH 64
 
 int webui_token_is_valid(const char *token);
@@ -12,5 +15,25 @@ int webui_auth_path_allows(const char *path, const char *authorization,
 int webui_auth_load_or_create(const char *directory,
                               char token[WEBUI_TOKEN_HEX_LENGTH + 1],
                               int *created);
+
+#define WEBUI_PAIR_CODE_LENGTH 8
+#define WEBUI_PAIR_TTL_MS 300000u
+#define WEBUI_PAIR_ATTEMPTS 5u
+typedef struct {
+    pthread_mutex_t lock;
+    uint64_t started_ms;
+    char code[WEBUI_PAIR_CODE_LENGTH + 1];
+    unsigned attempts;
+    int active;
+} webui_pairing_t;
+/* Initialize before serving requests. A fresh short-lived CSPRNG code is
+ * output only for local notification. One redemption, five attempts total;
+ * expiry or backward clock disables enrollment until a new local launch.
+ * Destroy only after all callers have joined. Neither function logs secrets. */
+int webui_pairing_init(webui_pairing_t *pairing, uint64_t now_ms,
+                       char code[WEBUI_PAIR_CODE_LENGTH + 1]);
+int webui_pairing_redeem(webui_pairing_t *pairing, const char *code,
+                         uint64_t now_ms);
+void webui_pairing_destroy(webui_pairing_t *pairing);
 
 #endif

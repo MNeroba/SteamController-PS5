@@ -168,3 +168,15 @@ int usb_session_cleanup(usb_resources_t *resources,
     if (!resources || !ops) return USB_SESSION_ERROR;
     return usb_resources_cleanup(resources, &ops->resources, context);
 }
+
+void usb_input_watchdog_init(usb_input_watchdog_t *w, uint64_t now_ms) {
+    if (w) w->last_input_ms = now_ms;
+}
+void usb_input_watchdog_refresh(usb_input_watchdog_t *w, uint64_t now_ms) {
+    if (w) w->last_input_ms = now_ms;
+}
+int usb_input_watchdog_expired(const usb_input_watchdog_t *w,
+                               uint64_t now_ms, unsigned timeout_ms) {
+    return !w || !timeout_ms || now_ms < w->last_input_ms ||
+        now_ms - w->last_input_ms >= timeout_ms;
+}

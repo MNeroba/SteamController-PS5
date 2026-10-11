@@ -1,13 +1,17 @@
-/* glibc hides POSIX.1-2008 file APIs and flags in strict C11 mode. */
-#if defined(__linux__) && !defined(_POSIX_C_SOURCE)
+#ifndef _POSIX_C_SOURCE
 #define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
 #endif
 
 #include "webui_auth.h"
+#include "private_file.h"
 
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <stdio.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -44,6 +48,70 @@ static int write_exact(int fd, const unsigned char *data, size_t length) {
     return 0;
 }
 
+static void erase_secret(void *data, size_t length) {
+    volatile unsigned char *p = data;
+    while (length--) *p++ = 0;
+}
+
+static int secure_random(void *data, size_t length) {
+    int fd = open("/dev/urandom", O_RDONLY);
+    if (fd < 0) return -1;
+    int result = read_exact(fd, data, length);
+    if (close(fd) != 0) result = -1;
+    return result;
+}
+
+int webui_pairing_init(webui_pairing_t *p, uint64_t now_ms,
+                       char code[WEBUI_PAIR_CODE_LENGTH + 1]) {
+    uint32_t random;
+    if (!p || !code) return -1;
+    memset(p, 0, sizeof(*p));
+    code[0] = 0;
+    /* Rejection sampling avoids bias from the 32-bit to decimal conversion. */
+    do {
+        if (secure_random(&random, sizeof(random)) != 0) return -1;
+    } while (random >= 4200000000u);
+    if (pthread_mutex_init(&p->lock, NULL) != 0) {
+        erase_secret(&random, sizeof(random)); return -1;
+    }
+    snprintf(p->code, sizeof(p->code), "%08u", (unsigned)(random % 100000000u));
+    erase_secret(&random, sizeof(random));
+    p->started_ms = now_ms;
+    p->active = 1;
+    memcpy(code, p->code, sizeof(p->code));
+    return 0;
+}
+
+int webui_pairing_redeem(webui_pairing_t *p, const char *code, uint64_t now_ms) {
+    if (!p || pthread_mutex_lock(&p->lock) != 0) return 0;
+    int ok = 0;
+    if (p->active && (now_ms < p->started_ms ||
+                     now_ms - p->started_ms >= WEBUI_PAIR_TTL_MS)) {
+        p->active = 0; erase_secret(p->code, sizeof(p->code));
+    }
+    if (p->active) {
+        unsigned char difference = 0;
+        ++p->attempts;
+        if (code && strlen(code) == WEBUI_PAIR_CODE_LENGTH) {
+            for (size_t i = 0; i < WEBUI_PAIR_CODE_LENGTH; ++i)
+                difference |= (unsigned char)code[i] ^ (unsigned char)p->code[i];
+            ok = difference == 0;
+        }
+        if (ok || p->attempts >= WEBUI_PAIR_ATTEMPTS) {
+            p->active = 0; erase_secret(p->code, sizeof(p->code));
+        }
+    }
+    pthread_mutex_unlock(&p->lock);
+    return ok;
+}
+
+void webui_pairing_destroy(webui_pairing_t *p) {
+    if (!p) return;
+    erase_secret(p->code, sizeof(p->code));
+    p->active = 0;
+    pthread_mutex_destroy(&p->lock);
+}
+
 int webui_token_is_valid(const char *token) {
     size_t i;
     if (!token || strlen(token) != WEBUI_TOKEN_HEX_LENGTH) return 0;
@@ -75,27 +143,11 @@ int webui_auth_path_allows(const char *path, const char *authorization,
     return webui_auth_matches(authorization, token);
 }
 
-static int open_private_directory(const char *path) {
-    int fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-    struct stat st;
-    if (fd < 0 && errno == ENOENT) {
-        if (mkdir(path, 0700) != 0 && errno != EEXIST) return -1;
-        fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
-    }
-    if (fd < 0) return -1;
-    if (fstat(fd, &st) != 0 || !S_ISDIR(st.st_mode) || st.st_uid != geteuid() ||
-        fchmod(fd, 0700) != 0 || fstat(fd, &st) != 0 || (st.st_mode & 077) != 0) {
-        close(fd);
-        return -1;
-    }
-    return fd;
-}
-
 static int read_token_file(int dir_fd, char token[WEBUI_TOKEN_HEX_LENGTH + 1]) {
     unsigned char file_data[WEBUI_TOKEN_HEX_LENGTH + 2];
     struct stat st;
     size_t i;
-    int fd = openat(dir_fd, TOKEN_FILE_NAME, O_RDONLY | O_NOFOLLOW);
+    int fd = openat(dir_fd, TOKEN_FILE_NAME, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
     if (fd < 0) return -1;
     if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_uid != geteuid() ||
         (st.st_mode & 077) != 0 || st.st_size != WEBUI_TOKEN_HEX_LENGTH + 1 ||
@@ -117,14 +169,8 @@ static int create_token_file(int dir_fd, char token[WEBUI_TOKEN_HEX_LENGTH + 1])
     unsigned char random[WEBUI_TOKEN_HEX_LENGTH / 2];
     unsigned char text[WEBUI_TOKEN_HEX_LENGTH + 1];
     size_t i;
-    int random_fd = open("/dev/urandom", O_RDONLY);
     int token_fd;
-    if (random_fd < 0) return -1;
-    if (read_exact(random_fd, random, sizeof(random)) != 0) {
-        close(random_fd);
-        return -1;
-    }
-    close(random_fd);
+    if (secure_random(random, sizeof(random)) != 0) return -1;
     for (i = 0; i < sizeof(random); i++) {
         text[i * 2] = (unsigned char)hex[random[i] >> 4];
         text[i * 2 + 1] = (unsigned char)hex[random[i] & 15];
@@ -160,7 +206,7 @@ int webui_auth_load_or_create(const char *directory,
     int dir_fd, result;
     if (created) *created = 0;
     if (!directory || !directory[0] || !token) return -1;
-    dir_fd = open_private_directory(directory);
+    dir_fd = private_directory_open(directory);
     if (dir_fd < 0) return -1;
     if (read_token_file(dir_fd, token) == 0) {
         close(dir_fd);

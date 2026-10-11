@@ -6,7 +6,7 @@
 
 ## Use
 
-1. Open **Remap → Buttons** in the authenticated portal and choose the profile to edit. WebUI remains disabled by default; follow the safe opt-in and enrollment steps in the root README.
+1. Open **Remap → Buttons** in the authenticated portal and choose the profile to edit. WebUI starts automatically when the runtime policy is absent; enter the short-lived code from the console notification. Advanced token recovery is available in the pairing dialog. Use only a trusted isolated LAN.
 2. Click/tap a Steam Controller button, or focus it and press Enter/Space. Use **Back / top** for trigger pulls and the four rear buttons. The image is viewed from behind: physical L is on the right, R on the left.
 3. Choose one or more DualSense outputs in the editor's grouped picker or preview image. Green outlines and badges show the draft assignment for the active activator. On the main page, first select a Steam input, then click/tap a DualSense output: it is staged for the **Press** action, and **Done** applies it while **Cancel** discards it. Coarse-pointer hit areas extend around small output hotspots.
 4. **Done** updates the draft profile. **Cancel** or Escape preserves its previous assignment. **Save changes** writes through the authenticated `/api/profile` API, then rereads the canonical profile before reporting Saved. Server-normalized values replace the submitted draft; newer local edits remain unsaved. Failed or incomplete readback keeps a “Save not confirmed” state; changing a game profile uses the existing load/save flow.
@@ -80,3 +80,9 @@ The production HTTP writer is tested against the actual embedded page, byte-for-
 ## Binding, persistence and navigation audit — M1-220 (2026-10-10)
 
 `VERIFIED_HOST_TEST`: full normal and ASan/UBSan suites PASS; profile 52 assertions, atomic storage 71, binding/proportional-pressure 165 and HTTP/auth 110. Nine portable artwork/generator contracts and 181 Edge/Playwright browser assertions PASS (all original 162 retained). The maximum-complexity stored profile is 14,573 bytes; complete 24-input/22-output/activator round-trip succeeds within the 24 KiB capacity. Final generated page: 685,503 UTF-8 bytes, 41 icons/four unchanged controller images. Clean SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `5bdd18153301213e7a4b82e3038dff24563fdc7e0e474ce41546d3c66ffc7dbc`. This is local source/build evidence; publication and Actions acknowledgement follow separately. Physical FW 12.00 remains NOT_RUN.
+
+## First launch and recovery
+
+The public interface initializes before authentication. Enter the eight-digit local notification code in the integrated desktop/mobile dialog; browser reload retains the session credential. Rejected credentials clear authentication while preserving unsaved edits. Backend-offline state keeps valid credentials for reconnect. Protected game icons use authenticated fetch and local blob URLs.
+
+A corrupt stored Default offers confirmed, authenticated recovery with a backup of its exact previous bytes. The profile store serializes load/patch/save for both menu and portal. See [loading and advanced recovery](development/LOADING.md). These flows have host/Chromium coverage; console notification, browser and filesystem behavior require H-09 hardware validation.

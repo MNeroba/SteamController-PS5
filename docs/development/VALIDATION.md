@@ -24,3 +24,15 @@ Log SHA256: normal fb2e88a3dbfd7e8a068d6527e96f337ff971154195aa6cb01a0f3b1e3ab87
 Negative attempts and fixes remain in TEST_LOG M1-222. Local toolchain paths/debug data can change ELF hashes; no cross-platform bit-identical ELF claim. Remote source/Actions/prerelease acknowledgement follows in current memory. No DEV release or GitHub description change is claimed before confirmation; manual dispatch/settings currently require browser login.
 
 Fresh export index check also reported two inherited whitespace issues in unchanged payload/shellui_pad.h and tests/test_safe_mode_contract.py. Their original Git blobs were deliberately preserved; these are baseline diagnostics, not new source edits. Only the reviewed change diff is claimed clean.
+
+## M1-227 — dev.2 software validation — 2026-10-11
+
+Complete255-file reviewed source export /tmp/sc-dev2-fresh, no preexisting generated header/ELF/SDK/cache. Normal and ASan/UBSan suites PASS,38 C suites plus Python contracts. Chromium CLI0.1.22 PASS202 (original183 retained); clean-export repeat PASS202. Clean SDKv0.43LLVM18.1.8 build PASS. Header determinism SHA2562b2071a4058792dd758de531d823acb6892070814e375136592b57161f9a0166,691930-byte page,41icons/four unchanged images. Local fresh ELF SHA256d299cc90947e051c2d30dc27826f94e7f17108dd945f2f369e8a710921a81b4f; published Linux asset digest is recorded separately after release acknowledgement. Scoped diff/credential/attribution checks PASS; full41 production C units retained. Negative attempts and fixes: TEST_LOG M1-227. All hardware tests NOT_RUN; FW12.00 unverified; stable release gate remains closed. DEV2 acknowledgement pending at this entry.
+
+Log sc-dev2-fresh-gates2.log SHA256 1735fbc59d0c73adde80c3935f24d70df746de1dbc6f2a9428534e04a45214c8.
+
+Log sc-dev2-final-host.log SHA256 355e448e327f15d8154cea60db7251d4b74317658fbc56808ae6f166248498ed.
+
+Log sc-dev2-fresh-browser.log SHA256 e07432da1efe8efed1ae240783c141159c2da16aaf88916003aa020e68e10ee9.
+
+Log browser.json SHA256 2fe105a9719a6178d940bf3d65c9403fad0b25ff551cea859ac9c8a9b18752fe.

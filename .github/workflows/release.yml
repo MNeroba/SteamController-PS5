@@ -16,7 +16,20 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Run portable host and sanitizer suite
-        run: make -C tests clean sanitize
+        run: |
+          make -C tests clean test
+          make -C tests sanitize
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      - name: Install pinned Chromium browser tools
+        run: |
+          npm install --global @playwright/cli@0.1.22
+          playwright-cli install-browser chromium --with-deps
+      - name: Run Chromium and controller asset gates
+        run: |
+          bash scripts/run_webui_browser.sh
+          python3 tests/test_webui_controllers.py
 
   cross-build:
     runs-on: ubuntu-24.04
@@ -60,6 +73,8 @@ jobs:
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
       - name: Require first-release hardware evidence
         run: python3 scripts/check_release_gate.py
 
@@ -77,6 +92,9 @@ jobs:
         with:
           name: ghost-control-ps5
           path: release-assets
+      - name: Verify downloaded ELF checksum
+        working-directory: release-assets
+        run: sha256sum --check ghost-control-ps5.elf.sha256
       - name: Publish release
         uses: softprops/action-gh-release@v3
         with:

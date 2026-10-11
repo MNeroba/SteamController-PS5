@@ -47,6 +47,8 @@ enum {
     WEBUI_HTTP_READ_TOO_LARGE = -2,
     WEBUI_HTTP_READ_TIMEOUT = -3,
     WEBUI_HTTP_READ_IO_ERROR = -4,
+    WEBUI_HTTP_READ_UNAUTHORIZED = -7,
+    WEBUI_HTTP_READ_FORBIDDEN = -8,
     WEBUI_HTTP_WRITE_OK = 0,
     WEBUI_HTTP_WRITE_TIMEOUT = -5,
     WEBUI_HTTP_WRITE_IO_ERROR = -6
@@ -74,6 +76,14 @@ int webui_http_read_request(void *context, webui_http_recv_fn receive,
                             webui_http_clock_fn clock, unsigned timeout_ms,
                             char *buffer, size_t capacity,
                             webui_http_request_t *request, char **body);
+
+/* Optional admission runs once immediately after headers, before waiting for
+ * any body. Return READ_OK, UNAUTHORIZED, FORBIDDEN or MALFORMED. */
+typedef int (*webui_http_admit_fn)(void *, const webui_http_request_t *);
+int webui_http_read_request_checked(void *context, webui_http_recv_fn receive,
+    webui_http_clock_fn clock, unsigned timeout_ms, char *buffer, size_t capacity,
+    webui_http_request_t *request, char **body, webui_http_admit_fn admit,
+    void *admit_context);
 
 /* Write all response chunks within one absolute monotonic deadline. */
 int webui_http_write_chunks(void *context, webui_http_send_fn send,

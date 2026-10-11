@@ -3,6 +3,8 @@
 from importlib.util import module_from_spec, spec_from_file_location
 from pathlib import Path
 import unittest
+import tempfile
+import subprocess
 
 ROOT = Path(__file__).resolve().parents[1]
 SPEC = spec_from_file_location("check_release_gate", ROOT / "scripts/check_release_gate.py")
@@ -32,6 +34,7 @@ def evidence_log(firmware="12.00"):
             "Controller: Steam Controller 2026 / fw 1.0",
             "Transport: USB-C",
             "Payload commit: 0123456789abcdef0123456789abcdef01234567",
+            "SDK: v0.43",
             "Result: VERIFIED_HARDWARE",
         )))
     return "\n\n".join(entries)
@@ -51,6 +54,31 @@ class ReleaseGateTests(unittest.TestCase):
         firmware = "13.60"
         self.assertEqual(RELEASE_GATE.validate_matrix(
             self.valid_matrix(firmware), evidence_log(firmware)), [])
+
+    def test_other_released_source_fails_closed(self):
+        errors = RELEASE_GATE.validate_matrix(self.valid_matrix(), evidence_log(), "f" * 40, ROOT)
+        self.assertTrue(any("source does not match" in error for error in errors))
+
+    def test_only_docs_descendant_can_reuse_hardware_evidence(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            def git(*args):
+                return subprocess.run(["git", "-C", directory, *args], check=True, capture_output=True, text=True).stdout.strip()
+            git("init"); git("config", "user.name", "Fixture"); git("config", "user.email", "fixture@example.invalid")
+            (root / "payload").mkdir(); (root / "payload/core.c").write_text("first")
+            git("add", ".");git("commit", "-m", "source"); tested=git("rev-parse", "HEAD")
+            (root / "README.md").write_text("hardware evidence")
+            git("add", ".");git("commit", "-m", "docs"); docs=git("rev-parse", "HEAD")
+            self.assertTrue(RELEASE_GATE.source_matches(tested, docs, root))
+            (root / "payload/core.c").write_text("changed")
+            git("add", ".");git("commit", "-m", "code"); code=git("rev-parse", "HEAD")
+            self.assertFalse(RELEASE_GATE.source_matches(tested, code, root))
+            self.assertFalse(RELEASE_GATE.source_matches(code, tested, root))
+
+    def test_different_sdk_evidence_fails_closed(self):
+        errors = RELEASE_GATE.validate_matrix(self.valid_matrix().replace("SDK v0.43", "SDK v0.44"),
+                                             evidence_log().replace("SDK: v0.43", "SDK: v0.44"))
+        self.assertTrue(any("SDK" in error for error in errors))
 
     def test_missing_required_gate_fails_closed(self):
         matrix = "\n".join(

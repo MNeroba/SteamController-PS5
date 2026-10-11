@@ -61,3 +61,7 @@ The owner explicitly requested reuse of four transparent WebP images and the SVG
 Remap audit follow-up (ADR-050/M1-218, 2026-10-10): local authored UI/geometry/regressions retain the existing artwork rights notice. `sc2_binding.c` and `sc2_profile.c` retain their Puckbridge-derived GPL provenance at the foundation pin above; changes suppress Shift-trigger Full pull and canonicalize conflicting Turbo/Toggle. The authored host-only `tests/webui_profile_fixture.c` reuses the production parser/formatter through a bounded stdin adapter and stubs unused platform lookup functions; no external implementation or proprietary SDK code was imported.
 
 Consolidation provenance review (2026-10-10): corrected a one-character PoorDS4 SHA typo in the foundation row to 476b0b667ce82c6e51ffd9e96d7ef1f5bfc74d4b, matching the preserved bridge NOTICE and GitHub commit readback. No source/license notice changed. All seven relocated upstream/starter files retain exact baseline blob hashes; new build/release tools are authored here, with no new imported implementation.
+
+## 2026-10-11 local hardening
+
+Pairing/HTTP admission, session-owned USB frames/watchdog, bounded metadata parsing and hook installation transaction are authored in this repository under GPL-3.0-or-later. Hook adapter changes derive from the already attributed Puckbridge/PoorDS4 pinned files above; no additional upstream code, assets or dependencies are imported. All inherited notices remain.

@@ -45,6 +45,9 @@ struct scan_call {
     int stop_calls;
     int close_calls;
     usb_resources_t resources;
+    struct usb_fs_endpoint endpoints[SC2_MAX_EPS];
+    int invalid_status;
+    int invalid_frames;
 };
 
 static _Thread_local struct scan_call *thread_call;
@@ -122,7 +125,7 @@ int ioctl(int fd, unsigned long request, ...) {
             static const uint8_t input_report[54] = {0x42};
             memcpy(report, input_report, sizeof(input_report));
         }
-        ep->pLength[0] = 54;
+        ep->pLength[0] = 54; ep->aFrames = thread_call->invalid_frames ? 0 : 1; ep->status = thread_call->invalid_status;
         ((struct usb_fs_complete *)argument)->ep_index =
             (uint8_t)endpoint_index;
         return 0;
@@ -138,7 +141,7 @@ int ioctl(int fd, unsigned long request, ...) {
     if (fd == 1) {
         static const uint8_t input_report[54] = {0x42};
         memcpy(report, input_report, sizeof(input_report));
-        ep->pLength[0] = sizeof(input_report);
+        ep->pLength[0] = sizeof(input_report); ep->aFrames = 1;
 
         pthread_mutex_lock(&gate_lock);
         valid_report_written = 1;
@@ -154,7 +157,7 @@ int ioctl(int fd, unsigned long request, ...) {
 
         memset(report, 0, 54);
         report[0] = 0xff;
-        ep->pLength[0] = 54;
+        ep->pLength[0] = 54; ep->aFrames = thread_call->invalid_frames ? 0 : 1; ep->status = thread_call->invalid_status;
 
         pthread_mutex_lock(&gate_lock);
         other_report_written = 1;
@@ -222,8 +225,8 @@ static const usb_session_ops_t scan_ops = {
 
 static void *scan_worker(void *opaque) {
     struct scan_call *call = opaque;
-    struct usb_fs_endpoint endpoints[SC2_MAX_EPS];
-    memset(endpoints, 0, sizeof(endpoints));
+    struct usb_fs_endpoint *endpoints = call->endpoints;
+    memset(call->endpoints, 0, sizeof(call->endpoints));
     thread_endpoints = endpoints;
     thread_call = call;
     thread_scan_mode = call->mode;
@@ -449,6 +452,11 @@ int main(void) {
                 stop_close_failure.resources.opened_endpoints,
                 stop_close_failure.resources.active_transfers);
         return 1;
+    }
+    if (stop_close_failure.endpoints[0].ppBuffer != stop_close_failure.resources.frame_buffer[0] ||
+        stop_close_failure.endpoints[0].ppBuffer[0] != stop_close_failure.resources.frame_data[0] ||
+        stop_close_failure.endpoints[0].pLength != stop_close_failure.resources.frame_length[0]) {
+        fprintf(stderr,"retained scan frame escaped its session storage\n");return 1;
     }
     int retry_stop_close_calls = 0;
     if (usb_resources_cleanup(&stop_close_failure.resources, &cleanup_ops,

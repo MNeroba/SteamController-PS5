@@ -18,7 +18,7 @@ USB-C and official Valve Puck · remapping · motion · touch · haptics
 
 ## What it does
 
-One native ELF translates Steam Controller input into a virtual DualSense while retaining Steam-specific controls in a reusable input model. Profiles and the optional local portal configure mappings, timing, sticks, trackpads and motion.
+One native ELF translates Steam Controller input into a virtual DualSense while retaining Steam-specific controls in a reusable input model. Profiles and the local portal configure mappings, timing, sticks, trackpads and motion.
 
 | Implemented in code / covered on the host | Physical validation still needed |
 | --- | --- |
@@ -93,7 +93,12 @@ This project produces **ELF only**: no PKG/FPKG or persistent installer. Use an 
 
 [Loading, checksum verification, trusted WebUI setup and recovery →](docs/development/LOADING.md)
 
-Safe defaults disable **game hooks, bridge probing, DualSense handoff and WebUI**. Optional WebUI uses an owner-only bearer token at `/data/ghostpad/webui.token` and port 8090 on allowed local IPv4 peers. HTTP is plaintext: use only a trusted isolated LAN. Internal `/data/ghostpad` paths remain for compatibility.
+1. Load the ELF through your existing compatible loader.
+2. Open **`http://<PS5-IP>:8090`** on your PC or phone.
+3. Enter the **eight-digit code from the PS5 notification** in the integrated pairing screen.
+4. Configure and Save; the portal confirms stored profile readback.
+
+WebUI starts automatically when the policy file is absent; no FTP or manual INI is needed. Explicit `ENABLE_WEBUI=0` is respected, and invalid existing policy fails closed. **Game hooks, bridge probing and DualSense handoff stay disabled.** Codes expire in five minutes, allow five attempts and one redemption; protected APIs retain strong bearer authentication. Advanced token recovery remains available. HTTP is plaintext: use only a trusted isolated LAN, never public port forwarding. Internal `/data/ghostpad` paths remain for compatibility.
 
 ## Progress and next steps
 

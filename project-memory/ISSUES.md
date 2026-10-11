@@ -98,3 +98,11 @@ P0-REMAP-IMPORT-01 / P1-REMAP-EDGE-01 publication: FIXED — HOST/BROWSER/BUILD 
 - P2-BUILD-GENERATED-01: FIXED_HOST — fresh host tree without tracked webui_html.h previously failed; both Makefiles now regenerate it, clean export Host/ASan-UBSan/SDK/browser pass. No source/asset deletion.
 - P2-PUBLISH-ACCESS-01: BLOCKED_ACCESS — connector cannot workflow_dispatch or modify repository description; Edge permission rejected, in-app GitHub signed out. Experimental workflow/notes are ready; owner login/manual dispatch needed. Suggested description: Steam Controller 2026 experimental PS5 payload: USB-C/Puck, remapping, motion/touch/haptics; FW12.00 unverified.
 - DEV review: no remaining reproducible unfixed critical host-code defect identified in this consolidation. Existing PS5 ABI/USB/privilege/hook/filesystem risks remain hardware-dependent and unverified; stable gate stays closed. Any newly found critical code defect must enter dev-release.json before publication.
+
+M1-225 resolution: P2-PUBLISH-ACCESS-01 resolved via authenticated in-app GitHub browser; description update and DEV workflow38075764498 manual dispatch acknowledged. Tablet header overflow fixed inffff5e0; Host38075607919 PASS183/normal/sanitizers, SDK38075607926 PASS. Physical blockers remain unchanged.
+
+## Static audit / first-launch closure — 2026-10-11 (M1-227, ADR-053)
+
+All eight P1/eight P2 findings in docs/development/STATIC_AUDIT.md have scoped fixes and software evidence. No known unresolved critical code defect from this register remains. Native USB/PS5 hook adapters are code/build-reviewed with portable transaction/worker coverage, not target-tested. Hardware can reopen these findings. Critical DEV blocker manifest was retained during remediation and cleared only after normal/sanitizer/browser/SDK evidence; any new critical defect must block publication again.
+
+First launch enables only authenticated WebUI; notification code replaces filesystem enrollment for normal use. Hooks/probe/DualSense handoff remain off. Real notification reliability, HTTP trusted-LAN transport, SDK/runtime ABI, failed target rollback, cancellation, native DualSense coexistence and FW12.00 remain BLOCKED_HARDWARE. Stable hardware gate is not satisfied; dev.2 publication is pending acknowledgement.

@@ -1,3 +1,10 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+
 /* ds_handoff.c — turn the DualSense off while the Steam Controller is in control
  *
  * Idea from the Manba V2 fork of Ghostcontrol (NikoBellikJR31): learn the
@@ -5,6 +12,7 @@
  * on it from SceShellUI. Unlike that fork, ids are never guessed (no sweep
  * over 0x..0300): only an id the system log named is ever disconnected. */
 
+#include "private_file.h"
 #include "ds_handoff.h"
 #include "runtime_control.h"
 #include <sys/types.h>
@@ -26,7 +34,10 @@
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #endif
 
-#define SETTINGS "/data/ghostpad/dualsense.ini"
+#ifndef DS_HANDOFF_SETTINGS_PATH
+#define DS_HANDOFF_SETTINGS_PATH "/data/ghostpad/dualsense.ini"
+#endif
+#define SETTINGS DS_HANDOFF_SETTINGS_PATH
 #define MAX_PADS 4
 #define MAX_VIRT 8
 
@@ -77,11 +88,11 @@ void ds_handoff_start(void) {
     g_allowed = 1;
     pthread_mutex_unlock(&g_lock);
     int enabled = 0;
-    FILE *f = fopen(SETTINGS, "r");
+    FILE *f = private_text_read(SETTINGS);
     if (f) {
         char l[96];
         while (fgets(l, sizeof(l), f))
-            if (!strncmp(l, "TURN_OFF_DUALSENSE=", 19)) enabled = atoi(l + 19) != 0;
+            if (!strcmp(l, "TURN_OFF_DUALSENSE=1\n") || !strcmp(l, "TURN_OFF_DUALSENSE=1")) enabled = 1;
         fclose(f);
     }
     pthread_mutex_lock(&g_lock);
@@ -98,11 +109,15 @@ int ds_handoff_set_enabled(int on) {
         LOG("dualsense hand-off: enable rejected by safe runtime policy\n");
         return -1;
     }
+    char text[40];
+    int n = snprintf(text, sizeof(text), "TURN_OFF_DUALSENSE=%d\n", enabled);
+    if (n < 0 || (size_t)n >= sizeof(text) || private_text_replace(SETTINGS, text, (size_t)n)) {
+        pthread_mutex_unlock(&g_lock);
+        LOG("dualsense hand-off: settings persistence failed\n");
+        return -1;
+    }
     g_enabled = enabled;
     pthread_mutex_unlock(&g_lock);
-    mkdir("/data/ghostpad", 0777);
-    FILE *f = fopen(SETTINGS, "w");
-    if (f) { fprintf(f, "TURN_OFF_DUALSENSE=%d\n", enabled); fclose(f); }
     LOG("dualsense hand-off: %s\n", enabled ? "on" : "off");
     return 0;
 }

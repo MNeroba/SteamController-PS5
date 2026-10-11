@@ -69,6 +69,18 @@ int main(void) {
     pthread_join(thread_a, NULL);
     pthread_join(thread_b, NULL);
 
+    /* A truncated Unicode escape at the allocation boundary must be rejected
+     * without touching bytes after the actual metadata. */
+    const char *bad_path = "build/game-list-test/user/CUSA00001/param.json";
+    FILE *bad = fopen(bad_path, "wb");
+    if (!bad) return 1;
+    for (size_t i = 0; i < 65535 - 15; ++i) fputc(' ', bad);
+    fputs("\"titleName\":\"\\u", bad);
+    fclose(bad);
+    char rejected[GC_GAME_NAME_MAX];
+    if (gc_game_name(id_a, rejected, sizeof(rejected)) != -1 || strcmp(rejected,id_a)) {
+        fprintf(stderr,"truncated metadata was accepted\n"); return 1;
+    }
     unlink("build/game-list-test/user/CUSA00001/param.json");
     unlink("build/game-list-test/user/CUSA00002/param.json");
     rmdir("build/game-list-test/user/CUSA00001");

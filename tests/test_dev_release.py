@@ -3,6 +3,7 @@
 import hashlib
 import contextlib
 import io
+from unittest.mock import patch
 import json
 import struct
 import sys
@@ -21,6 +22,10 @@ class DevRelease(unittest.TestCase):
         self.policy = json.loads((ROOT / 'docs/development/dev-release.json').read_text())
 
     def test_policy(self):
+        if self.policy['critical_code_blockers']:
+            with self.assertRaises(ValueError):
+                validate_policy(self.policy)
+        self.policy = dict(self.policy, critical_code_blockers=[])
         validate_policy(self.policy)
         for key, invalid in [('schema', None), ('channel', 'stable'), ('target_firmware', '13.60'),
                              ('firmware_verified', True), ('sdk', 'v0.44'),
@@ -50,7 +55,15 @@ class DevRelease(unittest.TestCase):
             elf = Path(temp) / 'test-fixture.elf'
             elf.write_bytes(data)
             out = Path(temp) / 'assets'
-            with contextlib.redirect_stdout(io.StringIO()):
+            # Test the packaging function using a synthetic policy in an
+            # isolated root. Never clear the real project's blocker manifest.
+            fixture_root = Path(temp) / 'source'; fixture_root.mkdir()
+            for name in ['LICENSE', 'docs/development/LOADING.md', 'payload/bridge/NOTICE.md',
+                         'payload/web/icons/LICENSE.txt', 'payload/web/controllers/NOTICE.md']:
+                target = fixture_root / name; target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes((ROOT / name).read_bytes())
+            (fixture_root / 'docs/development/dev-release.json').write_text(json.dumps(dict(self.policy, critical_code_blockers=[])))
+            with patch('package_dev_release.ROOT', fixture_root), contextlib.redirect_stdout(io.StringIO()):
                 package('a' * 40, 'v0.1.0-dev.1', elf, out)
             notes = (out / 'RELEASE_NOTES.md').read_text()
             self.assertIn(WARNING, notes)
@@ -69,10 +82,10 @@ class DevRelease(unittest.TestCase):
         self.assertEqual(config['browser']['launchOptions']['channel'], 'chromium')
         self.assertIn('--config tests/playwright-cli.json', (ROOT / 'scripts/run_webui_browser.sh').read_text())
         self.assertIn('cat "$log_dir/browser.json"', (ROOT / 'scripts/run_webui_browser.sh').read_text())
-        validate_browser({'result': 'PASS', 'checks': 181})
-        validate_browser({'output': json.dumps({'result': 'PASS', 'checks': 181})})
-        for value in [{}, {'result': 'FAIL', 'checks': 181},
-                      {'result': 'PASS', 'checks': 180}, {'result': 'PASS', 'checks': True}]:
+        validate_browser({'result': 'PASS', 'checks': 202})
+        validate_browser({'output': json.dumps({'result': 'PASS', 'checks': 202})})
+        for value in [{}, {'result': 'FAIL', 'checks': 202},
+                      {'result': 'PASS', 'checks': 201}, {'result': 'PASS', 'checks': True}]:
             with self.assertRaises(ValueError):
                 validate_browser(value)
 
@@ -88,6 +101,10 @@ class DevRelease(unittest.TestCase):
         stable = (ROOT / '.github/workflows/release.yml').read_text()
         self.assertIn('needs: [host-tests, cross-build, hardware-gate]', stable)
         self.assertIn('python3 scripts/check_release_gate.py', stable)
+        for requirement in ['make -C tests clean test','make -C tests sanitize',
+                            'bash scripts/run_webui_browser.sh','python3 tests/test_webui_controllers.py',
+                            'fetch-depth: 0','sha256sum --check ghost-control-ps5.elf.sha256']:
+            self.assertIn(requirement,stable)
 
 
 if __name__ == '__main__':

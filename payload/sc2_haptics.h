@@ -16,8 +16,8 @@ void sc2_haptic_rumble_for(uint16_t left, uint16_t right, int ms);
 void sc2_haptic_rumble_set(uint16_t left, uint16_t right);
 
 /* Only one Steam Controller 2026 reader may own haptic output at a time.
- * The USB manager claims its generation-tagged slot token before starting the
- * reader; failed startup abandons it, and the reader releases it at teardown.
+ * The reader claims its generation-tagged slot token only after a validated
+ * active input frame; idle discovery owns no lease. It releases at teardown.
  * This is a deliberate single-session support limit until every shared Steam
  * subsystem has an explicit multi-session contract. */
 int sc2_haptic_session_claim(slot_registry_token_t owner);

@@ -11,40 +11,49 @@ This is a native PS5 ELF, not a PKG/FPKG or persistent installer. A stock consol
 
    ```sh
    # Linux
-   sha256sum --check SteamController-PS5-v0.1.0-dev.1.elf.sha256
+   sha256sum --check SteamController-PS5-v0.1.0-dev.2.elf.sha256
    # macOS
-   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.1.elf.sha256
+   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.2.elf.sha256
    ```
 
 3. Keep the native DualSense available. Use a recoverable development environment; retain local console access. Do not enable hooks or built-in-radio experiments for a first test.
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.1.elf
+   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.2.elf
    ```
 
    Port 9021 is an inherited convenience default, not a compatibility guarantee. This project has not tested the transfer or loading procedure on physical hardware. Do not repeatedly send the payload when a loader has failed or become unresponsive.
 
-## Safe defaults
+## First launch
 
-With no valid `/data/ghostpad/runtime-policy.ini`, bridge probing, game hooks, DualSense handoff and WebUI are disabled. USB scanning is restricted to the Steam Controller allowlist and checked interfaces. Native BLE is not enabled. Do not disconnect the stock DualSense or alter its pairing state.
+1. Load the verified ELF through your existing compatible payload loader.
+2. Open `http://<PS5-IP>:8090` on your PC or phone on the same trusted LAN.
+3. Enter the **eight-digit pairing code** from the PS5 notification in the portal's integrated pairing screen.
+4. Configure the controller; Save confirms the stored profile with a fresh readback.
 
-Existing internal `/data/ghostpad` paths remain for compatibility. Profiles are stored under `/data/ghostpad/profiles/`. There is no automatic persistent installation or startup service.
+No FTP, manual INI file or persistent installation is required for this flow. A missing runtime policy enables WebUI automatically. The readiness notification appears only after successful listener startup. If startup fails, the payload reports the failure and continues its controller startup. Actual PS5 notification, loader, USB and networking behavior remain unverified.
 
-## Optional WebUI in a trusted environment
+## Safe defaults and advanced recovery
 
-Only after a safe baseline test, use your existing trusted console filesystem access to create `/data/ghostpad/runtime-policy.ini`:
+Bridge probing, game hooks and DualSense handoff remain disabled. USB scanning uses only the Steam Controller allowlist and checked interfaces. Native BLE is not enabled. Keep the stock DualSense available and preserve its pairing state.
+
+Pairing codes expire after five minutes, allow five attempts and can be redeemed once; concurrent redemption has one winner. The permanent bearer token is never shown in a notification or logged. A browser retains its credential in session storage, including reloads. If the code expires or has already been used, advanced recovery accepts the owner-only `/data/ghostpad/webui.token` via the dialog. A new payload start supplies a new short-lived code. Do not put either secret in URLs, screenshots, issues or committed logs.
+
+All protected APIs require bearer authentication plus request validation. Only loopback, private RFC1918 and link-local IPv4 peers are permitted; public IPv4 and IPv6 peers are rejected. HTTP is plaintext: use a trusted isolated LAN and **never forward port 8090 to the internet**.
+
+To explicitly disable the portal, create `/data/ghostpad/runtime-policy.ini` using trusted filesystem access:
 
 ```ini
 ENABLE_BRIDGE_PROBE=0
 ENABLE_GAME_HOOKS=0
 ENABLE_DUALSENSE_HANDOFF=0
-ENABLE_WEBUI=1
+ENABLE_WEBUI=0
 ```
 
-Restart through your established loader procedure. If startup succeeds, open `http://<PS5-IP>:8090`. Obtain the owner-only token from `/data/ghostpad/webui.token` using trusted local access and enter it in the portal. Do not put it in a URL, screenshot, issue or committed log. API access requires bearer authentication; allowed IPv4 peer ranges are loopback, private RFC1918 and link-local. IPv6/public IPv4 peers are rejected. Transport is plain HTTP: use a trusted isolated LAN and do not forward the port to the internet.
+Malformed, duplicated, inaccessible or unsafe existing policy files fail closed with all optional services disabled. An absent file uses the first-launch defaults. An explicit valid `ENABLE_WEBUI=0` is preserved. Corrupt or unsafe token storage also prevents WebUI startup.
 
-Missing, malformed or duplicated policy keys fail closed. This file enables service startup; it does not establish that PS5 sockets, filesystems, browser rendering or controller I/O work.
+Profiles remain under `/data/ghostpad/profiles/`. If the stored Default profile is corrupt, the authenticated UI offers an explicit confirmed recovery; the damaged file is retained as `default.ini.recovery.*`. Valid profiles cannot be reset by that recovery API. Other profiles remain untouched.
 
 ## Stop, recover and report
 

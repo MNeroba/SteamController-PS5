@@ -5,6 +5,7 @@
 #include "webui_http.h"
 
 #include <fcntl.h>
+#include <pthread.h>
 #include <errno.h>
 #include "webui_html.h"
 #include <stdio.h>
@@ -443,7 +444,64 @@ static void test_token_file_lifecycle(void) {
     CHECK(symlink("missing-token-target", path) == 0);
     CHECK(webui_auth_load_or_create(directory, second, &created) == -1);
     CHECK(unlink(path) == 0);
+    CHECK(mkfifo(path, 0600) == 0);
+    CHECK(webui_auth_load_or_create(directory, second, &created) == -1);
+    CHECK(unlink(path) == 0);
+    CHECK(webui_auth_load_or_create("/dev/null/invalid", second, &created) == -1);
     CHECK(rmdir(directory) == 0);
+}
+
+static int reject_unauthorized(void *context, const webui_http_request_t *r) {
+    (void)context;
+    return webui_auth_matches(r->authorization, token)?WEBUI_HTTP_READ_OK:WEBUI_HTTP_READ_UNAUTHORIZED;
+}
+static void test_admission_precedes_body(void) {
+    static const char wire[] = "POST /api/profile HTTP/1.1\r\nContent-Length: 100\r\n\r\n";
+    slow_request_t source = {wire, sizeof(wire)-1, 0, 0, 0, 0, 0};
+    webui_http_request_t request;char buffer[256],*body;
+    CHECK(webui_http_read_request_checked(&source, slow_request_body_receive,
+        slow_request_clock, 5000, buffer, sizeof(buffer), &request, &body,
+        reject_unauthorized, NULL)==WEBUI_HTTP_READ_UNAUTHORIZED);
+    CHECK(source.offset==sizeof(wire)-1);
+    CHECK(source.now_ms==10);
+}
+
+typedef struct { webui_pairing_t *pair; const char *code; int result; } redemption_t;
+static void *redeem_thread(void *arg) {
+    redemption_t *r = arg;
+    r->result = webui_pairing_redeem(r->pair, r->code, 1001);
+    return NULL;
+}
+static void test_pairing(void) {
+    webui_pairing_t pair;
+    char code[WEBUI_PAIR_CODE_LENGTH + 1];
+    CHECK(webui_pairing_init(&pair, 1000, code) == 0);
+    CHECK(strlen(code) == 8);
+    CHECK(webui_pairing_redeem(&pair, "invalid", 1000) == 0);
+    CHECK(webui_pairing_redeem(&pair, code, 1001) == 1);
+    CHECK(webui_pairing_redeem(&pair, code, 1002) == 0);
+    webui_pairing_destroy(&pair);
+    CHECK(webui_pairing_init(&pair, 1000, code) == 0);
+    CHECK(webui_pairing_redeem(&pair, code, 1000 + WEBUI_PAIR_TTL_MS) == 0);
+    webui_pairing_destroy(&pair);
+    CHECK(webui_pairing_init(&pair, 1000, code) == 0);
+    for (unsigned i = 0; i < WEBUI_PAIR_ATTEMPTS; ++i)
+        CHECK(webui_pairing_redeem(&pair, "bad", 1000) == 0);
+    CHECK(webui_pairing_redeem(&pair, code, 1001) == 0);
+    webui_pairing_destroy(&pair);
+    CHECK(webui_pairing_init(&pair, 1000, code) == 0);
+    CHECK(webui_pairing_redeem(&pair, code, 999) == 0);
+    webui_pairing_destroy(&pair);
+    CHECK(webui_pairing_init(&pair, 1000, code) == 0);
+    pthread_t threads[8]; redemption_t r[8];
+    for (int i = 0; i < 8; ++i) {
+        r[i] = (redemption_t){&pair, code, 0};
+        CHECK(pthread_create(&threads[i], NULL, redeem_thread, &r[i]) == 0);
+    }
+    int successes = 0;
+    for (int i = 0; i < 8; ++i) { CHECK(pthread_join(threads[i], NULL) == 0); successes += r[i].result; }
+    CHECK(successes == 1);
+    webui_pairing_destroy(&pair);
 }
 
 int main(void) {
@@ -462,6 +520,8 @@ int main(void) {
     test_reject_invalid_request_lines_and_lengths();
     test_authentication();
     test_token_file_lifecycle();
+    test_pairing();
+    test_admission_precedes_body();
     if (failures) {
         fprintf(stderr, "%d of %d web UI HTTP/auth checks failed\n", failures, checks);
         return 1;

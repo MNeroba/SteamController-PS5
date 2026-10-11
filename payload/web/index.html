@@ -324,9 +324,27 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
 dialog.profile-guard{color:var(--text);background:var(--panel,#1c2030);border:1px solid var(--line,#383d56);border-radius:16px;padding:24px;max-width:min(440px,calc(100vw - 32px))}
 dialog.profile-guard::backdrop{background:#0009}
 .profile-guard .guard-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+/* First-run enrollment uses the established dialog/card visual language. */
+#pairing{background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:18px;padding:24px;width:min(440px,calc(100vw - 32px));max-height:calc(100dvh - 32px);overflow:auto}
+#pairing::backdrop{background:#090b13bb;backdrop-filter:blur(4px)}
+#pairing h2{margin:0 0 12px}#pairing p{line-height:1.5}#pairing input{display:block;width:100%;margin:8px 0 16px;padding:12px;box-sizing:border-box}#pairCode{font-size:24px;letter-spacing:.16em}#pairMessage{min-height:1.5em;color:var(--muted)}#pairing details{margin-top:20px}#pairing summary{cursor:pointer}#pairing form button{width:100%}
 </style>
 </head>
 <body>
+<dialog id="pairing" aria-labelledby="pairTitle">
+  <h2 id="pairTitle">Pair this browser</h2>
+  <p>The WebUI is ready. Enter the eight-digit code from the SteamController-PS5 notification on your PS5. It expires after five minutes and works once.</p>
+  <form id="pairForm">
+    <label for="pairCode">Pairing code</label>
+    <input id="pairCode" type="text" inputmode="numeric" autocomplete="off" pattern="[0-9]{8}" minlength="8" maxlength="8" required aria-describedby="pairMessage">
+    <button class="primary" id="pairSubmit" type="submit">Pair browser</button>
+  </form>
+  <p id="pairMessage" role="status" aria-live="polite">Waiting for the code shown on the PS5.</p>
+  <details><summary>Advanced recovery token</summary>
+    <p>If pairing expired, reload the payload locally for a new code, or use the private token from <code>/data/ghostpad/webui.token</code>. Use a trusted LAN; do not share either credential.</p>
+    <form id="tokenForm"><label for="recoveryToken">Recovery token</label><input id="recoveryToken" type="password" autocomplete="off" minlength="64" maxlength="64" required><button type="submit">Use recovery token</button></form>
+  </details>
+</dialog>
 <header>
   <div class="wrap head">
     <div class="brand">SteamController-PS5<small>Steam Controller for PS5</small></div>
@@ -351,6 +369,8 @@ dialog.profile-guard::backdrop{background:#0009}
 
   <!-- REMAP -->
   <section id="tab-remap">
+    <div id="profileRecovery" class="card" hidden><b>Default profile cannot be read</b><p>Recover compiled defaults and preserve the damaged file as a backup. Other game profiles are kept.</p><button id="recoverDefault">Recover Default</button></div>
+
     <div class="card pbar">
       <label class="field"><span>Editing</span><select id="prof" aria-label="Profile to edit"></select></label>
       <label class="field"><span>Use</span><select id="mode" aria-label="Which profile the controller uses"></select></label>
@@ -670,27 +690,66 @@ function profileWrite(p){
 function comboText(v){const c=combo(v);return c.length?c.map(outputLabel).join(" + "):"Nothing"}
 function norm(v){return combo(v).sort().join("+")}
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2400)}
-let portalTokenCache=null,portalTokenPrompt=null;
+let portalTokenCache=null,portalTokenPrompt=null,resolvePortalToken=null;
+function pairingMessage(message){$("#pairMessage").textContent=message}
+function pairingRequired(){
+  $("#conn").textContent="Pairing required";
+  if(!portalTokenPrompt){
+    portalTokenPrompt=new Promise(resolve=>{resolvePortalToken=resolve});
+    if(!$("#pairing").open)$("#pairing").showModal();
+  }
+  return portalTokenPrompt;
+}
+function acceptPortalToken(token){
+  portalTokenCache=token;
+  try{sessionStorage.setItem("pb.webuiToken",token)}catch(e){}
+  if(resolvePortalToken)resolvePortalToken(token);
+  resolvePortalToken=null;portalTokenPrompt=null;
+  $("#pairing").close();$("#pairCode").value="";$("#recoveryToken").value="";
+  lastConn="";
+}
+$("#pairing").addEventListener("cancel",e=>e.preventDefault());
+$("#pairForm").onsubmit=async e=>{
+  e.preventDefault();const code=$("#pairCode").value.trim();
+  if(!/^[0-9]{8}$/.test(code)){pairingMessage("Enter all eight digits from the PS5 notification.");return}
+  $("#pairSubmit").disabled=true;pairingMessage("Pairing…");
+  try{
+    const response=await fetch("/pair",{method:"POST",headers:{"Content-Type":"text/plain;charset=UTF-8"},body:code,cache:"no-store"});
+    if(!response.ok)throw new Error(await response.text());
+    const result=await response.json();
+    if(!/^[a-fA-F0-9]{64}$/.test(result.token||""))throw new Error("Invalid pairing response");
+    acceptPortalToken(result.token);
+  }catch(error){pairingMessage(error instanceof TypeError?"Backend offline. Check the PS5 connection and try again.":error.message);$("#pairCode").value=""}
+  finally{$("#pairSubmit").disabled=false}
+};
+$("#tokenForm").onsubmit=async e=>{
+  e.preventDefault();const token=$("#recoveryToken").value.trim();
+  if(!/^[a-fA-F0-9]{64}$/.test(token)){pairingMessage("Recovery tokens contain exactly 64 hexadecimal characters.");return}
+  try{
+    const response=await fetch("/api/status",{headers:{Authorization:"Bearer "+token},cache:"no-store"});
+    if(!response.ok)throw new Error(response.status===401?"Recovery token rejected.":"Backend unavailable.");
+    acceptPortalToken(token);
+  }catch(error){pairingMessage(error instanceof TypeError?"Backend offline. Check the PS5 connection.":error.message)}
+};
 async function portalToken(){
   if(portalTokenCache)return portalTokenCache;
   try{portalTokenCache=sessionStorage.getItem("pb.webuiToken")}catch(e){}
-  if(portalTokenCache)return portalTokenCache;
-  if(!portalTokenPrompt){
-    portalTokenPrompt=Promise.resolve().then(()=>window.prompt(
-      "Enter the portal token from /data/ghostpad/webui.token on the PS5. Retrieve it locally and do not share it."))
-      .then(v=>{if(!v||!v.trim())throw new Error("Portal token is required");return v.trim()})
-      .finally(()=>{portalTokenPrompt=null});
-  }
-  portalTokenCache=await portalTokenPrompt;
-  try{sessionStorage.setItem("pb.webuiToken",portalTokenCache)}catch(e){}
-  return portalTokenCache;
+  return portalTokenCache||await pairingRequired();
 }
-async function api(path,opt={}){
+async function authorizedFetch(path,opt={}){
   const token=await portalToken(),headers=new Headers(opt.headers||{});
   headers.set("Authorization","Bearer "+token);
-  const r=await fetch(path,{...opt,headers}),t=await r.text();
-  if(r.status===401){portalTokenCache=null;try{sessionStorage.removeItem("pb.webuiToken")}catch(e){};throw new Error("Portal token rejected. Reload and enter the correct token.")}
-  if(!r.ok)throw new Error(t);return t
+  const r=await fetch(path,{...opt,headers});
+  if(r.status===401){
+    clearIconUrls();portalTokenCache=null;try{sessionStorage.removeItem("pb.webuiToken")}catch(e){}
+    pairingMessage("Browser credential rejected. Enter a new local code or use recovery.");
+    pairingRequired();throw new Error("Pairing required");
+  }
+  return r;
+}
+async function api(path,opt={}){
+  const r=await authorizedFetch(path,opt),t=await r.text();
+  if(!r.ok){const error=new Error(t);error.status=r.status;throw error}return t;
 }
 function isDirty(){return saveUnconfirmed||(saved!==""&&fmt(cur)!==saved)}
 function dirty(){const d=isDirty();$("#savebar").classList.toggle("show",d);$("#saveName").textContent=pname(editing);
@@ -1015,11 +1074,19 @@ async function loadAuthorized(id,ticket,stamp,push=true){
     const loaded=serverProfile(await api("/api/profile?id="+encodeURIComponent(id),{cache:"no-store"}));
     if(!operationCurrent(ticket,stamp))return false;
     ++editorGeneration;editing=id;cur=loaded;saved=fmt(cur);saveUnconfirmed=false;
-    $("#prof").value=id;$("#del").disabled=id==="default";render();
+    $("#profileRecovery").hidden=true;$("#prof").value=id;$("#del").disabled=id==="default";render();
     if(history.state?.profileLocation)history.replaceState(null,"",location.hash);
     syncHash(push);return true;
-  }catch(e){if(ticket===navigationGeneration){selectionCommitted();toast("Profile load failed: "+e.message)}return false}
+  }catch(e){if(ticket===navigationGeneration){selectionCommitted();if(id==="default"&&e.status===500)$("#profileRecovery").hidden=false;toast("Profile load failed: "+e.message)}return false}
 }
+$("#recoverDefault").onclick=async()=>{
+  if(!confirm("Recover Default? The damaged file will be preserved. Unsaved edits will be discarded after successful recovery."))return;
+  const ticket=++navigationGeneration,stamp=draftStamp();
+  try{await api("/api/recover-default",{method:"POST"});await refreshList();
+    if(operationCurrent(ticket,stamp))await loadAuthorized("default",ticket,stamp);
+    toast("Default recovered; previous file retained in profiles/default.ini.recovery.*");
+  }catch(e){toast("Recovery failed: "+e.message)}
+};
 async function load(id,force=false,push=true){
   const ticket=++navigationGeneration;selectionCommitted();
   if(!force&&!await canLeaveProfile()){if(ticket===navigationGeneration)selectionCommitted();return false}
@@ -1124,7 +1191,30 @@ $("#del").onclick=async()=>{
 window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()){e.preventDefault();e.returnValue=""}});
 
 /* ── games ── */
-function art(g,cls){return g&&g.icon?`<img src="/api/icon?id=${encodeURIComponent(g.id)}" alt="" loading="lazy">`:esc((g&&g.name||"?").trim().slice(0,1).toUpperCase())}
+const iconUrls=new Map(),iconRequests=new Map();
+function clearIconUrls(){for(const url of iconUrls.values())URL.revokeObjectURL(url);iconUrls.clear()}
+window.addEventListener("pagehide",clearIconUrls);
+function art(g){return g&&g.icon?`<img data-game-icon="${esc(g.id)}" alt="" loading="lazy">`:esc((g&&g.name||"?").trim().slice(0,1).toUpperCase())}
+async function authenticatedIcon(id){
+  if(iconUrls.has(id))return iconUrls.get(id);
+  if(iconRequests.has(id))return iconRequests.get(id);
+  const pending=(async()=>{
+    const credential=portalTokenCache;
+    const response=await authorizedFetch("/api/icon?id="+encodeURIComponent(id));
+    if(!response.ok)throw new Error("Icon unavailable");
+    const blob=await response.blob();
+    if(!blob.type.startsWith("image/")||blob.size>2097152||!blob.size)throw new Error("Invalid icon");
+    if(credential!==portalTokenCache)throw new Error("Session changed");
+    if(iconUrls.size>=128){const first=iconUrls.keys().next().value;URL.revokeObjectURL(iconUrls.get(first));iconUrls.delete(first)}
+    const url=URL.createObjectURL(blob);iconUrls.set(id,url);return url;
+  })();
+  iconRequests.set(id,pending);
+  try{return await pending}finally{if(iconRequests.get(id)===pending)iconRequests.delete(id)}
+}
+function hydrateIcons(root){root.querySelectorAll("img[data-game-icon]").forEach(async img=>{
+  try{const url=await authenticatedIcon(img.dataset.gameIcon);if(img.isConnected)img.src=url}
+  catch(e){if(img.isConnected)img.replaceWith(document.createTextNode("?"))}
+})}
 async function refreshGames(){
   try{games=JSON.parse(await api("/api/games"))}catch(e){games=[]}
   games.sort((a,b)=>a.name.localeCompare(b.name));renderGames();
@@ -1138,6 +1228,7 @@ function renderGames(){
     return `<div class="card game${playing?" playing":""}"><div class="art">${art(g)}</div><div class="name">${esc(g.name)}</div>
     <div class="meta"><span>${esc(g.id)}</span>${playing?'<span class="badge ok">Playing</span>':has?'<span class="badge lock">Profile</span>':""}</div>
     <button data-id="${esc(g.id)}" class="${has?"":"primary"}">${has?"Edit profile":"Create profile"}</button></div>`}).join("")||`<div class="empty"><b>No matches</b>No installed game is called "${esc(q)}".</div>`;
+  hydrateIcons($("#games"));
   $$("#games button[data-id]").forEach(b=>b.onclick=()=>{const g=games.find(g=>g.id===b.dataset.id);createFor(g.id,g.name)});
 }
 $("#gsearch").oninput=renderGames;
@@ -1149,6 +1240,7 @@ function renderNow(){
   if(key===lastNow)return;lastNow=key;
   const g=games.find(g=>g.id===status.title);
   $("#nowArt").innerHTML=status.title?art(g||{id:status.title,name:status.title_name||status.title,icon:true}):"–";
+  hydrateIcons($("#nowArt"));
   const img=$("#nowArt img");if(img)img.onerror=()=>{$("#nowArt").textContent=(status.title_name||"?").slice(0,1)};
   $("#nowTitle").textContent=status.title?(status.title_name||status.title):"No game running";
   const b=$("#nowBadge"),a=$("#nowAction");a.hidden=true;
@@ -1183,8 +1275,8 @@ async function poll(){
     paintBattery();
     renderNow();paintLive(status.inputs>>>0);paintHap();paintGyro();
     if($("#mode").value!==(status.override||""))$("#mode").value=status.override||"";
-  }catch(e){lastConn="";$("#dot").classList.remove("on");$("#conn").textContent="PS5 unreachable"}
-  setTimeout(poll,150);
+  }catch(e){lastConn="";$("#dot").classList.remove("on");$("#conn").textContent=portalTokenCache?"Backend offline":"Pairing required"}
+  setTimeout(poll,portalTokenCache?150:1000);
 }
 
 $("#pauseBtn").onclick=async()=>{try{await api("/api/pause?on="+(status.paused?0:1),{method:"POST"});toast(status.paused?"Resumed":"Paused")}catch(e){toast(e.message)}};
@@ -1271,7 +1363,7 @@ async function paintBridge(){
   let b,raw;try{raw=await api("/api/bridge");b=JSON.parse(raw)}catch(e){return}
   if(raw===lastBridge)return;lastBridge=raw;
   const g=games.find(g=>g.id===b.title),name=g?g.name:(b.title||"");
-  const row=(k,v,ok)=>`<div class="opt full"><span class="lbl">${k}</span><span class="badge ${ok===true?"ok":ok===false?"warn":""}">${esc(v)}</span></div>`;
+  const row=(k,v,ok)=>`<div class="opt full"><span class="lbl">${esc(k)}</span><span class="badge ${ok===true?"ok":ok===false?"warn":""}">${esc(v)}</span></div>`;
   if(!b.title||b.state===0){$("#bridgeOut").innerHTML=row("Status","Start a game to run the check",null);return}
   if(b.state<3){$("#bridgeOut").innerHTML=row(name,b.state===1?"Waiting for the game to finish loading…":"Checking…",null);return}
   const pass=b.result===2&&b.scan===0;
@@ -1297,7 +1389,7 @@ setInterval(()=>{if(!$("#tab-help").hidden)paintBridge()},1500);
   const loc=parseHash(location.hash||recall("pb.loc")||"");
   if(loc.tab&&TABS.includes(loc.tab)){tab=loc.tab;if(loc.sec)sec[loc.tab]=loc.sec}
   try{status=JSON.parse(await api("/api/status"))}catch(e){}
-  try{await refreshList();editing=loc.prof&&profiles.some(p=>p.id===loc.prof)?loc.prof:(status.active||"default");await load(editing,true,false)}catch(e){$("#conn").textContent="PS5 unreachable"}
+  try{await refreshList();editing=loc.prof&&profiles.some(p=>p.id===loc.prof)?loc.prof:(status.active||"default");await load(editing,true,false)}catch(e){$("#conn").textContent=portalTokenCache?"Backend offline":"Pairing required"}
   showTab(tab,false);
   refreshGames().then(()=>{lastNow="";renderNow()});
   poll();

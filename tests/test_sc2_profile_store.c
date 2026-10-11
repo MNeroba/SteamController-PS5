@@ -110,6 +110,15 @@ static void release_writers(void) {
     pthread_mutex_unlock(&gate_lock);
 }
 
+static int update_button(sc2_profile_t *p, void *context) {
+    int input = (int)(intptr_t)context;
+    p->map[input] = SCE_PAD_BUTTON_PS;
+    return 0;
+}
+static void *patch_button(void *context) {
+    return (void *)(intptr_t)sc2_store_update("patch", update_button, context);
+}
+
 int main(void) {
     writer_t writers[2];
     pthread_t threads[2];
@@ -223,6 +232,38 @@ int main(void) {
     candidate.name[0] = '\n';
     CHECK(sc2_store_save("integrity", &candidate) != 0);
     CHECK(sc2_store_load("integrity", &loaded) == 0 && memcmp(&original, &loaded, sizeof(original)) == 0);
+    /* Both real callers now hold the store lock through load/patch/save. */
+    CHECK(sc2_store_save("patch", &original) == 0);
+    CHECK(pthread_create(&threads[0], NULL, patch_button, (void *)(intptr_t)IN_A) == 0);
+    CHECK(pthread_create(&threads[1], NULL, patch_button, (void *)(intptr_t)IN_B) == 0);
+    void *patch_result;
+    CHECK(pthread_join(threads[0], &patch_result) == 0 && patch_result == NULL);
+    CHECK(pthread_join(threads[1], &patch_result) == 0 && patch_result == NULL);
+    CHECK(sc2_store_load("patch", &loaded) == 0);
+    CHECK(loaded.map[IN_A] == SCE_PAD_BUTTON_PS && loaded.map[IN_B] == SCE_PAD_BUTTON_PS);
+    unlink(SC2_DIR "/pipe.ini");
+    CHECK(mkfifo(SC2_DIR "/pipe.ini", 0600) == 0);
+    alarm(3);
+    CHECK(sc2_store_load("pipe", &loaded) == SC2_STORE_IO_ERROR);
+    alarm(0);
+    CHECK(unlink(SC2_DIR "/pipe.ini") == 0);
+    unlink(SC2_DIR "/link.ini");
+    CHECK(symlink("integrity.ini", SC2_DIR "/link.ini") == 0);
+    CHECK(sc2_store_load("link", &loaded) == SC2_STORE_IO_ERROR);
+    CHECK(unlink(SC2_DIR "/link.ini") == 0);
+    unlink(SC2_DIR "/default.ini");
+    for (unsigned i=0;i<16;++i) { char backup[128];
+        snprintf(backup,sizeof(backup),SC2_DIR "/default.ini.recovery.%u",i); unlink(backup);
+    }
+    file=fopen(SC2_DIR "/default.ini","w"); CHECK(file != NULL);
+    CHECK(fputs("broken historical bytes\n",file) >= 0 && fclose(file) == 0);
+    CHECK(sc2_store_update("default",update_button,(void*)(intptr_t)IN_A) == SC2_STORE_INVALID);
+    CHECK(sc2_store_recover_default() == 0);
+    CHECK(sc2_store_load("default", &loaded) == 0 && !memcmp(&original,&loaded,sizeof(original)));
+    file=fopen(SC2_DIR "/default.ini.recovery.0","r"); CHECK(file != NULL);
+    CHECK(fgets(buf,sizeof(buf),file) && !strcmp(buf,"broken historical bytes\n"));
+    CHECK(fclose(file) == 0);
+    CHECK(sc2_store_recover_default() != 0); /* Cannot silently reset a valid profile. */
     unlink(path);
     printf("Steam profile storage concurrency: %u checks passed\n", checks);
     return 0;

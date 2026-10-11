@@ -21,7 +21,7 @@ class SafeModeContract(unittest.TestCase):
             ("enable_bridge_probe", "bridge_probe_start(g_inject_uid)"),
             ("enable_game_hooks", "game_hooks_start()"),
             ("enable_ds_handoff", "ds_handoff_start()"),
-            ("enable_webui", "webui_start()"),
+            ("enable_webui", "webui_start(notify_str)"),
         ):
             self.assertIn(f"if (g_runtime_policy.{flag}", MAIN)
             self.assertIn(start, MAIN)
@@ -42,9 +42,9 @@ class SafeModeContract(unittest.TestCase):
         self.assertIn("403, \"DualSense hand-off is disabled by runtime policy\"", WEBUI)
 
     def test_policy_invalid_input_resets_to_safe_defaults(self):
-        self.assertIn("runtime_policy_defaults(policy);", POLICY)
+        self.assertIn("memset(policy, 0, sizeof(*policy));", POLICY)
         self.assertIn("goto invalid;", POLICY)
-        self.assertIn("open(path, O_RDONLY | O_NOFOLLOW)", POLICY)
+        self.assertIn("open(path, O_RDONLY | O_NOFOLLOW | O_NONBLOCK)", POLICY)
         self.assertIn("runtime_policy_load_file(RUNTIME_POLICY_PATH, policy)", MAIN)
 
     def test_startup_does_not_call_shellui_memory_patch_entrypoints(self):

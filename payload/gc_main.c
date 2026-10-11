@@ -223,7 +223,7 @@ static void *klog_capture_thread(void *arg) {
         }
         ssize_t len = read(fd, buf, sizeof(buf));
         if (len < 0) { if (errno==EINTR || errno==EAGAIN || errno==EWOULDBLOCK) continue; break; }
-        if (len == 0) continue;
+        if (len == 0) { gp_log("klog: capture stream closed\n"); break; }
         for (ssize_t i=0; i<len; i++) {
             char c = buf[i];
             if (c=='\n'||line_len>=sizeof(line)-1){line[line_len]='\0';parse_klog_line(line);line_len=0;}
@@ -285,12 +285,13 @@ static int runtime_cancel_requested(void *context) {
 }
 
 static void load_runtime_policy(runtime_policy_t *policy) {
-    if (runtime_policy_load_file(RUNTIME_POLICY_PATH, policy) != 0) {
-        runtime_policy_defaults(policy);
-        gp_log("runtime policy: no valid regular file at %s; using safe defaults\n",
+    int result = runtime_policy_load_file(RUNTIME_POLICY_PATH, policy);
+    if (result < 0) {
+        gp_log("runtime policy: invalid/unsafe file at %s; optional services disabled\n",
                RUNTIME_POLICY_PATH);
     }
 
+    if (result == RUNTIME_POLICY_MISSING) gp_log("runtime policy: first launch; authenticated WebUI enabled\n");
     gp_log("runtime policy: opt-ins bridge=%d hooks=%d dualsense=%d webui=%d\n",
            policy->enable_bridge_probe, policy->enable_game_hooks,
            policy->enable_ds_handoff, policy->enable_webui);
@@ -796,6 +797,9 @@ static void *usb_hid_thread(void *arg) {
     uint16_t vid = slot_entry.vendor_id, pid = slot_entry.product_id;
 
     struct usb_fs_endpoint eps[2 + SC2_HAP_MAX_OUT];
+    struct usb_fs_endpoint sc2_eps[SC2_MAX_EPS];
+    memset(eps, 0, sizeof(eps));
+    memset(sc2_eps, 0, sizeof(sc2_eps));
     sc2_ep_map_t sc2_map; memset(&sc2_map, 0, sizeof(sc2_map));
     int sc2_n_out = 0;
     struct usb_fs_init     init;
@@ -804,7 +808,8 @@ static void *usb_hid_thread(void *arg) {
     struct usb_fs_complete complete;
     uint8_t  buf[64];
     void    *buffers[1]; uint32_t lengths[1];
-    int fd = -1, out_opened = 0, sc2_iface = 0;
+    int fd = -1, out_opened = 0, sc2_iface = 0, owns_session = 0;
+    int haptics_ready = 0;
     usb_resources_t usb_resources;
     usb_resources_init(&usb_resources);
     int usb_ready_notified = 0;
@@ -857,7 +862,6 @@ static void *usb_hid_thread(void *arg) {
         }
         usleep(120000);
 
-        struct usb_fs_endpoint sc2_eps[SC2_MAX_EPS];
         memset(sc2_eps,0,sizeof(sc2_eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=sc2_eps; init.ep_index_max=SC2_MAX_EPS;
         if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
@@ -897,6 +901,13 @@ static void *usb_hid_thread(void *arg) {
             goto exit_slot;
         }
         if (runtime_is_stopping()) goto exit_slot;
+        /* Discovery must not own the single active Steam/feedback lease.
+         * An idle Puck can wait while a validated wired session is active. */
+        if (!sc2_haptic_session_claim(slot_token)) {
+            gp_log("slot[%d] validated controller waits for the active Steam session\n", slot);
+            goto exit_slot;
+        }
+        owns_session = 1;
         if (!sc2_pause_is_active()) sc2_vda_attach(slot_token, slot, &session);
         ds_handoff_sc2_session(!sc2_pause_is_active());
 
@@ -960,6 +971,7 @@ static void *usb_hid_thread(void *arg) {
                 }
             }
             sc2_status_set_haptics(1, out_opened ? own_out : -1);
+            haptics_ready = 1;
         }
         goto main_loop;
     }
@@ -978,7 +990,20 @@ main_loop: ;
     uint32_t steam_pkts = 0;
     uint8_t nintendo_seq = 1;
 
+    struct timespec input_now;
+    if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0) goto reinit;
+    usb_input_watchdog_t input_watchdog;
+    usb_input_watchdog_init(&input_watchdog, (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u);
     while (!runtime_is_stopping()) {
+        if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0 ||
+            usb_input_watchdog_expired(&input_watchdog,
+                (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u, 500)) {
+            gp_log("slot[%d] validated input expired; neutralizing and closing the session\n", slot);
+            goto reinit;
+        }
+        /* Failed STOP retains ownership; never rearm or mutate an active
+         * frame. Exit through tracked cleanup instead of overwriting it. */
+        if (usb_resources.active_transfers & 1u) goto reinit;
         memset(buf,0,64);
         buffers[0]=buf; lengths[0]=64;
         eps[0].ppBuffer=buffers; eps[0].pLength=lengths;
@@ -1017,13 +1042,20 @@ main_loop: ;
         }
         if (runtime_is_stopping()) goto reinit;
         if(!ok){
-            (void)usb_session_stop_transfer(&usb_resources,
-                &g_usb_session_ops, 0, NULL);
+            if (usb_session_stop_transfer(&usb_resources,
+                &g_usb_session_ops, 0, NULL) != 0) goto reinit;
             continue;
         }
-        if(lengths[0]<1) continue;
+        if (!usb_completed_frame_valid(&eps[0], sizeof(buf))) continue;
 
         uint32_t len = lengths[0];
+        steam_report_t validated;
+        if (steam_report_decode(buf, len, &validated) == 1 &&
+            validated.kind == STEAM_REPORT_INPUT) {
+            if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0) goto reinit;
+            usb_input_watchdog_refresh(&input_watchdog,
+                (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u);
+        }
 
         ScePadData pad; memset(&pad,0,sizeof(pad)); pad.quat.w=1.0f;
         int injected = 0;
@@ -1144,33 +1176,29 @@ main_loop: ;
 
 reinit:
     if (usb_ready_notified) { notify("Puckbridge: slot[%d] controller disconnected", slot); usb_ready_notified=0; }
-    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) { sc2_status_set_input(0, 0); sc2_status_set_haptics(0, -1); sc2_menu_request_close(); sc2_gyro_reset(); sc2_battery_reset(); ds_handoff_sc2_session(0); }
     goto cleanup_usb;
 uninit_exit:
 cleanup_usb:
-    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED)
-        (void)sc2_haptic_session_release(slot_token, &usb_resources,
-                                         &g_usb_session_ops, eps,
-                                         out_opened, sc2_iface, sc2_n_out);
+exit_slot:
+    /* Clear shared Steam state only while this generation still owns it.
+     * An idle scanner must never neutralize another active controller. */
+    if (owns_session && sc2_haptic_session_is_owner(slot_token)) {
+        game_hooks_feed(NULL, 0);
+        sc2_status_set_input(0, 0); sc2_status_set_haptics(0, -1);
+        sc2_menu_request_close(); sc2_gyro_reset(); sc2_battery_reset();
+        ds_handoff_sc2_session(0);
+        slot_registry_entry_t owned;
+        if (slot_registry_snapshot(&g_slots, slot_token, &owned) == SLOT_REGISTRY_OK && owned.virtual_ready)
+            (void)neutralize_vda_handle(owned.virtual_handle);
+        (void)sc2_haptic_session_release(slot_token, haptics_ready ? &usb_resources : NULL,
+            &g_usb_session_ops, eps, out_opened, sc2_iface, sc2_n_out);
+    }
+    sc2_haptic_session_abandon(slot_token);
     if (usb_resources.fd >= 0) {
-        int cleanup_result = usb_session_cleanup(&usb_resources,
-            &g_usb_session_ops, NULL);
-        if (cleanup_result != 0)
-            gp_log("slot[%d] USB resource cleanup reported %d\n",
-                   slot, cleanup_result);
+        int cleanup_result = usb_session_cleanup(&usb_resources, &g_usb_session_ops, NULL);
+        if (cleanup_result != 0) gp_log("slot[%d] USB resource cleanup reported %d\n", slot, cleanup_result);
     }
     fd = -1;
-
-exit_slot:
-    if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED)
-        sc2_haptic_session_abandon(slot_token);
-    if (usb_resources.fd >= 0) {
-        int cleanup_result = usb_session_cleanup(&usb_resources,
-            &g_usb_session_ops, NULL);
-        if (cleanup_result != 0)
-            gp_log("slot[%d] USB resource cleanup reported %d\n",
-                   slot, cleanup_result);
-    }
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
     sc2_assignment_release(assignment_token);
     sc2_input_state_reset(&session.sc2_input);
@@ -1315,18 +1343,6 @@ static void *controller_manager_thread(void *arg) {
             int lazy = (vid==VID_STEAM && (pid==PID_SC2_PUCK || pid==PID_SC2_WIRED));
             if (!lazy) notify("Puckbridge: %s detected — assign user on screen", name);
 
-            int owns_sc2_haptics = 0;
-            if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
-                if (!sc2_haptic_session_claim(slot_token)) {
-                    if ((scan % 5) == 0)
-                        gp_log("manager: Steam Controller at %s skipped; slot[%u] already owns the single SC2 session\n",
-                               path, slot_token.index);
-                    slot_release(slot_token, "another Steam Controller session owns haptics");
-                    continue;
-                }
-                owns_sc2_haptics = 1;
-            }
-
             /* The assignment lease serializes the PS5 dialog. Slot ownership
              * remains generation-tagged even if that dialog times out. */
             sc2_assignment_token_t assignment_token = 0;
@@ -1352,8 +1368,6 @@ static void *controller_manager_thread(void *arg) {
                 &g_slots, slot_token, !lazy, &start_ops, &start_context,
                 &cleanup_result);
             if (start_result != SLOT_LIFECYCLE_OK) {
-                if (owns_sc2_haptics)
-                    sc2_haptic_session_abandon(slot_token);
                 if (assignment_token)
                     sc2_assignment_release(assignment_token);
                 if (start_result == SLOT_LIFECYCLE_VDA_ATTACH_FAILED) {
@@ -1630,10 +1644,10 @@ int main(void) {
         ds_handoff_start();
     if (g_runtime_policy.enable_webui &&
         !g_signal_stop && !runtime_is_stopping()) {
-        webui_start();
-        notify("Puckbridge: remap portal on port %d", WEBUI_PORT);
+        if (webui_start(notify_str) != 0)
+            gp_log("webui unavailable; controller startup continues\n");
     }
-    gp_log("safe mode defaults: game-memory probe/hooks, DualSense hand-off and WebUI require explicit runtime-policy opt-in; USB accepts only Steam Controller 2026 identities\n");
+    gp_log("safe mode defaults: game-memory probe/hooks and DualSense hand-off require explicit runtime-policy opt-in; WebUI uses local pairing; USB accepts only Steam Controller 2026 identities\n");
 
     /* Start controller manager — handles all detection, VDA creation, USB threads */
     if (!g_signal_stop && !runtime_is_stopping() &&

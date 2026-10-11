@@ -1,6 +1,14 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+
 /* sc2_profile.c — button profiles, storage, and per-game auto-switching */
 
 #include "sc2_profile.h"
+#include "private_file.h"
 #include "runtime_control.h"
 #include "gc_types.h"
 #include "game_list.h"
@@ -413,6 +421,7 @@ void sc2_active_get(sc2_profile_t *p) {
 /* ── storage ──────────────────────────────────────────────────────────── */
 
 int sc2_store_valid_id(const char *id) {
+    if (!id) return 0;
     size_t n = strlen(id);
     if (n == 0 || n > SC2_ID_MAX) return 0;
     for (size_t i = 0; i < n; i++) {
@@ -422,11 +431,13 @@ int sc2_store_valid_id(const char *id) {
     return 1;
 }
 
-static void ensure_dir(void) {
+static int profile_directory(void) {
 #ifndef SC2_PROFILE_TEST
-    mkdir("/data/ghostpad", 0777);
+    int parent = private_directory_open("/data/ghostpad");
+    if (parent < 0) return -1;
+    close(parent);
 #endif
-    mkdir(SC2_DIR, 0777);
+    return private_directory_open(SC2_DIR);
 }
 
 /* Profile writes are small and infrequent; serialize replacement and delete so
@@ -435,9 +446,13 @@ static pthread_mutex_t g_store_lock = PTHREAD_MUTEX_INITIALIZER;
 
 int sc2_store_load(const char *id, sc2_profile_t *p) {
     if (!p || !sc2_store_valid_id(id)) return SC2_STORE_INVALID;
-    char path[128]; snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
-    FILE *f = fopen(path, "r");
-    if (!f) return errno == ENOENT ? SC2_STORE_NOT_FOUND : SC2_STORE_IO_ERROR;
+    int dir = profile_directory();
+    if (dir < 0) return SC2_STORE_IO_ERROR;
+    char name[SC2_ID_MAX+8];snprintf(name,sizeof(name),"%s.ini",id);
+    int fd=private_regular_open(dir,name);int saved_errno=errno;close(dir);
+    if(fd<0)return saved_errno==ENOENT?SC2_STORE_NOT_FOUND:SC2_STORE_IO_ERROR;
+    FILE *f = fdopen(fd,"r");
+    if(!f){close(fd);return SC2_STORE_IO_ERROR;}
     char buf[SC2_PROFILE_CAPACITY];
     size_t n = fread(buf, 1, sizeof(buf) - 1, f);
     int extra = fgetc(f), bad = ferror(f);
@@ -452,20 +467,22 @@ int sc2_store_load(const char *id, sc2_profile_t *p) {
     return 0;
 }
 
-int sc2_store_save(const char *id, const sc2_profile_t *p) {
+static int store_save_locked(const char *id, const sc2_profile_t *p) {
     if (!p || !sc2_store_valid_id(id)) return -1;
     char buf[SC2_PROFILE_CAPACITY];
     int n = sc2_profile_format(p, buf, sizeof(buf));
     sc2_profile_t checked;
     sc2_profile_default(&checked);
     if (n < 0 || sc2_profile_parse_checked(buf, &checked, 1) != 0) return -1;
-    pthread_mutex_lock(&g_store_lock);
-    ensure_dir();
-    char path[128], tmp[136];
-    snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
+    int dir=profile_directory();
+    if(dir<0)return -1;
+    char path[SC2_ID_MAX+8], tmp[SC2_ID_MAX+16];
+    snprintf(path, sizeof(path), "%s.ini", id);
     snprintf(tmp, sizeof(tmp), "%s.tmp", path);
-    FILE *f = fopen(tmp, "w");
-    if (!f) { pthread_mutex_unlock(&g_store_lock); return -1; }
+    int fd=openat(dir,tmp,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
+    if(fd<0){close(dir);return -1;}
+    FILE *f=fdopen(fd,"w");
+    if(!f){close(fd);unlinkat(dir,tmp,0);close(dir);return -1;}
 #ifdef SC2_PROFILE_STORE_TEST
     extern void sc2_profile_test_store_critical_enter(void);
     sc2_profile_test_store_critical_enter();
@@ -475,22 +492,68 @@ int sc2_store_save(const char *id, const sc2_profile_t *p) {
     int injected_failure = sc2_profile_test_fail_replace();
 #endif
     size_t w = fwrite(buf, 1, (size_t)n, f);
+    int sync_error=fflush(f);
+    if(!sync_error)sync_error=fsync(fileno(f));
     int close_error = fclose(f);
 #ifdef SC2_PROFILE_STORE_TEST
     if (injected_failure == 2) w = 0;
     if (injected_failure == 3) close_error = -1;
 #endif
-    if ((int)w != n || close_error != 0) {
-        unlink(tmp);
-        pthread_mutex_unlock(&g_store_lock);
+    if ((int)w != n || close_error != 0 || sync_error != 0) {
+        unlinkat(dir,tmp,0);
+        close(dir);
         return -1;
     }
 #ifdef SC2_PROFILE_STORE_TEST
-    int result = injected_failure == 1 ? -1 : rename(tmp, path);
+    int result = injected_failure == 1 ? -1 : renameat(dir,tmp,dir,path);
 #else
-    int result = rename(tmp, path);
+    int result = renameat(dir,tmp,dir,path);
 #endif
-    if (result != 0) unlink(tmp);
+    if (result != 0) unlinkat(dir,tmp,0);
+    close(dir);
+    return result;
+}
+int sc2_store_save(const char *id, const sc2_profile_t *p) {
+    pthread_mutex_lock(&g_store_lock);
+    int result=store_save_locked(id,p);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
+}
+
+int sc2_store_update(const char *id, sc2_profile_update_fn update, void *context) {
+    if(!id||!update)return SC2_STORE_INVALID;
+    pthread_mutex_lock(&g_store_lock);
+    sc2_profile_t profile;
+    int result=sc2_store_load(id,&profile);
+    if(result==SC2_STORE_NOT_FOUND){sc2_profile_default(&profile);result=0;}
+    if(!result)result=update(&profile,context);
+    if(!result)result=store_save_locked(id,&profile);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
+}
+
+int sc2_store_recover_default(void) {
+    pthread_mutex_lock(&g_store_lock);
+    sc2_profile_t old, fresh;
+    int loaded=sc2_store_load("default",&old),result=-1;
+    if(loaded==SC2_STORE_INVALID || loaded==SC2_STORE_NOT_FOUND){
+        int dir=profile_directory();
+        if(dir>=0){
+            int backed_up=loaded==SC2_STORE_NOT_FOUND;
+            if(!backed_up){
+                int fd=private_regular_open(dir,"default.ini");
+                if(fd>=0){close(fd);
+                    for(unsigned i=0;i<16;++i){char backup[64];
+                        snprintf(backup,sizeof(backup),"default.ini.recovery.%u",i);
+                        if(linkat(dir,"default.ini",dir,backup,0)==0){backed_up=1;break;}
+                        if(errno!=EEXIST)break;
+                    }
+                }
+            }
+            close(dir);
+            if(backed_up){sc2_profile_default(&fresh);result=store_save_locked("default",&fresh);}
+        }
+    }
     pthread_mutex_unlock(&g_store_lock);
     return result;
 }
@@ -509,7 +572,9 @@ int sc2_store_delete(const char *id) {
 }
 
 void sc2_store_list(void (*cb)(const char *, const char *, void *), void *u) {
-    ensure_dir();
+    int dir = profile_directory();
+    if (dir < 0) return;
+    close(dir);
     DIR *d = opendir(SC2_DIR);
     if (!d) return;
     struct dirent *e;
@@ -740,13 +805,16 @@ static void *watch_thread(void *arg) {
 }
 
 void sc2_select_start(void) {
-    ensure_dir();
+    int dir = profile_directory();
+    if (dir < 0) return;
+    close(dir);
     sc2_profile_t p;
-    if (sc2_store_load("default", &p) != 0) {       /* first run: write defaults */
+    int loaded = sc2_store_load("default", &p);
+    if (loaded != 0) {
         sc2_profile_default(&p);
         /* Preserve an invalid existing file for recovery; only bootstrap a
          * genuinely absent default. apply_selection uses safe defaults. */
-        if (access(SC2_DIR "/default.ini", F_OK) != 0 && errno == ENOENT) {
+        if (loaded == SC2_STORE_NOT_FOUND) {
             if (sc2_store_save("default", &p) != 0) LOG("sc2: default profile save failed\n");
         } else LOG("sc2: invalid default profile retained; using defaults\n");
     }
