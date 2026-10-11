@@ -67,6 +67,8 @@ Screenshots are from the real host fixture; they do not show a PS5 hardware sess
 
 Both USB paths are implemented and host-tested, **physically unverified**.
 
+**Published: [v0.1.0-dev.2](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.2)** — ELF, SHA256, loading instructions and notices; source `6ed81c2`. Repeated Host/ASan-UBSan/Chromium/SDK gates passed. Physical PS5 validation remains pending.
+
 [Experimental prereleases](https://github.com/MNeroba/SteamController-PS5/releases) contain a real SDK-built ELF, checksum, source SHA, loading instructions and notices **when published**. Choose a `dev/v…-dev.…` prerelease; this is not a stable firmware compatibility promise. If no prerelease is listed, no DEV download has been published yet. Successful [PS5 Actions runs](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) also provide temporary build artifacts.
 
 > **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 12.00 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**

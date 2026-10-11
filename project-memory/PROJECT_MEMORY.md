@@ -24,10 +24,12 @@ GitHub connector works for Git objects and read-only Actions, not manual workflo
 
 ## Next safe action
 
-Implementation published as `6ed81c2ba477285e932bd4593aa029554cadf757` (M1-228). Host38125160695 and SDK38125160699 queued without runners for11+ minutes at08:43UTC. Re-fetch their status; diagnose actual logs if a run fails. Only after both are successful on this exact SHA dispatch dev-release.yml from main with source_sha=6ed81c2ba477285e932bd4593aa029554cadf757, version=v0.1.0-dev.2. Verify actual prerelease/tag/six assets/downloaded ELF+checksum, then append acknowledgement. No dev.2 dispatch/publication or physical FW12.00 result is claimed. All clean-source software gates already pass locally; do not redo earlier implementation or bypass the CI gate.
+DEV2 publication and actual downloaded checksum are verified (M1-229). Release dev/v0.1.0-dev.2 points to6ed81c2ba477285e932bd4593aa029554cadf757; workflow38141611911 PASS, six assets. Published ELF SHA256bab7c92d8b49b56356a8d616104fc99ef69c49084adb49a76b574e92cb07dfbf. The previous runner queue blocker is resolved. Read CURRENT_STATUS.md, TEST_LOG.md M1-229 and docs/TEST_PLAN.md before continuation. Remaining runtime acceptance requires measured FW12.00 and explicitly authorized controlled physical tests; all hardware rows remain NOT_RUN. No firmware update, radio operation or stable release is authorized by DEV publication.
 
 ## M1-226 — Audit remediation and first-launch task intake — 2026-10-11
 
 Main ffff5e08905d394b67a7da070fcf4657a250f070 unchanged; no open PRs. DEV workflow 38075764498 succeeded and GitHub confirms dev/v0.1.0-dev.1 prerelease with six assets. Published ELF SHA-256 c908a67cfbe3fb0596b94ef472bc578062ee0a0bb024e683d3242e5f78354aaa. New audit: eight P1/eight P2 confirmed static findings registered in docs/development/STATIC_AUDIT.md, critical code defects added to DEV gate. New owner task FIRST_LAUNCH_TASK.md authorizes automatic authenticated WebUI and dev.2 after all gates. Physical firmware/notification/USB/PS5 remains NOT_RUN. Implementation and new gates pending; no dev.2 published.
 
 M1-227: automatic authenticated WebUI, local notification pairing and 16 static audit findings remediated. Normal, ASan/UBSan and SDK gates PASS on full 255-file source export; Chromium202 PASS on the matching portal, clean-export browser repeat PASS. DEV policy blocks newly discovered critical defects; no hardware or release claim before acknowledgement.
+
+M1-229: exact source push gates and all repeated DEV gates PASS; prerelease dev/v0.1.0-dev.2 and six assets acknowledged, actual downloaded ELF/checksum verified. See CURRENT_STATUS.md for digest and remaining hardware gates.

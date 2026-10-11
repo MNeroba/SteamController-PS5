@@ -1,25 +1,20 @@
 # Current status — 2026-10-11
 
-## Published implementation
+## Published dev.2
 
-- First-launch/dev.2 source published directly on main: `6ed81c2ba477285e932bd4593aa029554cadf757`, parentffff5e08905d394b67a7da070fcf4657a250f070; verified tree50f3f5dd7b26cbddd446de9f0d09498b6c6bb3b6,255 blobs/all41 production C units/all251 previous files retained/zero deletions. Documentation acknowledgement may advance main without changing this implementation.
-- All16 confirmed P1/P2 audit findings have scoped fixes. Full clean-source normal/ASan-UBSan/SDKv0.43LLVM18.1.8 gates PASS; Chromium202 PASS twice, including clean export. Evidence M1-227/228, ADR-053, STATIC_AUDIT.md. Scoped diff/credential/attribution checks PASS.
-- Missing policy starts authenticated WebUI8090. Pair with the eight-digit local notification code (five minutes/five attempts/one redemption); valid session restoration and advanced token recovery supported. Explicit disable and invalid-file fail-closed behavior preserved. Hooks/probe/DualSense handoff stay off.
-- One active Steam Controller2026 session. PS5 FW12.00 owner-reported/unverified. BLE/Edge/custom ShellUI identity research only. No physical console operation performed.
+- [Experimental prerelease dev/v0.1.0-dev.2](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.2) is published, prerelease=true/draft=false, six assets plus source archives. [DEV workflow38141611911](https://github.com/MNeroba/SteamController-PS5/actions/runs/38141611911) completed/success, all three jobs PASS. Evidence M1-229.
+- Exact source/tag: `6ed81c2ba477285e932bd4593aa029554cadf757`. Verified source tree50f3f5dd7b26cbddd446de9f0d09498b6c6bb3b6:255 blobs/all41 production C units/all251 previous files retained/zero deletions. Later documentation acknowledgement commits do not change this implementation.
+- Both exact-source push checks PASS: Host38125160695 and SDK38125160699. Repeated DEV normal/ASan-UBSan/Chromium202+/asset/build/checksum gates PASS with SDKv0.43/LLVM18. All16 confirmed static findings have scoped remediation; see STATIC_AUDIT.md, ADR-053, M1-227/228.
+- Actual downloaded ELF1782328 bytes, ELF64/little-endian/x86_64. SHA256 `bab7c92d8b49b56356a8d616104fc99ef69c49084adb49a76b574e92cb07dfbf` matches downloaded checksum, release notes and GitHub asset metadata. This is the published Linux digest; earlier local build digest is historical.
 
-## Current external blocker
+## First launch
 
-At2026-10-11 08:43UTC, Host38125160695 and SDK38125160699 remained queued for more than11 minutes without an assigned runner or executed step. API and GitHub job page both confirm waiting; no CI failure has been reported. Cause is unknown. Official githubstatus.com showed operational, which does not establish why these runs are queued. DEV2 has **not been dispatched or published**; mandatory push gates must first succeed.
+Missing policy starts authenticated WebUI8090. Pair with the eight-digit local notification code (five minutes/five attempts/one redemption); valid session restoration and advanced token recovery supported. Explicit disable and invalid-file fail-closed behavior preserved. Hooks/probe/DualSense handoff stay off. Notification delivery and actual portal remain physically unverified.
 
-## Exact continuation
+One active Steam Controller2026 session. PS5 FW12.00 is owner-reported/unverified. BLE/Edge/custom ShellUI identity research only. No physical console operation performed.
 
-1. Read memory/specs and fetch main plus these exact runs:
-   - https://github.com/MNeroba/SteamController-PS5/actions/runs/38125160695
-   - https://github.com/MNeroba/SteamController-PS5/actions/runs/38125160699
-2. If either fails, read its logs, fix the actual failure and validate the new full source SHA; do not bypass gates.
-3. Once both pass for `6ed81c2ba477285e932bd4593aa029554cadf757`, manually run dev-release.yml from **main**, source_sha=`6ed81c2ba477285e932bd4593aa029554cadf757`, version=`v0.1.0-dev.2`. The authenticated in-app GitHub form was prepared with these inputs; submission deliberately withheld while CI is queued.
-4. Require all repeated DEV gates, then verify actual `dev/v0.1.0-dev.2` prerelease/tag/six assets/ELF SHA256 against its downloaded checksum. Append acknowledgement; do not reuse DEV1 ELF or claim publication beforehand.
+## Remaining gates and continuation
 
-DEV1 is published at dev/v0.1.0-dev.1, workflow38075764498 PASS, six assets, ELF SHA256c908a67cfbe3fb0596b94ef472bc578062ee0a0bb024e683d3242e5f78354aaa. Local dev.2 clean-source ELF SHA256d299cc90947e051c2d30dc27826f94e7f17108dd945f2f369e8a710921a81b4f is not a published Linux asset digest.
+The earlier external runner queue blocker is resolved; its negative evidence remains in logs. No DEV publication blocker remains for this source. Stable H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain NOT_RUN. Real USB cancellation/watchdog timing, VDA ownership/neutralization, credentials, native hooks/unmap/rollback, motion/touch/haptics and native DualSense coexistence require hardware.
 
-Stable H-01/H-02/H-03/H-04/H-05/H-09/H-12 remain NOT_RUN. Notification delivery, loader/runtime, USB cancellation/watchdog timing, VDA ownership/neutralization, credentials, native hooks/unmap/rollback, motion/touch/haptics, real portal and native DualSense coexistence remain hardware-dependent. No hardware result or historical negative record has been changed.
+Next safely executable hardware stage: read docs/TEST_PLAN.md and HARDWARE_MATRIX.md, record measured firmware/read-only console baseline before an explicitly authorized controlled runtime test. Use only an independently confirmed compatible development loader; retain stock DualSense. Do not update firmware or operate the stock radio. No console access is available in this session.
