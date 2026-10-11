@@ -24,7 +24,7 @@ GitHub connector works for Git objects and read-only Actions, not manual workflo
 
 ## Next safe action
 
-First-launch and 16-item static audit remediation implemented (ADR-053/M1-227). Fresh-export Chromium202 and scoped diff/secret checks PASS; publish complete reviewed tree on verified main with expected_sha/force=false, then require Host/SDK push Actions for exact SHA. Dispatch dev-release.yml on main with version v0.1.0-dev.2 and that tested SHA; verify prerelease/tag/six assets/ELF digest. Update current status and append acknowledgement. No physical FW12.00 result exists.
+Implementation published as `6ed81c2ba477285e932bd4593aa029554cadf757` (M1-228). Host38125160695 and SDK38125160699 queued without runners for11+ minutes at08:43UTC. Re-fetch their status; diagnose actual logs if a run fails. Only after both are successful on this exact SHA dispatch dev-release.yml from main with source_sha=6ed81c2ba477285e932bd4593aa029554cadf757, version=v0.1.0-dev.2. Verify actual prerelease/tag/six assets/downloaded ELF+checksum, then append acknowledgement. No dev.2 dispatch/publication or physical FW12.00 result is claimed. All clean-source software gates already pass locally; do not redo earlier implementation or bypass the CI gate.
 
 ## M1-226 — Audit remediation and first-launch task intake — 2026-10-11
 
