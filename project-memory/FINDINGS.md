@@ -186,3 +186,7 @@ VERIFIED_PS5_BUILD: single SDKv0.43/LLVM18 ELF includes exact PNG/metadata; pack
 ## F106 — isolate optional installer loading (M1-233)
 
 VERIFIED_PS5_BUILD/VERIFIED_HOST_TEST: readelf exposed mandatory libSceAppInstUtil.sprx in the initial0a3dacb ELF; regression /tmp/sc-tile-dependency-red.py failed before fix. Native adapter now uses pinned SDK hello_dlfcn API contract only inside the authenticated installation action. No direct AppInstUtil import/link remains. Host stubs cover missing module/symbol, init, registration, termination and loader-close failures; cleanup errors latch, incomplete state/code retained until process exit. Full fresh normal40 C/sanitizer/Chromium214/build pass; readelf startup-dependency gate passes. Native dlopen/dlsym/installer behavior remains H-13 NOT_RUN. No system/console operation was executed.
+
+## F107 — icon directory readability with restrictive umask (M1-234)
+
+VERIFIED_HOST_TEST/VERIFIED_CODE: inherited umask077 made newly created sce_sys0700 while icon/metadata were0644. New regression failed before fix and passes after chmod0755 on that newly created own directory only. Existing directories/foreign bytes remain untouched. Normal/sanitizer40 C plus7 DEV unit contracts and SDK/dependency gate PASS. Real Shell icon visibility remains H-13 NOT_RUN.

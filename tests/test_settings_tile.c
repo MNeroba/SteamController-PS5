@@ -20,7 +20,12 @@ static int install(int fd) { return settings_tile_install(fd, icon, sizeof(icon)
 int main(void) {
  char root[]="/tmp/sc-tile-XXXXXX"; assert(mkdtemp(root));
  int fd=open(root,O_RDONLY|O_DIRECTORY);assert(fd>=0);
- assert(install(fd)==0&&calls==1);assert(install(fd)==0&&calls==2);
+ mode_t oldmask=umask(0077);
+ assert(install(fd)==0&&calls==1);
+ struct stat readable;assert(fstatat(fd,SETTINGS_TILE_ID "/sce_sys",&readable,0)==0);
+ assert((readable.st_mode&0777)==0755);
+ assert(fstatat(fd,SETTINGS_TILE_ID "/sce_sys/icon0.png",&readable,0)==0);
+ assert((readable.st_mode&0777)==0644);umask(oldmask);assert(install(fd)==0&&calls==2);
  fail_register=123;assert(install(fd)==SETTINGS_TILE_REGISTER_FAILED&&calls==3);
  fail_register=0;assert(install(fd)==0&&calls==4);
  int title=openat(fd,SETTINGS_TILE_ID,O_RDONLY|O_DIRECTORY);assert(title>=0);

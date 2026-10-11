@@ -70,9 +70,11 @@ int settings_tile_install(int app_fd,const unsigned char *icon,size_t icon_size,
     }else if(exact(title,".steamcontroller-owner",owner,sizeof(owner)-1))goto done;
     lock=openat(title,".install.lock",O_RDWR|O_CREAT|O_NOFOLLOW|O_NONBLOCK|O_CLOEXEC,0600);
     if(lock<0||!owned_file(lock)||flock(lock,LOCK_EX|LOCK_NB))goto done;
-    if(mkdirat(title,"sce_sys",0755)&&errno!=EEXIST)goto done;
+    int fresh_sys=mkdirat(title,"sce_sys",0755)==0;
+    if(!fresh_sys&&errno!=EEXIST)goto done;
     sys=openat(title,"sce_sys",O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
     if(sys<0||!directory(sys))goto done;
+    if(fresh_sys&&fchmod(sys,0755))goto done;
     if(asset(sys,"param.json",param,param_size,0644)||asset(sys,"icon0.png",icon,icon_size,0644)||
        fsync(title)||fsync(app_fd))goto done;
     result=register_title(context)?SETTINGS_TILE_REGISTER_FAILED:0;

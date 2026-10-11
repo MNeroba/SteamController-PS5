@@ -30,3 +30,7 @@ Single ELF now embeds the supplied icon and optional Media settings tile install
 ## M1-233 — release candidate refinement
 
 Initial tile source0a3dacb is superseded by lazy installer loading: missing AppInstUtil/API cannot impose a new controller-payload startup dependency. Full fresh normal40 C, sanitizer, Chromium214, SDK build and ELF dependency/package checks PASS; DEV contract suite now7. Feature/status/navigation updated. Select only the follow-up full source SHA for dev.3 after its own Host/PS5 push checks pass. Previous queued jobs had runner_id0/no steps for over10min. No dev.3 release/tag/assets are claimed yet. H-13 remains NOT_RUN.
+
+## M1-234 — final permissions check
+
+Final new-directory umask077 regression fixed and verified without changing existing directories. Normal/sanitizer40 C/Python7, SDK/dependency checks PASS; Chromium214 remains valid for unchanged browser/UI source. Use the final permission-fix main SHA (not0a3dacb or b214da9) for dev.3 after its own green push gates. One ELF remains experimental; on-console FW13.60 icon/registration/browser use is NOT_RUN. GitHub's previous jobs remained queued/unassigned; no dev.3 release or download is claimed yet.

@@ -5,5 +5,5 @@
   "firmware_verified": false,
   "sdk": "v0.43",
   "critical_code_blockers": [],
-  "review": "2026-10-11 M1-232/ADR-054: dev.2 static fixes retained; single-ELF optional tile ownership/auth/transaction/native-stub tests and normal/sanitizer/Chromium214/SDK gates pass locally. No known unresolved critical code blocker identified. Actual FW13.60 registration/browser and all console runtime remain unverified. M1-233: lazy optional module/symbol loading, cleanup failure stubs and mandatory ELF dependency guard verified; current candidate supersedes initial0a3dacb."
+  "review": "2026-10-11 M1-232/ADR-054: dev.2 static fixes retained; single-ELF optional tile ownership/auth/transaction/native-stub tests and normal/sanitizer/Chromium214/SDK gates pass locally. No known unresolved critical code blocker identified. Actual FW13.60 registration/browser and all console runtime remain unverified. M1-233: lazy optional module/symbol loading, cleanup failure stubs and mandatory ELF dependency guard verified; current candidate supersedes initial0a3dacb. M1-234: new owned sce_sys readability under umask077 regression fixed; normal/sanitizer40 C plus7 contracts and SDK/dependency gate pass. Hardware NOT_RUN."
 }
