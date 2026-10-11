@@ -14,7 +14,7 @@ USB-C and official Valve Puck · remapping · motion · touch · haptics
 
 </div>
 
-> **Experimental development project.** Host tests and PS5 SDK builds pass; no physical PS5 test has been performed. **FW 12.00 is the intended test environment, not confirmed compatible firmware.** Native BLE remains research. Keep your stock DualSense available.
+> **Experimental development project.** Host tests and PS5 SDK builds pass; no physical PS5 test has been performed. **FW 13.60 is the owner-reported intended test environment, not confirmed compatible firmware.** Native BLE remains research. Keep your stock DualSense available.
 
 ## What it does
 
@@ -71,7 +71,7 @@ Both USB paths are implemented and host-tested, **physically unverified**.
 
 [Experimental prereleases](https://github.com/MNeroba/SteamController-PS5/releases) contain a real SDK-built ELF, checksum, source SHA, loading instructions and notices **when published**. Choose a `dev/v…-dev.…` prerelease; this is not a stable firmware compatibility promise. If no prerelease is listed, no DEV download has been published yet. Successful [PS5 Actions runs](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) also provide temporary build artifacts.
 
-> **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 12.00 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
+> **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
 ## Build from source
 
@@ -91,7 +91,7 @@ Output: `payload/ghost-control-ps5.elf` (legacy internal filename). WebUI HTML, 
 
 ## Load and configure
 
-This project produces **ELF only**: no PKG/FPKG or persistent installer. Use an independently confirmed compatible development payload loader for your exact firmware. Neither the loader nor FW 12.00 runtime compatibility has been established by this project.
+This project produces **one ELF**: no PKG/FPKG. The optional settings tile installer and controller icon are embedded in this same payload. Use an independently confirmed compatible development payload loader for your exact firmware. Neither the loader nor FW 13.60 runtime compatibility has been established by this project.
 
 [Loading, checksum verification, trusted WebUI setup and recovery →](docs/development/LOADING.md)
 
@@ -106,7 +106,7 @@ WebUI starts automatically when the policy file is absent; no FTP or manual INI 
 
 - **Complete on the host:** upstream foundation/provenance audit, runtime hardening, reusable modules, profile integrity and remap/browser regressions, sanitizer coverage and SDK cross-build.
 - **DEV channel:** manual, exact-source prerelease workflow with repeated host/sanitizer/Chromium/asset/build/checksum gates. Separate from stable publication.
-- **Next hardware work:** measured FW 12.00, USB-C/Puck, gameplay/system UI, native DualSense coexistence, motion/touch/haptics, portal persistence and shutdown. Stable release waits for recorded physical evidence.
+- **Next hardware work:** measured FW 13.60, USB-C/Puck, gameplay/system UI, native DualSense coexistence, motion/touch/haptics, portal persistence and shutdown. Stable release waits for recorded physical evidence.
 - **Later research:** passive BLE feasibility, stable transport identity, advanced platform integration. Active stock-radio experiments require separate explicit approval.
 
 [Current status](project-memory/CURRENT_STATUS.md) · [Hardware test plan](docs/TEST_PLAN.md) · [Documentation index](docs/README.md) · [Repository audit](docs/development/REPOSITORY_AUDIT.md)
@@ -122,3 +122,7 @@ Built on [PuckbridgePS5](https://github.com/ThisIsAkill/PuckbridgePS5) by ThisIs
 Code is **GPL-3.0-or-later**, with existing notices retained. Xelu controller prompts are CC0; supplied controller photos have separate owner-authorized publication terms, not an inferred GPL/CC0 license. Read [LICENSE](LICENSE), [provenance](docs/PROVENANCE.md), [asset notices](payload/web/controllers/NOTICE.md) and [preserved upstream documents](docs/archive/upstream/README.md).
 
 Not affiliated with Valve or Sony. Steam, PlayStation and DualSense are their respective owners' trademarks.
+
+## Settings tile — dev.3
+
+One ELF includes the supplied controller icon and an optional Media tile installer. After pairing, open **Settings & help → PS5 tile → Create tile on PS5**, then confirm. The tile opens `http://127.0.0.1:8090/` while the payload runs. Pair again in the console browser using the current local code or recovery token. It does not launch the payload after reboot. See [tile setup and removal](docs/development/SETTINGS_TILE.md). FW 13.60 registration, browser launch and controller navigation remain **NOT_RUN** on hardware.

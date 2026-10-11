@@ -8,9 +8,9 @@ on:
         required: true
         type: string
       version:
-        description: Experimental version (v0.1.0-dev.2)
+        description: Experimental version (v0.1.0-dev.3)
         required: true
-        default: v0.1.0-dev.2
+        default: v0.1.0-dev.3
         type: string
 
 permissions:
@@ -106,8 +106,10 @@ jobs:
       - name: Verify deterministic embedded assets and clean SDK build
         run: |
           python3 payload/gen_html.py
-          sha256sum payload/webui_html.h > "$RUNNER_TEMP/generated.sha256"
+          python3 payload/gen_settings_tile.py
+          sha256sum payload/webui_html.h payload/settings_tile_assets.h > "$RUNNER_TEMP/generated.sha256"
           python3 payload/gen_html.py
+          python3 payload/gen_settings_tile.py
           sha256sum --check "$RUNNER_TEMP/generated.sha256"
           make -C payload clean
           make -C payload

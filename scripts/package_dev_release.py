@@ -10,14 +10,14 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 WARNING = ('Experimental development build. Not verified on physical PS5 hardware. '
-           'PS5 firmware 12.00 is the intended test environment, not a confirmed '
+           'PS5 firmware 13.60 is the intended test environment, not a confirmed '
            'compatible firmware. Use at your own risk.')
 SDK_SHA = 'a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb'
 
 
 def validate_policy(policy):
     if (policy.get('schema') != 1 or policy.get('channel') != 'experimental-dev' or
-            policy.get('target_firmware') != '12.00' or
+            policy.get('target_firmware') != '13.60' or
             policy.get('firmware_verified') is not False or policy.get('sdk') != 'v0.43' or
             policy.get('critical_code_blockers') != [] or not policy.get('review')):
         raise ValueError('DEV policy missing, altered, or has critical code blockers')
@@ -27,7 +27,7 @@ def validate_identifiers(source_sha, version):
     if not re.fullmatch(r'[0-9a-f]{40}', source_sha):
         raise ValueError('Select a full lowercase source commit SHA')
     if not re.fullmatch(r'v\d+\.\d+\.\d+-dev\.\d+', version):
-        raise ValueError('Version must have the form v0.1.0-dev.2')
+        raise ValueError('Version must have the form v0.1.0-dev.3')
 
 
 def validate_elf(data):
@@ -43,6 +43,10 @@ def package(source_sha, version, elf, output):
     validate_policy(json.loads((ROOT / 'docs/development/dev-release.json').read_text()))
     data = elf.read_bytes()
     validate_elf(data)
+    for name in ('icon0.png', 'param.json'):
+        embedded = (ROOT / 'payload/settings-tile' / name).read_bytes()
+        if not embedded or embedded not in data:
+            raise ValueError(f'Missing embedded settings tile asset: {name}')
     output.mkdir(parents=True, exist_ok=True)
     asset = f'SteamController-PS5-{version}.elf'
     (output / asset).write_bytes(data)
@@ -60,7 +64,7 @@ def package(source_sha, version, elf, output):
                'https://github.com/ps5-payload-dev/sdk/tree/d9c9519116944a7f1c22d262012c53b80b3520b7. '
                'SDK headers retain their individual GPL/BSD exceptions. SDK archive checksum: '
                f'`{SDK_SHA}`. No proprietary Sony SDK is included.\n\n')
-    for file in ('payload/bridge/NOTICE.md', 'payload/web/icons/LICENSE.txt',
+    for file in ('payload/settings-tile/NOTICE.md', 'payload/bridge/NOTICE.md', 'payload/web/icons/LICENSE.txt',
                  'payload/web/controllers/NOTICE.md'):
         notices += f'## {file}\n\n' + (ROOT / file).read_text() + '\n'
     (output / 'NOTICES.md').write_text(notices)
@@ -81,7 +85,7 @@ def package(source_sha, version, elf, output):
              'Use a trusted isolated LAN only; HTTP is plaintext.\n\n'
              'Read LOADING.md and NOTICES.md before testing. Verify the checksum before sending '
              'the ELF through an independently confirmed compatible development loader. '
-             'There is no PKG/FPKG or persistent installer. The stable hardware release gate remains blocked.\n')
+             'One ELF embeds the optional Media settings tile icon/metadata. After pairing, open Settings & help → PS5 tile, confirm Create tile on PS5. The tile opens http://127.0.0.1:8090/ while this payload is running; it does not start the payload. Registration and browser behavior on FW 13.60 require physical testing. No PKG/FPKG or second ELF is required. The stable hardware release gate remains blocked.\n')
     (output / 'RELEASE_NOTES.md').write_text(notes)
     print(f'{asset}: SHA-256 {digest}')
 

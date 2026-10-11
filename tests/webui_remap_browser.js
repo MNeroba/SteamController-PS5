@@ -15,6 +15,7 @@ async (page) => {
   const picker = k => page.locator('#pick .g-' + k);
   const errors = [];
   page.on('pageerror', error => errors.push(error.message));
+  await page.addInitScript(()=>{window.originalConfirm=window.confirm});
   await page.addInitScript(() => sessionStorage.setItem('pb.webuiToken', 'preview-only'));
   await page.setViewportSize({width:1440, height:1050});
   await page.goto('http://127.0.0.1:8765/#remap/profile=default/buttons');
@@ -429,8 +430,36 @@ async (page) => {
   await page.evaluate(()=>history.forward());await page.waitForFunction(()=>editing==='PPSA00001');
   check(await page.evaluate(()=>document.querySelector('#prof').value==='PPSA00001'&&location.hash.includes('profile=PPSA00001')),'Forward commits profile, dropdown and URL together');
   await page.evaluate(()=>load('default',true));
+  // Tile installation is explicit, authenticated and reported without claiming hardware success.
+  await page.evaluate(()=>{window.confirm=window.originalConfirm});
+  let tilePosts=0;let tileFail=true;
+  await page.route('**/api/settings-tile',async route=>{
+    tilePosts++;check(route.request().method()==='POST','tile uses POST');
+    check(route.request().postData()==='INSTALL SCPS50001','tile confirms fixed title only');
+    check(route.request().headers().authorization==='Bearer preview-only','tile keeps bearer authentication');
+    await new Promise(resolve=>setTimeout(resolve,250));
+    await route.fulfill({status:tileFail?500:200,contentType:'text/plain',body:tileFail?'Fixture registration failure':'Registration accepted; verify on console'});
+  });
+  await page.locator('[data-tab="help"]').click();await page.locator('[data-sec="tile"]').first().click();
+  check(tilePosts===0,'opening settings does not install a tile');
+  page.once('dialog',dialog=>dialog.dismiss());await page.locator('#tileInstall').click();
+  check(tilePosts===0,'cancelled tile confirmation has no side effects');
+  page.once('dialog',dialog=>dialog.accept());await page.locator('#tileInstall').click();
+  check(await page.locator('#tileInstall').isDisabled(),'tile button blocks duplicate pending requests');
+  await page.waitForFunction(()=>document.querySelector('#tileStatus').textContent.includes('Fixture registration failure'));
+  check(!await page.locator('#tileInstall').isDisabled(),'failed tile request permits retry');
+  tileFail=false;page.once('dialog',dialog=>dialog.accept());await page.locator('#tileInstall').click();
+  await page.waitForFunction(()=>document.querySelector('#tileStatus').textContent.includes('verify on console'));
+  check(tilePosts===2,'tile retry is explicit');await page.unroute('**/api/settings-tile');
   // First-run presentation: no filesystem access and no token prompt.
   const paired = await page.context().newPage();
+  let delayedStatus=0;
+  await paired.route('**/api/status',async route=>{
+    if(route.request().headers().authorization==='Bearer '+'42'.repeat(32)){
+      delayedStatus++;await new Promise(resolve=>setTimeout(resolve,1500));
+    }
+    await route.continue();
+  });
   await paired.setViewportSize({width:390,height:844});
   await paired.addInitScript(()=>{sessionStorage.removeItem('pb.webuiToken');window.prompt=()=>{throw new Error('Token prompt forbidden')}});
   await paired.goto('http://127.0.0.1:8765/');
@@ -444,6 +473,8 @@ async (page) => {
   await paired.locator('#pairCode').fill('12345678');await paired.locator('#pairSubmit').click();
   await paired.waitForFunction(()=>saved!==''&&!document.querySelector('#pairing').open);
   check(await paired.evaluate(()=>sessionStorage.getItem('pb.webuiToken')==='42'.repeat(32)),'pairing establishes a strong session bearer');
+  await paired.waitForFunction(()=>document.querySelector('#conn').textContent==='Controller not connected');
+  check(delayedStatus>0,'pairing waits for delayed authenticated status response');
   check((await paired.locator('#conn').textContent())==='Controller not connected','paired disconnected-controller state is useful');
   // Remove only the new page's startup token-clearing script for reload.
   await paired.close();

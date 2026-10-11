@@ -1,9 +1,9 @@
 {
   "schema": 1,
   "channel": "experimental-dev",
-  "target_firmware": "12.00",
+  "target_firmware": "13.60",
   "firmware_verified": false,
   "sdk": "v0.43",
   "critical_code_blockers": [],
-  "review": "2026-10-11: all 16 confirmed static findings remediated with recorded code/host/browser/build evidence (STATIC_AUDIT.md, M1-227, ADR-053); no known unresolved critical code blocker identified. Native runtime and FW 12.00 remain unverified."
+  "review": "2026-10-11 M1-232/ADR-054: dev.2 static fixes retained; single-ELF optional tile ownership/auth/transaction/native-stub tests and normal/sanitizer/Chromium214/SDK gates pass locally. No known unresolved critical code blocker identified. Actual FW13.60 registration/browser and all console runtime remain unverified."
 }

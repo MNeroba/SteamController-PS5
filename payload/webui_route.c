@@ -33,6 +33,7 @@ static const route_path_t routes[] = {
     ROUTE_PATH("/api/pause", WEBUI_ROUTE_PAUSE),
     ROUTE_PATH("/api/dualsense", WEBUI_ROUTE_DUALSENSE),
     ROUTE_PATH("/api/bridge", WEBUI_ROUTE_BRIDGE),
+    ROUTE_PATH("/api/settings-tile", WEBUI_ROUTE_SETTINGS_TILE),
     ROUTE_PATH("/api/log", WEBUI_ROUTE_LOG)
 };
 
@@ -55,6 +56,7 @@ static const char *const *allowed_params(webui_route_id_t route) {
         case WEBUI_ROUTE_PAUSE:
         case WEBUI_ROUTE_DUALSENSE: return on_params;
         case WEBUI_ROUTE_LOG: return log_params;
+        case WEBUI_ROUTE_SETTINGS_TILE:
         case WEBUI_ROUTE_RECOVER_DEFAULT:
         case WEBUI_ROUTE_PAIR:
         case WEBUI_ROUTE_INDEX:
@@ -147,6 +149,7 @@ int webui_route_method_allowed(webui_route_id_t route, int is_post) {
         case WEBUI_ROUTE_GAMES:
         case WEBUI_ROUTE_LOG:
             return !is_post;
+        case WEBUI_ROUTE_SETTINGS_TILE:
         case WEBUI_ROUTE_RECOVER_DEFAULT:
         case WEBUI_ROUTE_PAIR:
         case WEBUI_ROUTE_HAPTIC:

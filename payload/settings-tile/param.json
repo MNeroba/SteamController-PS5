@@ -1,0 +1,10 @@
+{
+  "applicationCategoryType": 65536,
+  "titleId": "SCPS50001",
+  "deeplinkUri": "http://127.0.0.1:8090/",
+  "localizedParameters": {
+    "defaultLanguage": "en-US",
+    "en-US": {"titleName": "Steam Controller Settings"},
+    "ru-RU": {"titleName": "Настройки Steam Controller"}
+  }
+}

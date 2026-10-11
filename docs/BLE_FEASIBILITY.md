@@ -1,13 +1,13 @@
-# PS5 FW 12.00 target — native Bluetooth/BLE feasibility protocol
+# PS5 FW 13.60 target — native Bluetooth/BLE feasibility protocol
 
-The project owner reports that the development console runs firmware 12.00 and will not be updated. This is a target report, **not** a compatibility result. No console diagnostic or radio experiment has been performed for this document update.
+The project owner reports that the development console runs firmware 13.60 after upgrading from 12.00 on 2026-10-11. This is a target report, **not** a compatibility result. No console diagnostic or radio experiment has been performed for this document update.
 
 This is a **platform research procedure**, not a blanket authorization to run raw HCI commands against the console's live internal radio.
 
 ## Known source-level facts and boundaries
 
 - Sony OS exposes a named `libSceBluetoothHid` module. Two open-source projects independently list many exports: `DNNDHH/PS5-3.20_Libs` NID stubs and `SvenGDK/SharpProspero` reconstructed declarations. SharpProspero's functions include Init, RegisterCallback/Device, GetDeviceInfo/Name/ReportDescriptor/InputReport/FeatureReport, SetOutput/Feature and InterruptOutput. This is **HID**, not proven GAP Central/GATT. The register-device function must **not** be presumed to perform pairing.
-- SharpProspero describes privileged device nodes `/dev/bt` and `/dev/bluetooth_hid`. This is source interpretation; accessibility and ABI on the reported FW 12.00 target remain untested.
+- SharpProspero describes privileged device nodes `/dev/bt` and `/dev/bluetooth_hid`. This is source interpretation; accessibility and ABI on the reported FW 13.60 target remain untested.
 - OmniPad's `src/bt_hci_usb.c` scans `/dev/ugen` nodes and attempts HCI USB commands. Existence of code is not proof that native LE scanning works; its receive path is incomplete and direct interface ownership is unresolved.
 - PS5 Linux independently operates internal BT hardware with patched xHCI/btusb, but OS and hardware revision differ. Linux patch PR #19 warns about BT instability.
 - Real 2025 experiment on PS5 rejected BLE keyboard with `CE-109524-1`, while Classic HID keyboard worked. This **does not** prove host BLE is physically impossible.
@@ -17,7 +17,7 @@ This is a **platform research procedure**, not a blanket authorization to run ra
 
 **Phase B0, host only:** pin sources; collect NIDs/ABI hypothesis + valid host parser fixtures; review licenses, privilege requirements, device ownership. Find any public Sony-compatible native GAP/GATT export (with actual parameters, revision and source).
 
-**Phase B1, safe hardware diagnostic:** a future read-only run on the user-reported FW 12.00 console must first confirm its exact model/build; report module availability, symbol lookup, and safe metadata of `/dev/bt`, `/dev/bluetooth_hid`, `/dev/ugen*`; record exact `errno`, result, timestamps, and the read-only code path. Do not call undocumented functions with opaque pointer layouts. Evaluate physical DualSense before/during/after; default no radio commands. This diagnostic was not part of the current host-only task and remains NOT_RUN.
+**Phase B1, safe hardware diagnostic:** a future read-only run on the user-reported FW 13.60 console must first confirm its exact model/build; report module availability, symbol lookup, and safe metadata of `/dev/bt`, `/dev/bluetooth_hid`, `/dev/ugen*`; record exact `errno`, result, timestamps, and the read-only code path. Do not call undocumented functions with opaque pointer layouts. Evaluate physical DualSense before/during/after; default no radio commands. This diagnostic was not part of the current host-only task and remains NOT_RUN.
 
 **Phase B2, separate approved active study:** only after a safety/recovery protocol and explicit operator approval, try documented OS-managed metadata/listening interfaces; do not seize USB/HCI driver interfaces from stock OS. Must establish whether OS can coexist with native DualSense connections. Abort on unexpected dropouts/privilege changes; restore state.
 
@@ -38,3 +38,5 @@ Do not copy the noncommercial-licensed BTstack into GPL distribution without com
 ## Output format
 
 Create `docs/BLE_DECISION.md` with: `target`, `hardware`, `fw`, `source pins`, `system API evidence`, `device ownership`, `B0...B6 gate statuses`, `commands/log hashes`, `stock DualSense coexistence`, `risk`, `next safe step`. Each experiment enters `project-memory/TEST_LOG.md` and negative results remain visible.
+
+Target update M1-231/232: owner reports FW13.60, unmeasured. Earlier FW12.00 plans/results remain historical in project-memory logs; no new radio access or native BLE compatibility evidence exists.

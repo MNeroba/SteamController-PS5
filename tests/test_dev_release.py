@@ -27,7 +27,7 @@ class DevRelease(unittest.TestCase):
                 validate_policy(self.policy)
         self.policy = dict(self.policy, critical_code_blockers=[])
         validate_policy(self.policy)
-        for key, invalid in [('schema', None), ('channel', 'stable'), ('target_firmware', '13.60'),
+        for key, invalid in [('schema', None), ('channel', 'stable'), ('target_firmware', '12.00'),
                              ('firmware_verified', True), ('sdk', 'v0.44'),
                              ('critical_code_blockers', ['unfixed corruption']), ('review', '')]:
             with self.subTest(key=key), self.assertRaises(ValueError):
@@ -51,6 +51,8 @@ class DevRelease(unittest.TestCase):
         data = bytearray(128)
         data[:7] = b'\x7fELF\x02\x01\x01'
         struct.pack_into('<HH', data, 16, 3, 62)
+        data += (ROOT / 'payload/settings-tile/icon0.png').read_bytes()
+        data += (ROOT / 'payload/settings-tile/param.json').read_bytes()
         with tempfile.TemporaryDirectory() as temp:
             elf = Path(temp) / 'test-fixture.elf'
             elf.write_bytes(data)
@@ -59,11 +61,14 @@ class DevRelease(unittest.TestCase):
             # isolated root. Never clear the real project's blocker manifest.
             fixture_root = Path(temp) / 'source'; fixture_root.mkdir()
             for name in ['LICENSE', 'docs/development/LOADING.md', 'payload/bridge/NOTICE.md',
-                         'payload/web/icons/LICENSE.txt', 'payload/web/controllers/NOTICE.md']:
+                         'payload/web/icons/LICENSE.txt', 'payload/web/controllers/NOTICE.md', 'payload/settings-tile/NOTICE.md', 'payload/settings-tile/icon0.png', 'payload/settings-tile/param.json']:
                 target = fixture_root / name; target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / name).read_bytes())
             (fixture_root / 'docs/development/dev-release.json').write_text(json.dumps(dict(self.policy, critical_code_blockers=[])))
             with patch('package_dev_release.ROOT', fixture_root), contextlib.redirect_stdout(io.StringIO()):
+                incomplete = Path(temp) / 'missing-icon.elf'; incomplete.write_bytes(data[:128])
+                with self.assertRaisesRegex(ValueError, 'Missing embedded'):
+                    package('a' * 40, 'v0.1.0-dev.1', incomplete, out)
                 package('a' * 40, 'v0.1.0-dev.1', elf, out)
             notes = (out / 'RELEASE_NOTES.md').read_text()
             self.assertIn(WARNING, notes)
@@ -73,6 +78,8 @@ class DevRelease(unittest.TestCase):
             self.assertEqual(asset.read_bytes(), data)
             self.assertEqual((out / (asset.name + '.sha256')).read_text(),
                              f'{hashlib.sha256(data).hexdigest()}  {asset.name}\n')
+            self.assertEqual(len(list(out.glob('*.elf'))), 1)
+            self.assertIn('One ELF', notes)
             for name in ['LOADING.md', 'NOTICES.md', 'LICENSE']:
                 self.assertTrue((out / name).stat().st_size)
 

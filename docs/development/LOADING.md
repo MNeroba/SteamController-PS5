@@ -1,26 +1,26 @@
 # Experimental DEV build: loading and configuration
 
-**Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 12.00 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
+**Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
 ## Before loading
 
-This is a native PS5 ELF, not a PKG/FPKG or persistent installer. A stock console cannot load it using these instructions. Independently confirm that your development environment, exact installed firmware and payload loader support this type of ELF. The project has not established a working loader/runtime combination on FW 12.00. Do not update firmware to follow an upstream example.
+This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using these instructions. Independently confirm that your development environment, exact installed firmware and payload loader support this type of ELF. The project has not established a working loader/runtime combination on FW 13.60. Do not update firmware to follow an upstream example.
 
 1. Download the ELF and its matching `.elf.sha256` from the same experimental prerelease. Read its exact source SHA, SDK version, warnings and notices.
 2. Verify the files in their download directory:
 
    ```sh
    # Linux
-   sha256sum --check SteamController-PS5-v0.1.0-dev.2.elf.sha256
+   sha256sum --check SteamController-PS5-v0.1.0-dev.3.elf.sha256
    # macOS
-   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.2.elf.sha256
+   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.3.elf.sha256
    ```
 
 3. Keep the native DualSense available. Use a recoverable development environment; retain local console access. Do not enable hooks or built-in-radio experiments for a first test.
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.2.elf
+   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.3.elf
    ```
 
    Port 9021 is an inherited convenience default, not a compatibility guarantee. This project has not tested the transfer or loading procedure on physical hardware. Do not repeatedly send the payload when a loader has failed or become unresponsive.
@@ -60,3 +60,9 @@ Profiles remain under `/data/ghostpad/profiles/`. If the stored Default profile 
 The implementation handles SIGINT/SIGTERM and coordinates neutral input, USB cancellation, service shutdown and owned slot cleanup. Physical rollback and ProsperoOS timing are unverified. Use your development environment's known recovery procedure if it becomes unresponsive; do not improvise firmware/system patches.
 
 For a test report, record the exact payload SHA, ELF checksum, SDK, measured console firmware/model, controller revision, USB-C/Puck transport and outcome. Never copy serials, tokens, Bluetooth addresses or bonding keys into the report. Follow `docs/TEST_PLAN.md` and `project-memory/HARDWARE_MATRIX.md` in the corresponding source. Stable release remains blocked until the required physical evidence is recorded and validated.
+
+## Optional on-console settings tile (same ELF)
+
+After pairing, open **Settings & help → PS5 tile → Create tile on PS5**, read the experimental warning and confirm. The embedded icon and metadata register only `SCPS50001` in Media. No second ELF, FTP or separate image upload is needed. Keep the payload running; the tile opens `http://127.0.0.1:8090/`, not the payload itself. The PS5 browser has its own session, so pair there again using the current console code or recovery token. Remove the tile through the PS5 normal Delete action. This installer does not perform native uninstallation or database editing.
+
+See [SETTINGS_TILE.md](SETTINGS_TILE.md) for failure/retry behavior and required FW 13.60 hardware checks. Do not treat an accepted registration request as a tested on-console launch.

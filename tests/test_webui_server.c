@@ -20,7 +20,8 @@ static int injected_bind(int fd, const struct sockaddr *address, socklen_t lengt
 }
 
 static char notification[256];
-static int notifications, mutations;
+static int notifications, mutations, tile_requests;
+int settings_tile_create(char *message,size_t capacity) { tile_requests++;snprintf(message,capacity,"host registration fixture");return 0; }
 static void capture_notification(const char *message) {
     ++notifications; snprintf(notification, sizeof(notification), "%s", message);
 }
@@ -98,6 +99,17 @@ int main(void) {
     assert(request(wire,out,sizeof(out))==200&&strstr(out,"connected"));
     snprintf(wire,sizeof(wire),"POST /api/profile?id=default HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 5\r\n\r\nA=PS\n",g_webui_token);
     assert(request(wire,out,sizeof(out))==200&&mutations==1);
+    snprintf(wire,sizeof(wire),"GET /api/status HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
+    assert(request("POST /api/settings-tile HTTP/1.1\r\nHost: localhost\r\nContent-Length: 17\r\n\r\n",out,sizeof(out))==401);
+    assert(tile_requests==0);
+    snprintf(wire,sizeof(wire),"GET /api/settings-tile HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
+    assert(request(wire,out,sizeof(out))==405&&tile_requests==0);
+    snprintf(wire,sizeof(wire),"POST /api/settings-tile HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 3\r\n\r\nBAD",g_webui_token);
+    assert(request(wire,out,sizeof(out))==400&&tile_requests==0);
+    snprintf(wire,sizeof(wire),"POST /api/settings-tile HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nOrigin: http://evil.example\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 17\r\n\r\nINSTALL SCPS50001",g_webui_token);
+    assert(request(wire,out,sizeof(out))==403&&tile_requests==0);
+    snprintf(wire,sizeof(wire),"POST /api/settings-tile HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nOrigin: http://localhost\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 17\r\n\r\nINSTALL SCPS50001",g_webui_token);
+    assert(request(wire,out,sizeof(out))==200&&tile_requests==1);
     snprintf(wire,sizeof(wire),"GET /api/status HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
     /* A concurrent slow untrusted client does not block authorized APIs. */
     int slow=connect_client();assert(send(slow,"G",1,0)==1);

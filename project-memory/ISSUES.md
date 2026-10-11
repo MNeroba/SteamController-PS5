@@ -108,3 +108,8 @@ All eight P1/eight P2 findings in docs/development/STATIC_AUDIT.md have scoped f
 First launch enables only authenticated WebUI; notification code replaces filesystem enrollment for normal use. Hooks/probe/DualSense handoff remain off. Real notification reliability, HTTP trusted-LAN transport, SDK/runtime ABI, failed target rollback, cancellation, native DualSense coexistence and FW12.00 remain BLOCKED_HARDWARE. Stable hardware gate is not satisfied; dev.2 publication is pending acknowledgement.
 
 M1-229 resolution: dev.2 publication is complete; workflow38141611911 PASS, source6ed81c2ba477285e932bd4593aa029554cadf757, tag/prerelease/six assets/actual downloaded ELF checksum verified. The earlier runner queue and release-pending conditions are resolved. Hardware blockers above remain unchanged; FW12.00 is not claimed compatible.
+
+## M1-232 — current dev.3 gates
+
+P2-CI-STATUS-01: local fix verified; main2a2fb9 CI failure was asynchronous status/profile ordering, reproduced with delayed status. Await exact-source remote green checks before dev.3.
+H-13 SETTINGS-TILE: BLOCKED_HARDWARE. Optional Media title registration, filesystem permissions, ABI termination, visible tile, loopback browser, independent pairing/controller navigation and normal Delete/reinstall on measured FW13.60 untested. Code fails closed on conflicts/errors and never elevates privileges. The tile does not autostart the payload. All existing stable hardware blockers remain; critical code blockers must be recorded if newly found.

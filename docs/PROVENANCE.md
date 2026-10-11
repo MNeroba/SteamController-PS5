@@ -65,3 +65,11 @@ Consolidation provenance review (2026-10-10): corrected a one-character PoorDS4 
 ## 2026-10-11 local hardening
 
 Pairing/HTTP admission, session-owned USB frames/watchdog, bounded metadata parsing and hook installation transaction are authored in this repository under GPL-3.0-or-later. Hook adapter changes derive from the already attributed Puckbridge/PoorDS4 pinned files above; no additional upstream code, assets or dependencies are imported. All inherited notices remain.
+
+## dev.3 settings tile (2026-10-11, before implementation)
+
+| Local paths | Pinned reference | License / reuse / changes |
+|---|---|---|
+| `payload/settings_tile_ps5.c`, `payload/settings-tile/param.json` | SDK `d9c9519116944a7f1c22d262012c53b80b3520b7`, `samples/install_app/payload.c:20–34`; owendswang/ps5-web-file-manager `3659cbbc40022e32229f9919f045018a988f2ef5`, `assets/param.json`, `src/app_installer.c` | SDK example GPL-3.0-or-later, John Törnblom (2025); Web File Manager root GPL-3.0. API declarations and Media/deeplink schema reference only; independently authored installer with exclusive, owned files, explicit authenticated opt-in, exact-title registration and no global-install fallback. No upstream implementation/assets copied. |
+| `payload/settings_tile_ps5.c` termination declaration | itsPLK/ps5-payload-manager `e4e72dc9d831dd09ee8fabc222ad1e7f5139050e`, `src/app_installer.c:34` | API signature reference only; no implementation copied. SDK v0.43 exports the termination symbol. |
+| `payload/settings-tile/source.jpg`, `icon0.png` | Owner attachment, requested for dev.3 publication on 2026-10-11 | Original JPEG SHA256 `fec522611c33371f416e6df59dbfb9656937470c0382f74e1151999db15de69c`; PNG `b5bbe4c1a321435f1b51ca64ebda9234e58f4a64d00972e05563c4950781bb55`. PNG is a deterministic stored 512×512 build asset converted with macOS sips; preserve original photo. Owner authorization does not establish a separate GPL/CC0 license or photographer attribution. |

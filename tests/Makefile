@@ -6,7 +6,7 @@ SC2_SCAN_GC_SECTIONS := -Wl,-dead_strip
 else
 SC2_SCAN_GC_SECTIONS := -Wl,--gc-sections
 endif
-TESTS := $(BUILD)/test_webui_server $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_usb_helpers $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue $(BUILD)/test_runtime_control $(BUILD)/test_runtime_instance $(BUILD)/test_credential_guard $(BUILD)/test_runtime_policy
+TESTS := $(BUILD)/test_settings_tile_ps5 $(BUILD)/test_settings_tile $(BUILD)/test_webui_server $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_usb_helpers $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue $(BUILD)/test_runtime_control $(BUILD)/test_runtime_instance $(BUILD)/test_credential_guard $(BUILD)/test_runtime_policy
 
 .PHONY: all test sanitize clean browser-fixture
 
@@ -22,6 +22,8 @@ $(BUILD)/webui_profile_fixture: webui_profile_fixture.c ../payload/sc2_profile.c
 	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -pthread -o $@
 
 test: $(TESTS)
+	./$(BUILD)/test_settings_tile_ps5
+	./$(BUILD)/test_settings_tile
 	./$(BUILD)/test_webui_server
 	./$(BUILD)/test_webui_http
 	./$(BUILD)/test_webui_peer_policy
@@ -196,3 +198,14 @@ $(BUILD)/test_webui_server: test_webui_server.c ../payload/webui.c ../payload/we
 
 # Shared storage contracts must invalidate incremental host binaries.
 $(BUILD)/test_webui_http $(BUILD)/test_webui_server $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_ds_handoff $(BUILD)/test_game_hooks: ../payload/private_file.h
+
+$(BUILD)/test_settings_tile: test_settings_tile.c ../payload/settings_tile.c ../payload/settings_tile.h | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -o $@
+
+../payload/settings_tile_assets.h: ../payload/gen_settings_tile.py ../payload/settings-tile/icon0.png ../payload/settings-tile/param.json
+	python3 ../payload/gen_settings_tile.py
+
+$(BUILD)/test_settings_tile_ps5: test_settings_tile_ps5.c ../payload/settings_tile.c ../payload/settings_tile_ps5.c ../payload/settings_tile.h ../payload/settings_tile_assets.h | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload test_settings_tile_ps5.c ../payload/settings_tile.c -o $@
+
+$(BUILD)/test_webui_server: ../payload/settings_tile.h

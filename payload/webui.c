@@ -18,6 +18,7 @@
 #include "webui_peer_policy.h"
 #include "webui_json.h"
 #include "runtime_control.h"
+#include "settings_tile.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -217,6 +218,17 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     }
     if (route.id == WEBUI_ROUTE_INDEX) {
         reply(fd, 200, "text/html; charset=utf-8", (const char *)webui_html, webui_html_len);
+        return;
+    }
+    if (route.id == WEBUI_ROUTE_SETTINGS_TILE) {
+        if (webui_stopping() || request.content_length != sizeof(SETTINGS_TILE_CONFIRM)-1 ||
+            !webui_http_profile_body_valid(&request, body) ||
+            memcmp(body, SETTINGS_TILE_CONFIRM, sizeof(SETTINGS_TILE_CONFIRM)-1)) {
+            REPLY_TXT(fd, 400, "Explicit tile confirmation required; no installation performed"); return;
+        }
+        char message[256];
+        int installed = settings_tile_create(message, sizeof(message));
+        REPLY_TXT(fd, installed ? 500 : 200, message);
         return;
     }
     if (route.id == WEBUI_ROUTE_STATUS) {

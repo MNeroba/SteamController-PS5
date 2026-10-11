@@ -10,3 +10,5 @@ steam-controller.jpg
 *.elf.sha256
 __pycache__/
 *.pyc
+
+payload/settings_tile_assets.h

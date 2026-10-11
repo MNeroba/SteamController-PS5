@@ -494,12 +494,16 @@ dialog.profile-guard::backdrop{background:#0009}
   <!-- SETTINGS & HELP -->
   <section id="tab-help" hidden>
     <nav class="sub" aria-label="Settings sections"><div class="subs">
-      <button data-sec="setup">Quick setup</button><button data-sec="pause">Pause</button><button data-sec="handoff">DualSense hand-off</button><button data-sec="ingame">In games</button><button data-sec="vibration">Vibration test</button><button data-sec="menu">On-console menu</button><button data-sec="bridge">Game bridge check</button><button data-sec="log">Troubleshooting log</button>
+      <button data-sec="setup">Quick setup</button><button data-sec="tile">PS5 tile</button><button data-sec="pause">Pause</button><button data-sec="handoff">DualSense hand-off</button><button data-sec="ingame">In games</button><button data-sec="vibration">Vibration test</button><button data-sec="menu">On-console menu</button><button data-sec="bridge">Game bridge check</button><button data-sec="log">Troubleshooting log</button>
     </div></nav>
     <div class="help">
       <section class="sec wide card" data-sec="setup" id="sec-setup">
         <div class="ch"><div><h3>Quick setup</h3><p>Recommended: play with the Steam Controller as your main controller, with game rumble sent to it. Turn the Steam Controller off at any time and your DualSense takes over; wake the Steam Controller with its <b>Steam</b> button to switch back.</p></div></div>
         <div class="body"><div class="btns"><button class="primary" id="ghRec">Use recommended settings</button></div></div>
+      </section>
+      <section class="sec card" data-sec="tile" id="sec-tile">
+        <div class="ch"><div><h3>Settings on your PS5</h3><p>Create a Steam Controller Settings tile in Media using the included controller icon. It opens this interface on the console while the payload is running. Experimental: FW 13.60 console behavior has not been tested.</p></div></div>
+        <div class="body"><div class="btns"><button id="tileInstall">Create tile on PS5</button></div><p class="status" id="tileStatus" role="status" aria-live="polite">Optional, installed only after confirmation. Pair again in the PS5 browser. Delete the tile using the console's normal Delete action.</p></div>
       </section>
       <section class="sec card" data-sec="pause" id="sec-pause">
         <div class="ch"><div><h3>Pause SteamController-PS5</h3><p>Hold the Steam Controller's <kbd>…</kbd> button for 5 seconds, anywhere (in a game or on the home screen), to pause SteamController-PS5: the Steam Controller stops sending input and your DualSense works exactly as normal. Hold it for 5 seconds again to resume. The controller gives a long buzz when pausing and a short one when resuming.</p></div></div>
@@ -1317,6 +1321,13 @@ function paintHap(){const h=status.hap,el=$("#hapDiag");if(!h){el.textContent=""
   const txt=!status.haptics?"Controller not connected to the payload.":
    `Queued ${h.q}, sent ${h.sent}, failed ${h.fail}. Last: ${h.q?(h.err?"error "+h.err:"OK")+" via "+via:"none yet"}. OUT endpoint: ${h.out>=0?"0x"+h.out.toString(16).padStart(2,"0"):"not available"}.`;
   if(el.textContent!==txt)el.textContent=txt}
+$("#tileInstall").onclick=async()=>{
+  if(!confirm("Create the Steam Controller Settings tile in PS5 Media? This writes its own app metadata and icon. FW 13.60 behavior is unverified. The payload must be running to open settings."))return;
+  const button=$("#tileInstall");button.disabled=true;$("#tileStatus").textContent="Requesting tile registration…";
+  try{$("#tileStatus").textContent=await api("/api/settings-tile",{method:"POST",body:"INSTALL SCPS50001"})}
+  catch(error){$("#tileStatus").textContent="Tile request failed: "+error.message}
+  finally{button.disabled=false}
+};
 $("#logShow").onclick=async()=>{const p=$("#log");if(!p.hidden){p.hidden=true;$("#logShow").textContent="Show log";return}p.textContent=await api("/api/log");p.hidden=false;$("#logShow").textContent="Hide log";p.scrollTop=p.scrollHeight};
 $("#logPrev").onclick=async()=>{const t=await api("/api/log?prev=1");try{await navigator.clipboard.writeText(t);toast("Previous run's log copied")}catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}};
 $("#logCopy").onclick=async()=>{const t=await api("/api/log");try{await navigator.clipboard.writeText(t);toast("Log copied")}catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}};

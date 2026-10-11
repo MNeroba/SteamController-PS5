@@ -78,6 +78,12 @@ static void test_query_values_are_bounded_and_methods_explicit(void) {
 }
 
 int main(void) {
+    webui_route_request_t tile;
+    CHECK(webui_route_parse("/api/settings-tile", &tile)==0);
+    CHECK(tile.id==WEBUI_ROUTE_SETTINGS_TILE);
+    CHECK(webui_route_method_allowed(tile.id,1));
+    CHECK(!webui_route_method_allowed(tile.id,0));
+    CHECK(webui_route_parse("/api/settings-tile?title=OTHER", &tile)==-1);
     test_route_names_are_exact();
     test_query_keys_are_exact_and_unique();
     test_query_values_are_bounded_and_methods_explicit();

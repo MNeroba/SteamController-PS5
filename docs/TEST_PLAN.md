@@ -82,7 +82,7 @@ Gate labels describe the cases actually executed, not the intended target covera
 
 | ID | Transport / feature | Required observed behavior |
 |---|---|---|
-| H-01 | Baseline PS5 | Confirm model, exact installed firmware (owner reports 12.00; verify on-console), loader, and native DualSense works before payload |
+| H-01 | Baseline PS5 | Confirm model, exact installed firmware (owner reports 13.60; verify on-console), loader, and native DualSense works before payload |
 | H-02 | USB | Actual wired Steam Controller connects, pads/sticks/triggers and PS/Home visible in UI and game |
 | H-03 | Puck | Official receiver recognized via correct HID interface and actual SC state received |
 | H-04 | Slot | User profile correct; no duplicate virtual pad; native DualSense still works |
@@ -147,3 +147,7 @@ T-P61: retain regression negatives for formatter overflow, incomplete store load
 Each required hardware matrix row must link to its own `### H-xx` section in the unchanged stable `project-memory/TEST_LOG.md` path. Record measured values with these labels: `Firmware: <exact version>`, `SDK: v0.43`, `Payload commit: <full 40-character SHA>` and `Result: VERIFIED_HARDWARE`, plus PS5 model, controller model/firmware and transport matching the matrix. Do not turn an unrun row into evidence.
 
 The stable checker compares the tested SHA with the release source. It accepts that exact commit or its descendant only when `payload/`, `scripts/`, `tests/` and `.github/workflows/` are unchanged. This permits committing documentation/evidence after a real test but prevents old hardware results certifying new code or build inputs. Full normal, ASan/UBSan, Chromium, embedded assets, clean SDK build and downloaded ELF checksum gates also run before stable publication. All current physical gates remain NOT_RUN; DEV prereleases do not satisfy them.
+
+## H-13 — optional settings tile on measured FW 13.60
+
+**NOT_RUN / BLOCKED_HARDWARE.** Record measured FW/build/model and exact dev.3 source/ELF digest before consenting to app registration. Retain the stock DualSense. Verify: no installation on startup or cancelled confirmation; authenticated confirmation creates only SCPS50001 under /user/app; correct 512×512 supplied icon in Media; repeat request does not overwrite other titles; browser opens loopback8090; fresh pairing/session recovery works; D-pad/stick selection and text entry work; payload stopped/reboot yields an unavailable page without reboot autostart; native DualSense, games and existing tiles unchanged; normal console Delete removes only our tile; reinstall works. Record all API errors, permissions, termination and optional rollback behavior. Do not fabricate a target pass from host stubs. No system_ex writes, Shell memory patch, privilege escalation or radio operation is used by this feature.

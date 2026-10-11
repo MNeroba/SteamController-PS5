@@ -20,7 +20,8 @@ typedef enum {
     WEBUI_ROUTE_PAUSE,
     WEBUI_ROUTE_DUALSENSE,
     WEBUI_ROUTE_BRIDGE,
-    WEBUI_ROUTE_LOG
+    WEBUI_ROUTE_LOG,
+    WEBUI_ROUTE_SETTINGS_TILE
 } webui_route_id_t;
 
 typedef struct {

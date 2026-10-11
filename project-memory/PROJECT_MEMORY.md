@@ -24,7 +24,7 @@ GitHub connector works for Git objects and read-only Actions, not manual workflo
 
 ## Next safe action
 
-DEV2 publication and actual downloaded checksum are verified (M1-229). Release dev/v0.1.0-dev.2 points to6ed81c2ba477285e932bd4593aa029554cadf757; workflow38141611911 PASS, six assets. Published ELF SHA256bab7c92d8b49b56356a8d616104fc99ef69c49084adb49a76b574e92cb07dfbf. The previous runner queue blocker is resolved. Read CURRENT_STATUS.md, TEST_LOG.md M1-229 and docs/TEST_PLAN.md before continuation. Remaining runtime acceptance requires measured FW12.00 and explicitly authorized controlled physical tests; all hardware rows remain NOT_RUN. No firmware update, radio operation or stable release is authorized by DEV publication.
+DEV2 publication and actual downloaded checksum are verified (M1-229). Release dev/v0.1.0-dev.2 points to6ed81c2ba477285e932bd4593aa029554cadf757; workflow38141611911 PASS, six assets. Published ELF SHA256bab7c92d8b49b56356a8d616104fc99ef69c49084adb49a76b574e92cb07dfbf. The previous runner queue blocker is resolved. Read CURRENT_STATUS.md, TEST_LOG.md M1-229 and docs/TEST_PLAN.md before continuation. Remaining runtime acceptance requires measured FW13.60 (owner-reported upgrade2026-10-11) and explicitly authorized controlled physical tests; all hardware rows remain NOT_RUN. No firmware update, radio operation or stable release is authorized by DEV publication.
 
 ## M1-226 — Audit remediation and first-launch task intake — 2026-10-11
 
@@ -33,3 +33,9 @@ Main ffff5e08905d394b67a7da070fcf4657a250f070 unchanged; no open PRs. DEV workfl
 M1-227: automatic authenticated WebUI, local notification pairing and 16 static audit findings remediated. Normal, ASan/UBSan and SDK gates PASS on full 255-file source export; Chromium202 PASS on the matching portal, clean-export browser repeat PASS. DEV policy blocks newly discovered critical defects; no hardware or release claim before acknowledgement.
 
 M1-229: exact source push gates and all repeated DEV gates PASS; prerelease dev/v0.1.0-dev.2 and six assets acknowledged, actual downloaded ELF/checksum verified. See CURRENT_STATUS.md for digest and remaining hardware gates.
+
+M1-231: owner reports upgrading the console from12.00 to13.60 on2026-10-11; current target is13.60, unmeasured/unverified. Earlier12.00 records and dev.2 metadata remain historical. SDKv0.43 and safety policy unchanged. New DEV packaging currently pins12.00 and must be adapted with its regression before another release; see CURRENT_STATUS.md. No on-console action was taken.
+
+## M1-232 — dev.3 implementation continuation
+
+Current intended target13.60 (owner report, firmware_verified=false); SDKv0.43. Exactly one ELF, with optional authenticated Settings & help → PS5 tile installation and embedded owner-supplied PNG/metadata. ADR-054/F105/M1-232 document ownership, retry and failure contracts; H-13 is physical-only. Local normal/sanitizer40 C suites, Chromium214 and SDK build PASS; publish only after fresh complete-source gates and remote acknowledgement. Current next commands are in SESSION_LOG M1-232. Existing dev.2 tag/assets/history remain immutable.

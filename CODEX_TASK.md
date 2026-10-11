@@ -1,6 +1,6 @@
 # SteamController-PS5 — active execution specification
 
-Revision 1.2 · 2026-10-10 · Target: owner-reported **PS5 FW 12.00**, hardware-unverified · **SDK v0.43**
+Revision 1.2 · 2026-10-10 · Target: owner-reported **PS5 FW 13.60**, hardware-unverified · **SDK v0.43**
 
 The [full original specification](docs/archive/CODEX_TASK-1.1.md) is preserved verbatim and remains authoritative for detailed contracts, safety rules, evidence labels and acceptance criteria. Read it in full before substantial implementation. This file consolidates the current execution order; it does not revoke uncompleted requirements. Historical setup/PR instructions are superseded by the owner's direct-main solo-development policy and separate experimental DEV authorization.
 
@@ -8,7 +8,7 @@ The [full original specification](docs/archive/CODEX_TASK-1.1.md) is preserved v
 
 One maintainable native payload specialized for Steam Controller 2026 via USB-C and official Puck. Keep full Steam input capabilities in a reusable core with one slot/session authority and virtual DualSense. Reuse audited modules before rewriting. Do not conflate implemented code, host tests, SDK build or physical runtime success.
 
-Use VERIFIED_CODE, VERIFIED_HOST_TEST, VERIFIED_PS5_BUILD, VERIFIED_HARDWARE, UPSTREAM_CLAIM, EXTERNAL_HARDWARE, HYPOTHESIS and BLOCKED. No compatibility claim for 12.00 before a measured real run. Preserve legal notices and exact pins. No stock-radio/BLE/HCI, firmware writes or forced DualSense disconnect without the original hardware/approval gates.
+Use VERIFIED_CODE, VERIFIED_HOST_TEST, VERIFIED_PS5_BUILD, VERIFIED_HARDWARE, UPSTREAM_CLAIM, EXTERNAL_HARDWARE, HYPOTHESIS and BLOCKED. No compatibility claim for 13.60 before a measured real run; earlier 12.00 records remain historical. Preserve legal notices and exact pins. No stock-radio/BLE/HCI, firmware writes or forced DualSense disconnect without the original hardware/approval gates.
 
 ## Completed software milestones
 
@@ -39,3 +39,11 @@ Read AGENTS, full original specification, source/evidence, architecture, BLE, te
 Publish only reviewed paths on the verified complete main tree with expected parent and force=false. The desktop checkout is an inherited dirty overlay, not an authoritative Git snapshot. Never stage/publish it wholesale. External contributors use PRs per CONTRIBUTING; the owner uses direct main updates until the first successful release. Do not rewrite history without a separate backup/proposal and explicit force-push approval.
 
 At end: inspect diff, run diff-check/tests/sanitizers/build/browser as relevant, verify publication/Actions and actual downloadable assets, update persistent current status and exact next commands, report only acknowledged commits/releases. Hardware-dependent work remains explicit BLOCKED, not simulated success.
+
+### Owner target update — 2026-10-11 (M1-231)
+
+Owner reports upgrading from FW12.00 to13.60. Use13.60 for future measured hardware/launcher/BLE checks; no update was performed by this agent. Keep SDKv0.43 and safety gates. Published dev.2 metadata remains unchanged. Before another DEV release, update the current12.00 packaging policy/warning/regression and current guides together; never relabel old test results.
+
+### Current dev.3 task — M1-232
+
+Owner requests supplied icon and on-console settings launcher in **one ELF**. Implemented optional authenticated confirmation, embedded icon/metadata and owned exact-title registration; local software/build evidence only. Finalize fresh-source and remote gates, publish experimental dev/v0.1.0-dev.3, record exact release acknowledgement. Current console target owner-reported FW13.60, unmeasured; SDKv0.43 and safety defaults retained. H-13 is hardware-gated. Historical12.00/dev.2 records remain unchanged. See ADR-054 and SETTINGS_TILE.md.
