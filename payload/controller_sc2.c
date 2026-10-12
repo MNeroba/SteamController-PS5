@@ -139,7 +139,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
     /* COMPLETE is multiplexed for the whole FS session. Do not consume a
      * completion owned by another endpoint before the scan has opened its
      * candidate set. */
-    if (resources->active_transfers != 0)
+    if ((resources->active_transfers | resources->completed_transfers | resources->retired_transfers) != 0)
         return USB_RESOURCES_BAD_STATE;
     for (int i = 0; i < n; i++) {
         if (resources->opened_endpoints & (UINT32_C(1) << i))
@@ -203,6 +203,7 @@ int sc2_find_active_ep(int fd, usb_resources_t *resources,
             complete_result = usb_session_complete_any_transfer(resources,
                     ops, &c, &completed_endpoint, ops_context);
             if (complete_result != USB_SESSION_OK) break;
+            (void)usb_resources_take_completion(resources, completed_endpoint);
             int i = completed_endpoint;
             if (i >= 0 && i < n && opened[i] && started[i]) {
                 started[i] = 0;

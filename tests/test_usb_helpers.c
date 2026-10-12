@@ -38,7 +38,7 @@ static int fake_start(int fd, void *configuration, void *opaque) {
     uint8_t endpoint = ((struct usb_fs_start *)configuration)->ep_index;
     CHECK(endpoint == 1 || endpoint == 2);
     fake->start_calls++;
-    if (fake->endpoint) fake->observed_buffer = fake->endpoint->ppBuffer[0];
+    if (fake->endpoint && fake->endpoint->ppBuffer) fake->observed_buffer = fake->endpoint->ppBuffer[0];
     if (fake->fail_start_once) {
         fake->fail_start_once = 0;
         errno = EIO;
@@ -53,6 +53,7 @@ static int fake_complete(int fd, void *configuration,
     CHECK(fd == 42 && configuration != NULL &&
           completed_endpoint_index != NULL);
     fake->complete_calls++;
+    if(fake->endpoint)fake->endpoint->aFrames=1;
     if (fake->fail_complete_once) {
         fake->fail_complete_once = 0;
         errno = EIO;
@@ -135,6 +136,7 @@ int main(void) {
     const uint8_t report[] = {0x80, 1, 2, 3};
     fake_usb_t fake = {0};
     init_session(&resources, 2);
+    fake.endpoint = &endpoints[1];
     fake.completed[0] = 2;
     fake.completed[1] = 1;
     fake.completion_count = 0;
@@ -171,7 +173,7 @@ int main(void) {
     CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
     CHECK(fake.stop_calls == 2 && resources.fd == -1);
 
-    fake = (fake_usb_t){ .fail_start_once = 1 };
+    fake = (fake_usb_t){ .fail_start_once = 1, .endpoint = &endpoints[1] };
     init_session(&resources, 1);
     CHECK(usb_send_out(&resources, &ops, &endpoints[1], 1, report,
                        sizeof(report), "start-stop", 0, 2, &fake) == -EIO);

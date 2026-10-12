@@ -40,6 +40,7 @@ void sc2_select_active_name(char *o,size_t n) { if(n)*o=0; }
 int sc2_store_valid_id(const char *id) { return !strcmp(id,"default"); }
 void sc2_store_list(void (*cb)(const char*,const char*,void*),void *u) { cb("default","Default",u); }
 int sc2_store_load(const char *id,sc2_profile_t *p) { (void)id; memset(p,0,sizeof(*p));return 0; }
+void sc2_active_get(sc2_profile_t *p) { memset(p,0,sizeof(*p)); }
 void sc2_profile_default(sc2_profile_t *p) { memset(p,0,sizeof(*p)); }
 int sc2_profile_parse_checked(const char *t,sc2_profile_t *p,int c) { (void)t;(void)p;(void)c;return 0; }
 int sc2_store_save(const char *id,const sc2_profile_t *p) { (void)id;(void)p;++mutations;return 0; }
@@ -110,6 +111,18 @@ int main(void) {
     assert(request(wire,out,sizeof(out))==403&&tile_requests==0);
     snprintf(wire,sizeof(wire),"POST /api/settings-tile HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nOrigin: http://localhost\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 17\r\n\r\nINSTALL SCPS50001",g_webui_token);
     assert(request(wire,out,sizeof(out))==200&&tile_requests==1);
+    snprintf(wire,sizeof(wire),"GET /api/status HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
+    assert(request("GET /api/diagnostics HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==401);
+    snprintf(wire,sizeof(wire),"GET /api/diagnostics HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nOrigin: http://evil.example\r\n\r\n",g_webui_token);
+    assert(request(wire,out,sizeof(out))==403);
+    snprintf(wire,sizeof(wire),"GET /api/diagnostics?path=secrets HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
+    assert(request(wire,out,sizeof(out))==400);
+    snprintf(wire,sizeof(wire),"POST /api/diagnostics HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\nContent-Length: 0\r\n\r\n",g_webui_token);
+    assert(request(wire,out,sizeof(out))==405);
+    snprintf(wire,sizeof(wire),"GET /api/diagnostics HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
+    assert(request(wire,out,sizeof(out))==200 && strstr(out,DIAGNOSTICS_FILENAME));
+    assert(strstr(out,"No Steam Controller detected")&&!strstr(out,g_webui_token)&&!strstr(out,code));
+    assert(strstr(out,"Content-Disposition: attachment;")&&strstr(out,"Cache-Control: no-store"));
     snprintf(wire,sizeof(wire),"GET /api/status HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
     /* A concurrent slow untrusted client does not block authorized APIs. */
     int slow=connect_client();assert(send(slow,"G",1,0)==1);

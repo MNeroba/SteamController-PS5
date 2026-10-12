@@ -1,3 +1,21 @@
+# Current status — 2026-10-12
+
+## Dev.3 LibrePad integration candidate — M1-237
+
+**UNPUBLISHED. Owner review/explicit approval is required before dev.3 dispatch, tag or release. Dev.1/dev.2 releases are unchanged.** This supersedes historical publication next actions below.
+
+- Baseline main6dc554633b133c0dd8c865168010306e38e66384 verified complete267 blobs; old f480e58 push gates both now PASS (queue resolved).
+- Implemented portable user-list consensus and existing-worker owned VDA recovery, serialized Add/release ownership, IN/OUT completion retention and cancellation retirement,500ms watchdog, authenticated bounded/redacted diagnostic download, truthful limited connection notices, matching Payload Manager metadata and mandatory two-section changelogs.
+- Existing single ELF/tile/artwork/pairing/profiles/gyro/touch/haptics preserved. Tile remains explicitly confirmed. SDKv0.43, /data/ghostpad, safe defaults retained. No automatic account binding/native DualSense mutation, storage migration, new generic controller support or radio operation added.
+- Local normal/sanitizer44 C suites plus existing Python contracts/9 artwork/7 DEV/5 changelog checks; Chromium220; clean45-C SDKv0.43 and optional-dependency checks recorded in TEST_LOG. Fresh-source/source-SHA package and new main push acknowledgement follow.
+- H-13 Settings tile, H-14 user recovery/native coexistence and H-15 actual USB cancellation/watchdog/diagnostic browser/notification behavior remain NOT_RUN/BLOCKED_HARDWARE. Positive Add receipt semantics and terminal USB close require physical confirmation. Stable gate still fails closed.
+
+Next: finish exact-source export/packaging/diff review; push complete tested source with expected main parent and zero deletions, record full source SHA/CI/checksum, then stop for owner review. **Do not dispatch dev-release.yml or create dev.3 tag.**
+
+---
+
+## Historical status (previous checkpoint, retained)
+
 # Current status — 2026-10-11
 
 ## Published dev.2
@@ -42,3 +60,7 @@ Implementation source ACK: f480e58b953c75a87d7f1b929789ad023fc05fb1; tree 91184e
 External release blocker: exact-source Host38170245378/job114561164646 and SDK38170245381/job114561164692 still queued, runner_id0, steps0 at20:05:58 UTC. Earlier candidate jobs had the same unassigned state for over16min; obsolete0a3dacb cancellations requested. No compiler failure, global incident or billing cause is proven. dev.3 tag/release/assets NOT_PUBLISHED; do not represent local packaging as a GitHub download. Leave current candidate checks queued; do not bypass the gate.
 
 Next exact action: query latest push runs for f480e58b953c75a87d7f1b929789ad023fc05fb1; only after both succeed, dispatch dev-release.yml on main with source_sha=f480e58b953c75a87d7f1b929789ad023fc05fb1, version=v0.1.0-dev.3 (authenticated browser form is prepared). Then wait repeated gates, verify tag points to selected source, prerelease=true, six assets/one ELF, actual downloaded SHA256 and source; append acknowledgement. Existing dev.2/tag/assets and historical FW12.00 records unchanged. No physical deployment, app registration or radio/firmware operation performed.
+
+## M1-235 — LibrePad v1.1.2 task intake, 2026-10-12
+
+Owner requests integration in existing unpublished dev.3 and explicitly withholds release/tag approval. This supersedes earlier dispatch next actions: DO NOT DISPATCH or publish dev.3 until owner approval. Main6dc554633b133c0dd8c865168010306e38e66384 has267 blobs; all match local bytes. Original dev.3 sourcef480e58b953c75a87d7f1b929789ad023fc05fb1 Host38170245378/SDK38170245381 both completed/success; old runner queue is resolved. No open PR; only dev.1/dev.2 published, unchanged. Reference tagv1.1.2 annotatedbb60defad681563742448faaefa29b440ea83a0e resolves7466317b4b356249e07770f3914c995e1a4d633a. RootGPL3, no code copied yet. Release now warns of rejected symlink storage migration and recommends1.1.3; do not adopt migration. Logout recovery is upstream host evidence only. Preserve single ELF/tile, USB/Puck/security/defaults and /data/ghostpad. Next: audit pinned virtual/USB/diagnostics/metadata source, add regressions, implement smallest owned-worker recovery and bounded authenticated report, changelog/metadata gates, full local validation and reviewed main push; stop before DEV publication. No hardware available; all physical rows NOT_RUN.

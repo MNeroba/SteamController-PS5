@@ -40,6 +40,8 @@ typedef struct {
     int32_t virtual_handle;
     int virtual_ready;
     int virtual_deleting;
+    int virtual_creating;
+    int virtual_blocked; /* ambiguous receipt: never repeat AddDevice */
     int confirmed;
 } slot_registry_entry_t;
 
@@ -54,6 +56,7 @@ typedef struct {
     uint32_t next_generation[SLOT_REGISTRY_MAX_SLOTS];
     slot_registry_entry_t entries[SLOT_REGISTRY_MAX_SLOTS];
     int initialized;
+    int creation_blocked; /* ambiguous Add receipt inhibits all future creation */
 } slot_registry_t;
 
 int slot_registry_init(slot_registry_t *registry);
@@ -86,7 +89,8 @@ int slot_registry_delete_virtual(slot_registry_t *registry,
                                  slot_registry_token_t token,
                                  slot_registry_delete_fn delete_fn,
                                  void *context);
-/* Returns 1 on first confirmation, 0 if already confirmed, or a negative
+/* Button activity only: this is not proof of PS5 account binding.
+ * Returns 1 on first confirmation, 0 if already confirmed, or a negative
  * SLOT_REGISTRY_* result for an invalid/stale token. */
 int slot_registry_mark_confirmed(slot_registry_t *registry,
                                  slot_registry_token_t token);
@@ -94,3 +98,8 @@ int slot_registry_mark_confirmed(slot_registry_t *registry,
 int slot_registry_release(slot_registry_t *registry,
                           slot_registry_token_t token);
 uint32_t slot_registry_count_claimed(slot_registry_t *registry);
+
+/* Reserve creation before any side effect. Finish retains a positive owned
+ * handle even if release was requested during AddDevice, for later cleanup. */
+int slot_registry_begin_virtual_create(slot_registry_t *registry, slot_registry_token_t token);
+int slot_registry_finish_virtual_create(slot_registry_t *registry, slot_registry_token_t token, int32_t handle);

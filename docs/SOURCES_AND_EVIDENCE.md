@@ -56,3 +56,12 @@
 - Per-device ShellUI Steam icon/name override: NOT_VERIFIED.
 
 Record new evidence as append-only items with exact links, date, source revision and independent test status, not retroactive replacement of prior failures.
+
+
+## LibrePad v1.1.2 review — 2026-10-12
+
+Tagbb60defad681563742448faaefa29b440ea83a0e → commit7466317b4b356249e07770f3914c995e1a4d633a; actual inspected src/ps5/virtual_controller.c:375–435/470–650 (host logout recovery; hardware unconfirmed), src/input/usb_device.c:184–252 (multiplexed completions/output validation), src/dashboard/http_server.c:315–365 (download concept) and config/payload/LibrePadPS5.elf.json (metadata concept). No implementation copied. Root GPL3 reviewed. Release notes now explicitly warn of symbolic-link storage startup failure and recommend1.1.3; do not adopt migration. Our independently authored observer/lifecycle/report extend existing modules and retain /data/ghostpad.
+
+Payload Manager schema verified at itsPLK/ps5-payload-manager e4e72dc9d831dd09ee8fabc222ad1e7f5139050e CUSTOM_REPOSITORIES.md: name/filename/url/description/version/category/checksum; top-level catalog wrapper is separate. Candidate sidecar uses a future dev.3 URL, not an already available asset. No physical compatibility is inferred from either reference.
+
+FreeBSD kernel reference (engineering evidence, no code copied): freebsd/freebsd-src 12b769ed36a115da3b5013c92cdf294a3a5de98d sys/dev/usb/usb_generic.c:1444–1463 demonstrates STOP may queue a late cancel completion; :213–231 ugen_close performs transfer teardown; usb_dev.c:939–976 close callback releases USB FIFOs. Pinned bytes match releng/12.0 fetched source. This supports retiring cancelled indices and retaining session buffers through terminal close; it does not prove ProsperoOS behavior. Failed-close is a terminal relinquishment (no retry on potentially reused fd); H-15 must confirm kernel teardown. SDKv0.43 libSceUserService stub exports sceUserServiceGetLoginUserIdList (llvm-nm checked); actual return semantics remain H-14.

@@ -75,3 +75,11 @@ Pairing/HTTP admission, session-owned USB frames/watchdog, bounded metadata pars
 | `payload/settings-tile/source.jpg`, `icon0.png` | Owner attachment, requested for dev.3 publication on 2026-10-11 | Original JPEG SHA256 `fec522611c33371f416e6df59dbfb9656937470c0382f74e1151999db15de69c`; PNG `b5bbe4c1a321435f1b51ca64ebda9234e58f4a64d00972e05563c4950781bb55`. PNG is a deterministic stored 512×512 build asset converted with macOS sips; preserve original photo. Owner authorization does not establish a separate GPL/CC0 license or photographer attribution. |
 
 M1-233 lazy installer loading: SDK v0.43 pin `d9c9519116944a7f1c22d262012c53b80b3520b7`, `samples/hello_dlfcn/main.c:53–70` (John Törnblom, GPL-3.0-or-later) demonstrates dlopen/dlsym/dlclose. API usage reference only. The authored adapter resolves the three installer functions only after authenticated tile confirmation, with checked cleanup and no new mandatory AppInstUtil ELF dependency; no sample implementation copied.
+
+## LibrePadPS5 v1.1.2 engineering review (2026-10-12, before changes)
+
+| Planned local paths | Pinned reference | Rights and adaptation |
+|---|---|---|
+| user-session/slot lifecycle, USB completion, diagnostics, release metadata | arwebSE/LibrePadPS5 `7466317b4b356249e07770f3914c995e1a4d633a` (v1.1.2; root GPL-3.0), `src/ps5/virtual_controller.c:375–435`, `src/input/usb_device.c:184–252`, `src/dashboard/http_server.c:315–365`, `config/payload/LibrePadPS5.elf.json` | General engineering/API/schema reference only; independently authored extensions of our existing registry/session/HTTP stack under GPL-3.0-or-later. No upstream implementation copied. No XInput/8BitDo commands, storage migration, guessed native handles, MBus binding or BT code imported. Upstream recovery has host tests but no physical confirmation; hardware reports for unrelated devices do not establish Steam compatibility. |
+
+FreeBSD 12b769ed36a115da3b5013c92cdf294a3a5de98d sys/dev/usb/usb_generic.c / usb_dev.c, BSD-2-Clause-FreeBSD: read-only engineering evidence for USBFS cancellation/close; zero copied implementation. Prospero behavior remains unverified.

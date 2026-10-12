@@ -117,3 +117,10 @@ H-13 SETTINGS-TILE: BLOCKED_HARDWARE. Optional Media title registration, filesys
 M1-233: optional installer startup dependency fixed with lazy API loading and ELF dependency guard; missing capability fails only tile request. Physical loader/registration behavior remains H-13. Initial0a3dacb source must not be selected for dev.3; use the follow-up SHA after its own green push checks. Earlier push jobs waited without runner allocation; no cause beyond runner_id0/empty steps proven.
 
 M1-234: restrictive inherited umask could hide new tile assets; failing mode regression fixed and normal/sanitizer/build checks pass. No new known critical blocker remains. Native permissions/readability/visibility still H-13 NOT_RUN. Current remote release gate is unassigned GitHub runners, not a diagnosed source compilation failure.
+
+
+## M1-236 dev.3 integration checkpoint — 2026-10-12
+
+P1-USB-CANCEL-02 FIXED_HOST: late STOP completion could be assigned to a restarted index; retired masks and completed-IN preservation prevent reuse/overwrite until FS teardown. P1-VDA-CREATE-02 FIXED_HOST: pending Add reservation retains generation/positive ownership during release; ambiguous alias inhibits future creation without deleting native/other owned handles. P1-USER-RECOVERY-01 IMPLEMENTED_HOST: confirmed user-list consensus drives existing-worker recovery; failed deletion remains conservative, no automatic account binding. Positive Add return ABI and native coexistence remain physical H-14 blockers.
+
+P1-DIAGNOSTICS-01 IMPLEMENTED_HOST/BROWSER: bounded authenticated/redacted report, no arbitrary files. P2-METADATA-CHANGELOG-01 IMPLEMENTED_HOST: seven assets/one ELF, exact source/version/checksum, mandatory two-section notes. Settings tile retained H-13; USBFS terminal close/cancellation/watchdog and PS5 downloads/notifications H-15 NOT_RUN. Old runner queue resolved. dev.3 release/tag approval explicitly withheld by owner; this is a publication boundary, not an inferred technical failure. Existing dev.2 unchanged.

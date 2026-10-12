@@ -1,6 +1,7 @@
 PS5_HOST ?= 192.168.69.44
 PORT     ?= 9021
 TARGET   := ghost-control-ps5.elf
+.DEFAULT_GOAL := all
 
 ifndef PS5_PAYLOAD_SDK
 $(error PS5_PAYLOAD_SDK is not set)
@@ -11,25 +12,31 @@ include $(PS5_PAYLOAD_SDK)/toolchain/prospero.mk
 CFLAGS  += -D__PROSPERO__ -Wall -Wextra -g -O2 -fPIC -fno-stack-protector
 LDFLAGS += -lScePad -lSceUserService -lSceSystemService -lpthread -ldl
 
-SRC := settings_tile.c settings_tile_ps5.c gc_main.c runtime_control.c runtime_instance.c credential_guard.c credential_kernel.c runtime_policy.c shellui_pad.c usb_helpers.c usb_resources.c usb_session.c controller_nintendo.c controller_xbox.c controller_steam.c controller_sc2.c steam_usb.c steam_protocol.c steam_mapping.c steam_motion.c steam_feedback.c sc2_control.c sc2_status.c sc2_profile.c slot_registry.c slot_lifecycle.c game_list.c webui.c webui_http.c webui_route.c webui_peer_policy.c webui_auth.c webui_json.c sc2_haptics.c sc2_menu.c sc2_binding.c sc2_gyro.c sc2_flick.c sc2_trigfx.c ds_handoff.c bridge_probe.c bridge/wireless_ds4.c game_hooks.c
+SRC := diagnostics.c user_session.c settings_tile.c settings_tile_ps5.c gc_main.c runtime_control.c runtime_instance.c credential_guard.c credential_kernel.c runtime_policy.c shellui_pad.c usb_helpers.c usb_resources.c usb_session.c controller_nintendo.c controller_xbox.c controller_steam.c controller_sc2.c steam_usb.c steam_protocol.c steam_mapping.c steam_motion.c steam_feedback.c sc2_control.c sc2_status.c sc2_profile.c slot_registry.c slot_lifecycle.c game_list.c webui.c webui_http.c webui_route.c webui_peer_policy.c webui_auth.c webui_json.c sc2_haptics.c sc2_menu.c sc2_binding.c sc2_gyro.c sc2_flick.c sc2_trigfx.c ds_handoff.c bridge_probe.c bridge/wireless_ds4.c game_hooks.c
 
-.PHONY: all clean deploy
+.PHONY: all clean deploy build-info
+
+build-info:
+	python3 gen_build_info.py
+
+build_info.h: build-info
+
 
 all: $(TARGET)
 
 WEB_ASSETS := $(wildcard web/icons/*.png web/controllers/*.webp) web/controllers/layouts.json
-webui_html.h: web/index.html gen_html.py $(WEB_ASSETS)
+webui_html.h: web/index.html gen_html.py version.h $(WEB_ASSETS)
 	python3 gen_html.py
 
 settings_tile_assets.h: gen_settings_tile.py settings-tile/icon0.png settings-tile/param.json
 	python3 gen_settings_tile.py
 
 HEADERS := $(wildcard *.h bridge/*.h)
-$(TARGET): $(SRC) $(HEADERS) webui_html.h settings_tile_assets.h
+$(TARGET): $(SRC) $(HEADERS) webui_html.h settings_tile_assets.h build_info.h
 	$(CC) $(CFLAGS) -o $@ $(SRC) $(LDFLAGS)
 
 clean:
-	rm -f $(TARGET) webui_html.h settings_tile_assets.h
+	rm -f $(TARGET) webui_html.h settings_tile_assets.h build_info.h
 
 deploy: $(TARGET)
 	nc -w 8 $(PS5_HOST) $(PORT) < $(TARGET)

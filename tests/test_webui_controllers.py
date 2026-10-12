@@ -112,6 +112,7 @@ class Controllers(unittest.TestCase):
             target = Path(tmp)
             shutil.copytree(WEB, target / 'web')
             shutil.copy(ROOT / 'payload/gen_html.py', target)
+            shutil.copy(ROOT / 'payload/version.h', target)
             subprocess.run(['python3', str(target / 'gen_html.py')], cwd=ROOT, check=True)
             header = (target / 'webui_html.h').read_text()
             page = bytes(int(v, 16) for v in re.findall(r'0x([0-9a-f]{2})', header))
@@ -133,7 +134,7 @@ class Controllers(unittest.TestCase):
         makefile = (ROOT / 'payload/Makefile').read_text()
         self.assertIn('web/icons/*.png web/controllers/*.webp', makefile)
         self.assertIn('web/controllers/layouts.json', makefile)
-        self.assertIn('webui_html.h: web/index.html gen_html.py $(WEB_ASSETS)', makefile)
+        self.assertIn('webui_html.h: web/index.html gen_html.py version.h $(WEB_ASSETS)', makefile)
 
 
 if __name__ == '__main__':

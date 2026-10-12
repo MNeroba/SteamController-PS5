@@ -12,6 +12,10 @@ typedef struct {
     int fs_initialized;
     uint32_t opened_endpoints;
     uint32_t active_transfers;
+    uint32_t completed_transfers; /* received, not yet consumed by its owner */
+    uint32_t retired_transfers;   /* STOP may leave queued completions: no reuse until UNINIT */
+    uint64_t starts, completions, late_completions, failures, timeouts, protocol_errors;
+
     /* Stable until session cleanup closes the device. Failed STOP/CLOSE may
      * retain kernel references; neither payload bytes nor frame metadata can
      * point into a helper's stack or be overwritten while the endpoint is busy. */
@@ -63,3 +67,5 @@ int usb_resources_finish_fs(usb_resources_t *resources,
 int usb_resources_cleanup(usb_resources_t *resources,
                           const usb_resources_ops_t *ops,
                           void *context);
+
+int usb_resources_take_completion(usb_resources_t *resources, uint8_t endpoint_index);

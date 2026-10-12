@@ -6,6 +6,10 @@ import json
 import re
 import shutil
 import struct
+try:
+    from .check_changelog import validate as validate_changelog
+except ImportError:
+    from check_changelog import validate as validate_changelog
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -38,20 +42,41 @@ def validate_elf(data):
         raise ValueError('Missing or invalid ELF64 x86-64 payload')
 
 
+def validate_metadata(metadata,version,asset):
+    expected=f'https://github.com/MNeroba/SteamController-PS5/releases/download/dev/{version}/{asset}'
+    if (metadata.get('name')!='SteamController-PS5' or metadata.get('filename')!=asset or
+        metadata.get('version')!=version or metadata.get('url')!=expected or
+        metadata.get('category')!='Controller' or not metadata.get('description') or
+        'unverified' not in metadata['description']):
+        raise ValueError('Payload Manager metadata/version/artifact mismatch')
+    if 'checksum' in metadata and not re.fullmatch(r'[0-9a-f]{64}',metadata['checksum']):
+        raise ValueError('Invalid Payload Manager checksum')
+
+
 def package(source_sha, version, elf, output):
     validate_identifiers(source_sha, version)
     validate_policy(json.loads((ROOT / 'docs/development/dev-release.json').read_text()))
+    changes=validate_changelog(version,ROOT)
+    metadata=json.loads((ROOT/'config/payload/SteamController-PS5.elf.json').read_text())
+    asset=f'SteamController-PS5-{version}.elf'
+    validate_metadata(metadata,version,asset)
     data = elf.read_bytes()
     validate_elf(data)
+    if source_sha.encode() not in data or version.encode() not in data:
+        raise ValueError("ELF must embed selected source SHA and version")
     for name in ('icon0.png', 'param.json'):
         embedded = (ROOT / 'payload/settings-tile' / name).read_bytes()
         if not embedded or embedded not in data:
             raise ValueError(f'Missing embedded settings tile asset: {name}')
+    if output.exists() and any(output.iterdir()):
+        raise ValueError("Use an empty output directory; do not mix release artifacts")
     output.mkdir(parents=True, exist_ok=True)
     asset = f'SteamController-PS5-{version}.elf'
     (output / asset).write_bytes(data)
     digest = hashlib.sha256(data).hexdigest()
     (output / f'{asset}.sha256').write_text(f'{digest}  {asset}\n')
+    metadata['checksum']=digest
+    (output / f'{asset}.json').write_text(json.dumps(metadata,indent=2)+'\n')
     shutil.copyfile(ROOT / 'LICENSE', output / 'LICENSE')
     shutil.copyfile(ROOT / 'docs/development/LOADING.md', output / 'LOADING.md')
     source = f'https://github.com/MNeroba/SteamController-PS5/tree/{source_sha}'
@@ -59,7 +84,7 @@ def package(source_sha, version, elf, output):
                f'Payload source: [{source_sha}]({source}). The release tag points to this exact revision. '
                'GitHub provides the matching source archive alongside these assets.\n\n'
                'Code: GPL-3.0-or-later; full text in LICENSE. Preserve inherited notices. '
-               'PuckbridgePS5 / Ghostcontrol / PoorDS4 provenance and pins: docs/PROVENANCE.md in that source.\n\n'
+               'PuckbridgePS5 / Ghostcontrol / PoorDS4 / LibrePadPS5 engineering-reference provenance and pins: docs/PROVENANCE.md in that source.\n\n'
                'Community SDK v0.43 corresponding source: '
                'https://github.com/ps5-payload-dev/sdk/tree/d9c9519116944a7f1c22d262012c53b80b3520b7. '
                'SDK headers retain their individual GPL/BSD exceptions. SDK archive checksum: '
@@ -68,12 +93,13 @@ def package(source_sha, version, elf, output):
                  'payload/web/controllers/NOTICE.md'):
         notices += f'## {file}\n\n' + (ROOT / file).read_text() + '\n'
     (output / 'NOTICES.md').write_text(notices)
-    notes = (f'# SteamController-PS5 {version} — experimental DEV\n\n**{WARNING}**\n\n'
+    notes = (f'# SteamController-PS5 {version} — experimental DEV\n\n**{WARNING}**\n\n' +
+             changes+'\n'+
              f'- Source: [`{source_sha}`]({source})\n'
              '- SDK: PS5 Payload SDK v0.43 / LLVM 18\n'
              f'- SDK archive SHA-256: `{SDK_SHA}`\n'
              f'- Payload: `{asset}`\n- ELF SHA-256: `{digest}`\n\n'
-             'Required workflow gates: normal host, ASan/UBSan, 202+ Chromium assertions, '
+             'Required workflow gates: normal host, ASan/UBSan, 220+ Chromium assertions, '
              'nine image/embedding contracts, deterministic asset generation, clean PS5 cross-build '
              'and checksum verification. These establish software/build evidence only.\n\n'
              'USB-C/Puck, virtual DualSense, motion/touch/haptics and shutdown remain physically unverified. '

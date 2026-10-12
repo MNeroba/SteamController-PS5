@@ -535,6 +535,33 @@ async (page) => {
   check(recoveryAuthenticated,'Default recovery uses the authenticated mutation API');
   check(await page.evaluate(()=>editing==='default'&&!isDirty()),'Default recovery confirms canonical saved readback');
   await page.unroute('**/api/profile?id=default');await page.unroute('**/api/recover-default');
+  // Diagnostic export: authenticated bounded text, failures retain retry control.
+  await page.evaluate(()=>{switchTab('help');goSec('diagnostics',true)});
+  let diagnosticAuth=false;
+  await page.route('**/api/diagnostics',route=>{
+    diagnosticAuth=!!route.request().headers().authorization;
+    return route.fulfill({status:200,contentType:'text/plain',body:'SteamController-PS5 diagnostic report\nVersion: v0.1.0-dev.3\nNo controller detected.\n'});
+  });
+  const diagnosticDownload=page.waitForEvent('download');
+  await page.locator('#diagnosticsDownload').click();
+  const downloadedReport=await diagnosticDownload;
+  check(downloadedReport.suggestedFilename()==='SteamController-PS5-Diagnostics-v0.1.0-dev.3.txt','diagnostic export uses versioned text filename');
+  check(diagnosticAuth,'diagnostic export carries existing bearer');
+  await page.waitForFunction(()=>document.querySelector('#diagnosticsStatus').textContent.includes('Downloaded'));
+  check(await page.locator('#diagnosticsStatus').textContent().then(t=>t.includes('Review')),'diagnostic export reminds users to review before sharing');
+  await page.unroute('**/api/diagnostics');
+  await page.route('**/api/diagnostics',route=>route.fulfill({status:500,body:'Unavailable'}));
+  await page.locator('#diagnosticsDownload').click();
+  await page.waitForFunction(()=>document.querySelector('#diagnosticsStatus').textContent.includes('failed'));
+  check(await page.locator('#diagnosticsStatus').textContent().then(t=>t.includes('failed')),'failed diagnostic generation reports failure');
+  check(await page.locator('#diagnosticsDownload').isEnabled(),'failed download permits retry');
+  await page.unroute('**/api/diagnostics');
+  await page.route('**/api/diagnostics',route=>route.fulfill({status:200,body:'x'.repeat(24577)}));
+  await page.locator('#diagnosticsDownload').click();
+  await page.waitForFunction(()=>document.querySelector('#diagnosticsStatus').textContent.includes('failed'));
+  check(await page.locator('#diagnosticsStatus').textContent().then(t=>t.includes('failed')),'oversized diagnostic report is rejected');
+  await page.unroute('**/api/diagnostics');
+  await page.evaluate(()=>switchTab('remap'));
   check(errors.length===0, 'no JavaScript runtime errors');
   return {result:'PASS',checks:passed.length,passed,decoded,hardware:'NOT_RUN; loopback fixture only'};
 }

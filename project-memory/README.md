@@ -11,4 +11,4 @@
 | [SESSION_LOG](SESSION_LOG.md) | Work sequence and publication acknowledgements |
 | [HARDWARE_MATRIX](HARDWARE_MATRIX.md) | Owner-reported target vs measured physical evidence |
 
-Read current summaries first; use historical logs to trace a particular ADR, defect or test. M1-220/221 is the latest binding/profile implementation/publication evidence before repository consolidation. Logs and old negative attempts are retained; no hardware result has been changed.
+Read current summaries first; use historical logs to trace a particular ADR, defect or test. M1-220/221 preserves binding/profile history; M1-229 is published dev.2, M1-232/234 is the earlier single-ELF tile candidate, and M1-235–237 is the current unpublished LibrePad integration. Owner approval is required before dev.3 dispatch. Logs and old negative attempts are retained; no hardware result has been changed.

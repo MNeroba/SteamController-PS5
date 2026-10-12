@@ -19,6 +19,7 @@
 #include "webui_json.h"
 #include "runtime_control.h"
 #include "settings_tile.h"
+#include "diagnostics.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -219,6 +220,31 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     if (route.id == WEBUI_ROUTE_INDEX) {
         reply(fd, 200, "text/html; charset=utf-8", (const char *)webui_html, webui_html_len);
         return;
+    }
+    if (route.id == WEBUI_ROUTE_DIAGNOSTICS) {
+        diagnostics_steam_t snapshot={0};
+        sc2_status_snapshot(&snapshot.steam);snapshot.paused=sc2_pause_is_active();
+        sc2_profile_t profile;sc2_active_get(&profile);
+        sc2_select_active_name(snapshot.profile,sizeof(snapshot.profile));
+        snapshot.left_trackpad_mode=profile.lpad;snapshot.right_trackpad_mode=profile.rpad;
+        snapshot.shift=profile.shift_in;
+        for(int i=0;i<SC2_IN_COUNT;i++)if(profile.map[i])snapshot.mappings++;
+        sc2_gyro_status_t gyro;sc2_gyro_status(&gyro);
+        snapshot.gyro_wanted=gyro.wanted;snapshot.gyro_imu=gyro.imu;
+        snapshot.gyro_active=gyro.active;snapshot.gyro_calibrated=gyro.calibrated;
+        char *report=malloc(DIAGNOSTICS_REPORT_MAX);
+        if(!report){REPLY_TXT(fd,500,"Cannot allocate diagnostic report");return;}
+        int length=diagnostics_report(report,DIAGNOSTICS_REPORT_MAX,&snapshot);
+        if(length<0){free(report);REPLY_TXT(fd,500,"Diagnostic report limit exceeded");return;}
+        char header[384];int n=snprintf(header,sizeof(header),
+            "HTTP/1.1 200 OK\r\nContent-Type: text/plain; charset=utf-8\r\nContent-Length: %d\r\n"
+            "Content-Disposition: attachment; filename=\"%s\"\r\nCache-Control: no-store\r\n"
+            "X-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n",length,DIAGNOSTICS_FILENAME);
+        if(n>0&&(size_t)n<sizeof(header)) {
+            webui_http_chunk_t chunks[]={{header,(size_t)n},{report,(size_t)length}};
+            send_response_chunks(fd,chunks,2);
+        }
+        free(report);return;
     }
     if (route.id == WEBUI_ROUTE_SETTINGS_TILE) {
         if (webui_stopping() || request.content_length != sizeof(SETTINGS_TILE_CONFIRM)-1 ||
@@ -567,6 +593,7 @@ static void *server_thread(void *arg) {
 }
 
 int webui_start(webui_notify_fn notify) {
+    if(!g_webui_thread_started)diagnostics_webui(-1);
     if (g_webui_thread_started) return -1;
     if (!notify || initialize_webui_auth() != 0) {
         LOG("webui: disabled; private token storage or local notification unavailable\n");
@@ -605,6 +632,7 @@ int webui_start(webui_notify_fn notify) {
         notify("SteamController-PS5 — WebUI unavailable: server thread failed"); return -1;
     }
     g_webui_thread_started = 1;
+    diagnostics_webui(1);
     char message[160];
     snprintf(message, sizeof(message), "SteamController-PS5 — WebUI ready on port %d. Pairing code: %s (5 min)", WEBUI_PORT, code);
     notify(message); /* Local UI only: never pass this message to LOG. */
@@ -618,6 +646,7 @@ int webui_stop(void) {
     atomic_store(&g_webui_stopping, 1);
     if (pthread_join(g_webui_thread, NULL) != 0) return -1;
     g_webui_thread_started = 0; g_listener = -1;
+    diagnostics_webui(0);
     webui_pairing_destroy(&g_pairing);
     memset(g_webui_token, 0, sizeof(g_webui_token));
     return 0;

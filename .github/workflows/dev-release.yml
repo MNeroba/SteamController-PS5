@@ -81,6 +81,7 @@ jobs:
       - name: Verify exact checkout and experimental policy
         run: |
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
+          python3 scripts/check_changelog.py --version "$DEV_VERSION"
           python3 -c 'import json; from pathlib import Path; from scripts.package_dev_release import validate_policy; validate_policy(json.loads(Path("docs/development/dev-release.json").read_text()))'
       - uses: actions/setup-node@v4
         with:
@@ -124,6 +125,7 @@ jobs:
           test -s LOADING.md
           test -s NOTICES.md
           test -s LICENSE
+          test -s "SteamController-PS5-${DEV_VERSION}.elf.json"
       - uses: actions/upload-artifact@v6
         with:
           name: experimental-dev-assets
@@ -154,7 +156,7 @@ jobs:
         run: |
           cd release-assets
           sha256sum --check "SteamController-PS5-${DEV_VERSION}.elf.sha256"
-          for file in RELEASE_NOTES.md LOADING.md NOTICES.md LICENSE; do test -s "$file"; done
+          for file in RELEASE_NOTES.md LOADING.md NOTICES.md LICENSE "SteamController-PS5-${DEV_VERSION}.elf.json"; do test -s "$file"; done
       - name: Reject a tag created while the build was running
         uses: actions/github-script@v8
         with:
@@ -178,6 +180,7 @@ jobs:
           files: |
             release-assets/SteamController-PS5-*.elf
             release-assets/SteamController-PS5-*.elf.sha256
+            release-assets/SteamController-PS5-*.elf.json
             release-assets/RELEASE_NOTES.md
             release-assets/LOADING.md
             release-assets/NOTICES.md

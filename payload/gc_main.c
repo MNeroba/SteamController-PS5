@@ -1,14 +1,7 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * Ghost-Control v5: Multi-controller support
- * USB HID controllers → virtual DualSense devices on PS5
- *
- * Supports up to MAX_SLOTS (4) simultaneous controllers:
- *   - 8BitDo / Nintendo Switch Pro  (VID=057E PID=2009)
- *   - Xbox One S                    (VID=045E PID=02EA)
- *
- * Each detected controller gets its own VDA device + force_bind
- * assignment dialog + VDI injection thread.
- * Hotplug: plug in any time, disconnect any time.
+ * SteamController-PS5: one active Steam Controller 2026 USB-C/Puck session.
+ * Legacy adapters remain inherited source; supported runtime identities are
+ * restricted by steam_usb. Virtual devices are owned by the slot registry.
  */
 
 #include <stdarg.h>
@@ -67,6 +60,8 @@
 #include "runtime_instance.h"
 #include "credential_kernel.h"
 #include "runtime_policy.h"
+#include "user_session.h"
+#include "diagnostics.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -92,6 +87,10 @@ void ghostpad_status_log(const char *fmt, ...) {
     char buf[LOG_MAX]; va_list ap;
     va_start(ap, fmt); vsnprintf(buf, sizeof(buf)-1, fmt, ap); va_end(ap);
     buf[LOG_MAX-1] = '\0';
+    struct timespec log_now;
+    uint64_t log_ms=clock_gettime(CLOCK_MONOTONIC,&log_now)==0 ?
+        (uint64_t)log_now.tv_sec*1000u+(uint64_t)log_now.tv_nsec/1000000u:0;
+    diagnostics_log(buf,log_ms);
     klog_printf("%s", buf);
     pthread_mutex_lock(&g_log_lock);
     if (g_log_fd >= 0) {
@@ -107,6 +106,7 @@ void ghostpad_status_log(const char *fmt, ...) {
 extern int32_t sceUserServiceInitialize(void *params);
 extern int32_t sceUserServiceGetInitialUser(int32_t *outUserId);
 extern int32_t sceUserServiceGetForegroundUser(int32_t *outUserId);
+extern int32_t sceUserServiceGetLoginUserIdList(int32_t users[4]);
 extern int32_t scePadInit(void);
 extern int32_t scePadSetProcessPrivilege(int32_t privilege);
 extern int32_t scePadVirtualDeviceAddDevice(void *param, int32_t deviceType);
@@ -126,7 +126,8 @@ static gc_diag_once_t g_vdi_error_log = GC_DIAG_ONCE_INIT;
 /* Serialize AddDevice calls from concurrent controller sessions. A klog
  * DEVICE_ADDED event is not an ownership receipt. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
-static int32_t         g_inject_uid = 0x10000000;
+static int32_t         g_inject_uid = -1;
+static user_session_t g_users = USER_SESSION_INITIALIZER;
 static volatile sig_atomic_t g_signal_stop;
 static pthread_t g_klog_tid, g_manager_tid;
 static int g_klog_started, g_manager_started, g_runtime_shutdown_done;
@@ -156,6 +157,21 @@ static void notify(const char *fmt, ...) {
     sceKernelSendNotificationRequest(0, &req, sizeof(req), 0);
 }
 
+/* Connection notices share a bounded limiter; enrollment notifications bypass it. */
+static pthread_mutex_t g_notice_lock = PTHREAD_MUTEX_INITIALIZER;
+static uint64_t g_notice_time[6];
+static void connection_notice(unsigned category,const char *fmt,...) {
+    if(category>=6)return;
+    struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now)!=0)return;
+    uint64_t ms=(uint64_t)now.tv_sec*1000u+(uint64_t)now.tv_nsec/1000000u;
+    pthread_mutex_lock(&g_notice_lock);
+    int allowed=!g_notice_time[category] || (ms>=g_notice_time[category] && ms-g_notice_time[category]>=5000);
+    if(allowed)g_notice_time[category]=ms?ms:1;
+    pthread_mutex_unlock(&g_notice_lock);
+    if(!allowed)return;
+    char message[256];va_list ap;va_start(ap,fmt);vsnprintf(message,sizeof(message),fmt,ap);va_end(ap);
+    notify("%s",message);
+}
 static void notify_str(const char *m) { notify("%s", m); }
 
 /* ── klog capture thread ──────────────────────────────────────────────── */
@@ -240,12 +256,14 @@ typedef struct {
     uint32_t inject_count;
     int bind_ok;
     int32_t last_vdi_ret;
+    slot_recovery_t recovery;
+    uint64_t last_vda_attempt_ms;
 } usb_session_state_t;
 
 static int slot_virtual_ready(slot_registry_token_t token) {
     slot_registry_entry_t entry;
     return slot_registry_snapshot(&g_slots, token, &entry) == SLOT_REGISTRY_OK &&
-           entry.virtual_ready;
+           entry.state == SLOT_REGISTRY_ACTIVE && entry.virtual_ready && !entry.virtual_deleting;
 }
 
 static void inject_pad(slot_registry_token_t token, int slot,
@@ -253,8 +271,12 @@ static void inject_pad(slot_registry_token_t token, int slot,
     slot_registry_entry_t entry;
     if (!session ||
         slot_registry_snapshot(&g_slots, token, &entry) != SLOT_REGISTRY_OK ||
-        !entry.virtual_ready)
+        !entry.virtual_ready || entry.state != SLOT_REGISTRY_ACTIVE ||
+        session->recovery.pending || sc2_pause_is_active())
         return;
+    user_session_snapshot_t users;
+    user_session_snapshot(&g_users, &users);
+    if (users.logged_out) return;
     int32_t h = entry.virtual_handle;
     int vr = scePadVirtualDeviceInsertData(h, pad);
     session->last_vdi_ret = vr;
@@ -440,12 +462,13 @@ static int probe_one_path(const char *path, uint16_t *out_vid, uint16_t *out_pid
 
 /* ── Create VDA for a slot ────────────────────────────────────────────── */
 static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
-    struct { int32_t size; int32_t userId; int32_t pad[6]; } vdp;
+    struct { int32_t size; int32_t creation_word; int32_t pad[6]; } vdp;
     pthread_mutex_lock(&g_vda_create_lock);
-    memset(&vdp,0,sizeof(vdp)); vdp.size=sizeof(vdp); vdp.userId=1;
+    memset(&vdp,0,sizeof(vdp)); vdp.size=sizeof(vdp); vdp.creation_word=1; /* Preserve legacy ABI bytes; word meaning is physically unverified. */
 
     if (out_bind_ok) *out_bind_ok = 0;
     int ret = scePadVirtualDeviceAddDevice(&vdp, VIRTUAL_DEVICE_TYPE_DUALSENSE);
+    diagnostics_vda_result(1,ret);
     gp_log("slot[%d] VDA ret=0x%08x\n", slot, (uint32_t)ret);
 
     /* Only a positive handle returned by this exact AddDevice call can be
@@ -478,6 +501,7 @@ static int delete_vda_handle(int32_t handle, void *opaque) {
     vda_delete_context_t *context = (vda_delete_context_t *)opaque;
     (void)neutralize_vda_handle(handle);
     int result = scePadVirtualDeviceDeleteDevice(handle);
+    diagnostics_vda_result(0,result);
     if (result != 0)
         gp_log("slot[%d] VDA delete handle=0x%x failed (%s), ret=0x%08x\n",
                context->slot, (uint32_t)handle, context->why, (uint32_t)result);
@@ -489,6 +513,11 @@ static int delete_slot_vda(slot_registry_token_t token, int slot,
     vda_delete_context_t context = { slot, why };
     return slot_registry_delete_virtual(&g_slots, token, delete_vda_handle,
                                         &context);
+}
+
+static int worker_create_virtual(uint32_t slot,int32_t *handle,int *bind_ok,void *context) {
+    (void)context;*handle=create_vda_for_slot((int)slot,bind_ok);
+    return *handle>0 ? 0 : -1;
 }
 
 /* ── Lazy virtual pad for the Steam Controller (2026) ───────────────────
@@ -504,21 +533,25 @@ static int sc2_vda_attach(slot_registry_token_t token, int slot,
         return 0;
     if (entry.virtual_ready) return 1;
 
+    user_session_snapshot_t users;
+    user_session_snapshot(&g_users, &users);
+    if (!users.can_register || session->recovery.pending) return 0;
+    struct timespec now;
+    if(clock_gettime(CLOCK_MONOTONIC,&now)!=0)return 0;
+    uint64_t ms=(uint64_t)now.tv_sec*1000u+(uint64_t)now.tv_nsec/1000000u;
+    if(session->last_vda_attempt_ms && ms-session->last_vda_attempt_ms<1000)return 0;
+    session->last_vda_attempt_ms=ms;
     int bind_ok = 0;
-    int32_t h = create_vda_for_slot(slot, &bind_ok);
-    if (h < 0) { gp_log("slot[%d] SC2 virtual pad create failed\n", slot); return 0; }
-    int result = slot_registry_set_virtual(&g_slots, token, h);
-    if (result != SLOT_REGISTRY_OK) {
-        /* A failed registration cannot prove whether this handle aliases a
-         * device already owned by another slot. Never delete an ambiguous ID. */
-        gp_log("slot[%d] SC2 virtual pad was not registered (result=%d); keeping handle untouched\n",
-               slot, result);
+    slot_lifecycle_ops_t ops={.create_virtual=worker_create_virtual};
+    int result=slot_lifecycle_attach(&g_slots,token,&ops,NULL,&bind_ok);
+    if(result!=0) {
+        gp_log("slot[%d] SC2 owned registration unavailable (result=%d); no handle scan\n",slot,result);
         return 0;
     }
     session->bind_ok = bind_ok;
     session->last_vdi_ret = -1;
     session->inject_count = 0;
-    notify("Puckbridge: Steam Controller connected");
+    connection_notice(1,"SteamController-PS5: virtual DualSense ready — press Steam/PS to choose a user");
     return 1;
 }
 
@@ -541,6 +574,7 @@ static void sc2_vda_detach(slot_registry_token_t token, int slot,
         sc2_assignment_release(*assignment_token);
         *assignment_token = 0;
     }
+    if (session) session->recovery.pending=0;
     gp_log("slot[%d] SC2 virtual pad removed (%s)\n", slot, why);
 }
 
@@ -772,6 +806,17 @@ static int detach_sc2_map_interfaces(int fd, uint16_t vid, uint16_t pid,
     return count;
 }
 
+static int arm_input_transfer(usb_resources_t *resources,struct usb_fs_endpoint *eps,
+                               uint8_t *buf,void **buffers,uint32_t *lengths) {
+    if(resources->retired_transfers&1u)return -1;
+    if((resources->active_transfers|resources->completed_transfers)&1u)return 0;
+    memset(buf,0,64);buffers[0]=buf;lengths[0]=64;
+    eps[0].ppBuffer=buffers;eps[0].pLength=lengths;eps[0].nFrames=1;
+    eps[0].aFrames=0;eps[0].status=0;
+    struct usb_fs_start start={.ep_index=0};
+    return usb_session_start_transfer(resources,&g_usb_session_ops,0,&start,NULL);
+}
+
 static void *usb_hid_thread(void *arg) {
     usb_thread_arg_t *targ = (usb_thread_arg_t *)arg;
     slot_registry_token_t slot_token = targ->slot_token;
@@ -812,8 +857,9 @@ static void *usb_hid_thread(void *arg) {
     int haptics_ready = 0;
     usb_resources_t usb_resources;
     usb_resources_init(&usb_resources);
-    int usb_ready_notified = 0;
+    int usb_ready_notified = 0, watchdog_expired = 0, streaming_started = 0;
 
+    diagnostics_usb_begin(slot_token,dev_path,vid,pid);
     gp_log("slot[%d] USB thread: %s VID=0x%04x PID=0x%04x\n",
            slot, dev_path, vid, pid);
 
@@ -828,6 +874,7 @@ static void *usb_hid_thread(void *arg) {
     /* ── Steam Controller 2026 (Puck / cable) ──────────────────────────── */
     if (pid == PID_SC2_PUCK || pid == PID_SC2_WIRED) {
         int is_puck = (pid == PID_SC2_PUCK);
+        diagnostics_usb_stage(slot_token,"open USB device",0);
         if (usb_session_open(&usb_resources, &g_usb_session_ops, dev_path,
                              O_RDWR, NULL) != 0) {
             gp_log("slot[%d] SC2 open fail errno=%d\n", slot, errno);
@@ -836,25 +883,30 @@ static void *usb_hid_thread(void *arg) {
         fd = usb_resources.fd;
 
         uint8_t addrs[SC2_MAX_EPS];
+        diagnostics_usb_stage(slot_token,"validate USB configuration",0);
         int map_status = sc2_ep_map(fd, is_puck, &sc2_map);
         int n_eps = 0;
         if (map_status == SC2_USB_MAP_UNAVAILABLE) {
+            diagnostics_usb_stage(slot_token,NULL,ENOTSUP);
             gp_log("slot[%d] SC2 config descriptor unavailable; refusing endpoint scan\n", slot);
             goto exit_slot;
         } else if (map_status == SC2_USB_MAP_DEVICE_GONE) {
             gp_log("slot[%d] SC2 device disappeared during config read\n", slot);
             goto exit_slot;
         } else if (map_status < 0) {
+            diagnostics_usb_stage(slot_token,NULL,EPROTO);
             gp_log("slot[%d] SC2 config descriptor invalid; refusing endpoint scan\n", slot);
             goto exit_slot;
         } else {
             n_eps = sc2_collect_in_eps(&sc2_map, addrs, SC2_MAX_EPS);
             if (n_eps <= 0) {
+                diagnostics_usb_stage(slot_token,NULL,EPROTO);
                 gp_log("slot[%d] SC2 config has no eligible HID IN endpoints\n", slot);
                 goto exit_slot;
             }
         }
 
+        diagnostics_usb_stage(slot_token,"claim validated Steam interfaces",0);
         if (detach_sc2_map_interfaces(fd, vid, pid, &sc2_map) < 0) {
             gp_log("slot[%d] SC2 descriptor-mapped interface detach failed errno=%d\n",
                    slot, errno);
@@ -862,6 +914,7 @@ static void *usb_hid_thread(void *arg) {
         }
         usleep(120000);
 
+        diagnostics_usb_stage(slot_token,"initialize USBFS discovery",0);
         memset(sc2_eps,0,sizeof(sc2_eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=sc2_eps; init.ep_index_max=SC2_MAX_EPS;
         if (usb_session_init_fs(&usb_resources, &g_usb_session_ops,
@@ -870,15 +923,17 @@ static void *usb_hid_thread(void *arg) {
             goto exit_slot;
         }
 
+        diagnostics_usb_stage(slot_token,"wait for validated Steam input",0);
         /* Wait for the controller to wake / pick the puck slot it's paired to */
         int active = 0, told = 0;
-        while ((active = sc2_find_active_ep(fd, &usb_resources,
-                                             &g_usb_session_ops, NULL,
-                                             sc2_eps, addrs, n_eps,
-                                             2000, runtime_cancel_requested,
-                                             NULL)) == 0 &&
-               !runtime_is_stopping()) {
-            if (!told) { gp_log("slot[%d] Puck idle — waiting for the controller to turn on\n", slot); told = 1; }
+        while (!runtime_is_stopping()) {
+            active=sc2_find_active_ep(fd,&usb_resources,&g_usb_session_ops,NULL,
+                sc2_eps,addrs,n_eps,2000,runtime_cancel_requested,NULL);
+            if(active!=0)break;
+            if(!told){gp_log("slot[%d] Puck idle — waiting for controller input\n",slot);told=1;}
+            if(usb_resources.active_transfers || usb_resources.opened_endpoints)break;
+            if(usb_session_uninit_fs(&usb_resources,&g_usb_session_ops,NULL)!=0 ||
+               usb_session_init_fs(&usb_resources,&g_usb_session_ops,&init,NULL)!=0)goto exit_slot;
         }
         if (usb_resources.opened_endpoints != 0 ||
             usb_resources.active_transfers != 0) {
@@ -911,6 +966,7 @@ static void *usb_hid_thread(void *arg) {
         if (!sc2_pause_is_active()) sc2_vda_attach(slot_token, slot, &session);
         ds_handoff_sc2_session(!sc2_pause_is_active());
 
+        diagnostics_usb_stage(slot_token,"initialize streaming USBFS",0);
         /* Re-init with the single active endpoint at index 0 for the main loop */
         memset(eps,0,sizeof(eps)); memset(&init,0,sizeof(init));
         init.pEndpoints=eps; init.ep_index_max=2 + SC2_HAP_MAX_OUT;
@@ -970,6 +1026,8 @@ static void *usb_hid_thread(void *arg) {
                            slot, o, sc2_map.it[j].iface);
                 }
             }
+            diagnostics_usb_endpoints(slot_token,sc2_iface,active,out_opened?own_out:-1);
+            connection_notice(2,"SteamController-PS5: %s detected (%04x:%04x)",is_puck?"Valve Puck":"USB-C",vid,pid);
             sc2_status_set_haptics(1, out_opened ? own_out : -1);
             haptics_ready = 1;
         }
@@ -980,6 +1038,8 @@ static void *usb_hid_thread(void *arg) {
     goto exit_slot;
 
 main_loop: ;
+    diagnostics_usb_stage(slot_token,"streaming",0);
+    streaming_started=1;
     int hs_state = (pid==PID_XBOX || pid==PID_STEAM_WIRED || pid==PID_SC2_PUCK || pid==PID_SC2_WIRED) ? HS_STREAMING : HS_WAIT_81_01;
     int sc2_link = 1;
     /* DualSense took back over after a hand-off: the Steam Controller is
@@ -998,34 +1058,29 @@ main_loop: ;
         if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0 ||
             usb_input_watchdog_expired(&input_watchdog,
                 (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u, 500)) {
+            watchdog_expired=1;
+            diagnostics_usb_snapshot(slot_token,&usb_resources,1);
+            diagnostics_usb_stage(slot_token,"input watchdog expired",ETIMEDOUT);
             gp_log("slot[%d] validated input expired; neutralizing and closing the session\n", slot);
             goto reinit;
         }
-        /* Failed STOP retains ownership; never rearm or mutate an active
-         * frame. Exit through tracked cleanup instead of overwriting it. */
-        if (usb_resources.active_transfers & 1u) goto reinit;
-        memset(buf,0,64);
-        buffers[0]=buf; lengths[0]=64;
-        eps[0].ppBuffer=buffers; eps[0].pLength=lengths;
-        eps[0].aFrames=0; eps[0].status=0;
-
-        memset(&start,0,sizeof(start)); start.ep_index=0;
-        if (usb_session_start_transfer(&usb_resources, &g_usb_session_ops,
-                                       0, &start, NULL)!=0) {
-            if (errno==EBUSY){
-                (void)usb_session_stop_transfer(&usb_resources,
-                    &g_usb_session_ops, 0, NULL);
-                usleep(5000);
-            } else if (errno==ENXIO||errno==ENOTTY){
-                gp_log("slot[%d] START errno=%d — device gone\n",slot,errno); goto reinit;
-            } else {
-                gp_log("slot[%d] START fatal errno=%d\n",slot,errno); goto reinit;
+        if (usb_resources.retired_transfers & 1u) goto reinit;
+        if (!(usb_resources.active_transfers & 1u) && !(usb_resources.completed_transfers & 1u)) {
+            memset(buf,0,64);buffers[0]=buf;lengths[0]=64;
+            eps[0].ppBuffer=buffers;eps[0].pLength=lengths;eps[0].nFrames=1;
+            eps[0].aFrames=0;eps[0].status=0;
+            memset(&start,0,sizeof(start));start.ep_index=0;
+            if(usb_session_start_transfer(&usb_resources,&g_usb_session_ops,0,&start,NULL)!=0) {
+                gp_log("slot[%d] IN START %s errno=%d; owned cleanup\n",slot,usb_session_error_name(errno),errno);
+                goto reinit;
             }
-            continue;
         }
-
         int ok=0, cerr=0, cw=0;
-        for(cw=0;cw<60 && !runtime_is_stopping();cw++){
+        for(cw=0;cw<1000 && !runtime_is_stopping();cw++){
+            if(clock_gettime(CLOCK_MONOTONIC,&input_now)!=0)goto reinit;
+            if(usb_input_watchdog_expired(&input_watchdog,(uint64_t)input_now.tv_sec*1000u+(uint64_t)input_now.tv_nsec/1000000u,500)){
+                watchdog_expired=1;diagnostics_usb_stage(slot_token,"input watchdog expired",ETIMEDOUT);goto reinit;
+            }
             memset(&complete,0,sizeof(complete));
             uint8_t completed_endpoint = UINT8_MAX;
             int complete_result = usb_session_complete_transfer(
@@ -1034,29 +1089,37 @@ main_loop: ;
             if(complete_result == USB_SESSION_OK && completed_endpoint == 0){
                 ok=1;break;
             }
-            if(complete_result == USB_SESSION_COMPLETED_OTHER) continue;
+            if(complete_result == USB_SESSION_COMPLETED_OTHER || complete_result == USB_SESSION_CANCELLED_COMPLETION) continue;
             cerr=errno;
             if(cerr==ENXIO||cerr==ENOTTY){gp_log("slot[%d] COMPLETE errno=%d — gone\n",slot,cerr);goto reinit;}
-            if(cerr!=EBUSY) break;
+            if(cerr!=EBUSY && cerr!=EAGAIN && cerr!=EWOULDBLOCK && cerr!=ETIMEDOUT) break;
             usleep(500);
         }
         if (runtime_is_stopping()) goto reinit;
         if(!ok){
-            if (usb_session_stop_transfer(&usb_resources,
-                &g_usb_session_ops, 0, NULL) != 0) goto reinit;
+            gp_log("slot[%d] IN COMPLETE %s errno=%d; cancel and neutralize\n",slot,usb_session_error_name(cerr?cerr:ETIMEDOUT),cerr);
+            goto reinit;
+        }
+        if (!usb_completed_frame_valid(&eps[0], sizeof(buf))) {
+            usb_session_note_error(&usb_resources,EPROTO);
+            diagnostics_usb_input(slot_token,0,0,0,0);
+            diagnostics_usb_snapshot(slot_token,&usb_resources,0);
             continue;
         }
-        if (!usb_completed_frame_valid(&eps[0], sizeof(buf))) continue;
 
         uint32_t len = lengths[0];
         steam_report_t validated;
-        if (steam_report_decode(buf, len, &validated) == 1 &&
-            validated.kind == STEAM_REPORT_INPUT) {
+        int report_valid=steam_report_decode(buf,len,&validated)==1 && validated.kind==STEAM_REPORT_INPUT;
+        if (report_valid) {
             if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0) goto reinit;
             usb_input_watchdog_refresh(&input_watchdog,
                 (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u);
         }
 
+        diagnostics_usb_input(slot_token,len,len?buf[0]:0,
+            (uint64_t)input_now.tv_sec*1000u+(uint64_t)input_now.tv_nsec/1000000u,
+            report_valid);
+        diagnostics_usb_snapshot(slot_token,&usb_resources,0);
         ScePadData pad; memset(&pad,0,sizeof(pad)); pad.quat.w=1.0f;
         int injected = 0;
 
@@ -1082,11 +1145,33 @@ main_loop: ;
                 sc2_power_off(fd, sc2_iface);
                 notify("Puckbridge: DualSense in control. Press the Steam button to switch back.");
             }
+            user_session_snapshot_t users;
+            user_session_snapshot(&g_users,&users);
+            uint64_t recovery_ms=(uint64_t)input_now.tv_sec*1000u+(uint64_t)input_now.tv_nsec/1000000u;
+            int eligible=sc2_link && !sc2_pause_is_active() && !sc2_parked && !game_hooks_input_active();
+            if(users.logout_epoch!=session.recovery.epoch || !session.last_vda_attempt_ms ||
+               recovery_ms-session.last_vda_attempt_ms>=1000) {
+                unsigned before=session.recovery.recovered;
+                slot_lifecycle_ops_t recovery_ops={.create_virtual=worker_create_virtual,.delete_virtual=delete_vda_handle};
+                vda_delete_context_t recovery_context={slot,"confirmed user-session transition"};
+                int recovery_result=slot_lifecycle_recover(&g_slots,slot_token,&session.recovery,&users,
+                    eligible,&recovery_ops,&recovery_context);
+                if(session.recovery.pending)session.last_vda_attempt_ms=recovery_ms;
+                if(session.recovery.recovered!=before) {
+                    session.bind_ok=0;session.last_vdi_ret=-1;session.inject_count=0;
+                    connection_notice(3,"SteamController-PS5: user-session recovery ready — choose a user with Steam/PS");
+                }
+                if(recovery_result<0)gp_log("slot[%d] user recovery deferred result=%d; retaining owned device\n",slot,recovery_result);
+            }
+            slot_registry_entry_t diagnostic_slot;
+            if(slot_registry_snapshot(&g_slots,slot_token,&diagnostic_slot)==0)
+                diagnostics_virtual(slot_token,&diagnostic_slot,&users,&session.recovery);
             if (sc2_pause_is_active() || sc2_parked) {
                 /* Paused (hold … 5 s) or the DualSense is in control: release
                  * everything and remove the virtual pad; the hooks see it as
                  * off. Reports are still read to catch the resume / Steam button. */
                 game_hooks_feed(NULL, 0);
+                if(arm_input_transfer(&usb_resources,eps,buf,buffers,lengths)!=0)goto reinit;
                 sc2_haptic_service(slot_token, &usb_resources,
                     &g_usb_session_ops, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
@@ -1125,6 +1210,7 @@ main_loop: ;
                     ds_handoff_sc2_used();
                 if (injected) game_hooks_feed(&pad, sc2_link);
                 else if (!sc2_link) game_hooks_feed(NULL, 0);
+                if(arm_input_transfer(&usb_resources,eps,buf,buffers,lengths)!=0)goto reinit;
                 sc2_haptic_service(slot_token, &usb_resources,
                     &g_usb_session_ops, eps, out_opened, sc2_iface, sc2_n_out);
                 sc2_gyro_service(fd, sc2_iface);
@@ -1133,7 +1219,7 @@ main_loop: ;
                     inject_pad(slot_token, slot, &session, &pad); /* release everything first */
                     sc2_vda_detach(slot_token, slot, &session, &assignment_token,
                                    "controller asleep / out of range");
-                    notify("Puckbridge: Steam Controller disconnected");
+                    connection_notice(4,"SteamController-PS5: controller asleep or disconnected");
                     injected = 0;
                 }
                 /* In a hooked game the Steam Controller is merged straight into the
@@ -1159,27 +1245,32 @@ main_loop: ;
 
         if (injected > 0) {
             if (!usb_ready_notified) {
-                notify("Puckbridge: slot[%d] streaming — controller active", slot);
+                connection_notice(1,"SteamController-PS5: input active — Steam/PS selects the console user");
                 usb_ready_notified = 1;
             }
-            /* First real button press confirms the assignment — release the gate
-             * so the manager can start the next controller's dialog. */
+            /* Button activity releases our serialization gate only; it does
+             * not prove an account assignment performed by the PS5 UI. */
             if (pad.buttons != 0 &&
                 slot_registry_mark_confirmed(&g_slots, slot_token) == 1) {
                 if (assignment_token) sc2_assignment_release(assignment_token);
                 assignment_token = 0;
-                gp_log("slot[%d] assignment confirmed (button press)\n", slot);
+                gp_log("slot[%d] button activity seen; account binding remains console-controlled\n", slot);
             }
             inject_pad(slot_token, slot, &session, &pad);
         }
     }
 
 reinit:
-    if (usb_ready_notified) { notify("Puckbridge: slot[%d] controller disconnected", slot); usb_ready_notified=0; }
+    if (usb_ready_notified) { connection_notice(4,"SteamController-PS5: USB connection lost — waiting for reconnection"); usb_ready_notified=0; }
     goto cleanup_usb;
 uninit_exit:
 cleanup_usb:
 exit_slot:
+    if(!runtime_is_stopping()) {
+        if(!watchdog_expired)diagnostics_usb_stage(slot_token,NULL,errno?errno:EIO);
+        if(!streaming_started)connection_notice(0,"SteamController-PS5: initialization failed (%04x:%04x) — download diagnostics",vid,pid);
+    }
+    diagnostics_usb_snapshot(slot_token,&usb_resources,watchdog_expired);
     /* Clear shared Steam state only while this generation still owns it.
      * An idle scanner must never neutralize another active controller. */
     if (owns_session && sc2_haptic_session_is_owner(slot_token)) {
@@ -1196,13 +1287,20 @@ exit_slot:
     sc2_haptic_session_abandon(slot_token);
     if (usb_resources.fd >= 0) {
         int cleanup_result = usb_session_cleanup(&usb_resources, &g_usb_session_ops, NULL);
+        if (cleanup_result != 0) diagnostics_usb_stage(slot_token,"USB cleanup reported failure",cleanup_result);
         if (cleanup_result != 0) gp_log("slot[%d] USB resource cleanup reported %d\n", slot, cleanup_result);
     }
     fd = -1;
     gp_log("slot[%d] USB thread exiting — freeing slot\n", slot);
     sc2_assignment_release(assignment_token);
     sc2_input_state_reset(&session.sc2_input);
-    slot_release(slot_token, "USB reader exit");
+    int released=slot_release(slot_token, "USB reader exit");
+    slot_registry_entry_t final_slot={0};
+    if(slot_registry_snapshot(&g_slots,slot_token,&final_slot)!=0)final_slot.state=SLOT_REGISTRY_FREE;
+    user_session_snapshot_t final_users;user_session_snapshot(&g_users,&final_users);
+    diagnostics_virtual(slot_token,&final_slot,&final_users,&session.recovery);
+    (void)released; /* Keep the last initialization/failure stage after cleanup. */
+    if(runtime_is_stopping())diagnostics_usb_stage(slot_token,"session closed by payload shutdown",0);
     usb_worker_mark_done(slot_token);
     return NULL;
 }
@@ -1285,8 +1383,20 @@ static int manager_start_usb_worker(slot_registry_token_t token,
     pthread_mutex_unlock(&g_usb_workers_lock);
     gp_log("manager: slot[%u] USB thread started handle=0x%x\n",
            token.index, (uint32_t)virtual_handle);
-    notify("Puckbridge: slot[%u] ready — press a button to assign", token.index);
+    connection_notice(1,"SteamController-PS5: USB reader ready — waiting for virtual DualSense/user selection");
     return 0;
+}
+
+static void observe_users(void) {
+    int32_t users[4]={-1,-1,-1,-1},foreground=-1;
+    int result=sceUserServiceGetLoginUserIdList(users);
+    int fg_result=sceUserServiceGetForegroundUser(&foreground);
+    struct timespec now;
+    if(clock_gettime(CLOCK_MONOTONIC,&now)!=0)return;
+    user_session_observe(&g_users,result,users,fg_result,foreground,
+        (uint64_t)now.tv_sec*1000u+(uint64_t)now.tv_nsec/1000000u);
+    user_session_snapshot_t snapshot;user_session_snapshot(&g_users,&snapshot);
+    diagnostics_users(&snapshot);
 }
 
 /* ── Controller manager thread ────────────────────────────────────────── */
@@ -1296,6 +1406,7 @@ static void *controller_manager_thread(void *arg) {
     gp_log("Manager thread started (MAX_SLOTS=%d)\n", MAX_SLOTS);
 
     while (!runtime_is_stopping()) {
+        observe_users();
         reap_finished_usb_workers();
         if (runtime_is_stopping()) break;
         static char devs[MAX_UGEN_DEVS][32];
@@ -1450,6 +1561,7 @@ static int restore_runtime_credentials(void) {
 }
 
 static int fail_startup(const char *reason) {
+    diagnostics_startup(reason,-1);
     gp_log("startup aborted: %s\n", reason);
     if (restore_runtime_credentials() != 0)
         gp_log("startup abort: credentials remain elevated until process exit\n");
@@ -1593,10 +1705,12 @@ int main(void) {
         slot_registry_destroy(&g_slots);
         return 1;
     }
-    gp_log("Ghost-Control v5 starting — %d slots\n", MAX_SLOTS);
-    notify("PuckbridgePS5 (built on Ghostcontrol by StonedModder) — plug in controllers now");
+    gp_log("SteamController-PS5 %s starting — one active Steam session\n",STEAMCONTROLLER_VERSION);
+    notify("SteamController-PS5: starting — connect Steam Controller by USB-C or Valve Puck");
 
     load_runtime_policy(&g_runtime_policy);
+    diagnostics_runtime("initializing services",0,kernel_get_fw_version(),&g_runtime_policy);
+    diagnostics_webui(0);
 
     if (runtime_instance_acquire(PID_PATH, &g_pid_lock_fd) != 0) {
         gp_log("refusing startup: runtime PID lock unavailable or another recorded process is alive (errno=%d)\n",
@@ -1604,13 +1718,24 @@ int main(void) {
         return fail_startup("runtime PID lock unavailable");
     }
 
-    sceUserServiceInitialize(NULL);
-    sceUserServiceGetInitialUser(&userId);
-    sceUserServiceGetForegroundUser(&fgUser);
-    gp_log("userId=0x%08x fgUser=0x%08x\n", (uint32_t)userId, (uint32_t)fgUser);
-    g_inject_uid = (fgUser > 0) ? fgUser : userId;
-    if ((uint32_t)userId<0x10000000u||(uint32_t)userId>0x1000000Fu) userId=0x10000000;
-    gp_log("inject_uid=0x%08x\n", (uint32_t)g_inject_uid);
+    ret=sceUserServiceInitialize(NULL);
+    gp_log("UserService initialization ret=0x%08x\n",(unsigned)ret);
+    int initial_result=sceUserServiceGetInitialUser(&userId);
+    int foreground_result=sceUserServiceGetForegroundUser(&fgUser);
+    int32_t logged_users[4]={-1,-1,-1,-1};
+    int list_result=sceUserServiceGetLoginUserIdList(logged_users);
+    struct timespec startup_now;
+    if(clock_gettime(CLOCK_MONOTONIC,&startup_now)==0)
+        user_session_observe(&g_users,list_result,logged_users,foreground_result,fgUser,
+            (uint64_t)startup_now.tv_sec*1000u+(uint64_t)startup_now.tv_nsec/1000000u);
+    g_inject_uid=-1;
+    if(list_result==0)for(int i=0;i<4;i++) {
+        if(foreground_result==0 && fgUser>0 && logged_users[i]==fgUser)g_inject_uid=fgUser;
+    }
+    if(g_inject_uid<0 && initial_result==0 && list_result==0)
+        for(int i=0;i<4;i++)if(userId>0 && logged_users[i]==userId)g_inject_uid=userId;
+    gp_log("UserService initial/foreground/list results=%d/%d/%d; no automatic virtual-user binding\n",
+        initial_result,foreground_result,list_result);
 
     credential_guard_result_t credential_result = elevate_credentials();
     if (credential_result != CREDENTIAL_GUARD_OK)
@@ -1633,7 +1758,7 @@ int main(void) {
     /* Remap portal + per-game profile switching */
     sc2_notify_fn = notify_str;
     if (!g_signal_stop && !runtime_is_stopping()) sc2_select_start();
-    if (g_runtime_policy.enable_bridge_probe &&
+    if (g_runtime_policy.enable_bridge_probe && g_inject_uid>0 &&
         !g_signal_stop && !runtime_is_stopping())
         bridge_probe_start(g_inject_uid);
     if (g_runtime_policy.enable_game_hooks &&
@@ -1661,6 +1786,7 @@ int main(void) {
         }
     }
 
+    diagnostics_startup(g_manager_started?"running; waiting for Steam Controller":"USB manager startup failed",startup_result);
     /* Keep-alive until SIGINT/SIGTERM; handlers only set this signal-safe flag. */
     uint32_t tick = 0;
     while (g_manager_started && !g_signal_stop && !runtime_is_stopping()) {
@@ -1672,6 +1798,7 @@ int main(void) {
             gp_log("alive tick=%u active_slots=%u\n", tick, active);
         }
     }
+    diagnostics_startup("stopping",0);
     int shutdown_result;
     while ((shutdown_result = runtime_shutdown()) == -1) {
         gp_log("shutdown: waiting before retrying owner cleanup\n");

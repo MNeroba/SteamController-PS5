@@ -1,11 +1,15 @@
 #!/usr/bin/env python3
 """Embed the portal, button icons and controller artwork in one offline page."""
-import base64, glob, json, os
+import base64, glob, json, os, re
 from pathlib import Path
 
 os.chdir(Path(__file__).resolve().parent)
 
 html = open('web/index.html', encoding='utf-8').read()
+version = re.search(r'#define STEAMCONTROLLER_VERSION "([^"]+)"', Path('version.h').read_text())[1]
+if html.count('/*__VERSION__*/""') != 1:
+    raise ValueError('Expected one application version placeholder')
+html = html.replace('/*__VERSION__*/""', json.dumps(version))
 
 # Inline web/icons/*.png as data URIs at the /*__ICONS__*/{} placeholder.
 icons = {}

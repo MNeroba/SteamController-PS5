@@ -2,6 +2,7 @@
 #pragma once
 
 #include "slot_registry.h"
+#include "user_session.h"
 
 #include <stdint.h>
 
@@ -40,3 +41,12 @@ int slot_lifecycle_release(slot_registry_t *registry,
                            slot_registry_token_t token,
                            slot_registry_delete_fn delete_virtual,
                            void *context);
+
+int slot_lifecycle_attach(slot_registry_t *registry, slot_registry_token_t token,
+                          const slot_lifecycle_ops_t *ops, void *context, int *bind_ok);
+typedef struct { uint32_t epoch, attempts, recovered, deletion_failures; int pending; } slot_recovery_t;
+/* Called only by the existing USB worker at report boundaries. No USB I/O,
+ * mapping reset or thread restart. eligibility excludes pause/release/sleep. */
+int slot_lifecycle_recover(slot_registry_t *registry, slot_registry_token_t token,
+                           slot_recovery_t *recovery, const user_session_snapshot_t *users,
+                           int eligible, const slot_lifecycle_ops_t *ops, void *context);

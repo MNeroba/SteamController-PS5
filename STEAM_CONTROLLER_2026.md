@@ -42,3 +42,16 @@ The project is focused on one Steam Controller 2026 connected by USB-C or the of
 ## Binding, persistence and navigation audit — M1-220 (2026-10-10)
 
 `VERIFIED_HOST_TEST`: full normal and ASan/UBSan suites PASS; profile 52 assertions, atomic storage 71, binding/proportional-pressure 165 and HTTP/auth 110. Nine portable artwork/generator contracts and 181 Edge/Playwright browser assertions PASS (all original 162 retained). The maximum-complexity stored profile is 14,573 bytes; complete 24-input/22-output/activator round-trip succeeds within the 24 KiB capacity. Final generated page: 685,503 UTF-8 bytes, 41 icons/four unchanged controller images. Clean SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `5bdd18153301213e7a4b82e3038dff24563fdc7e0e474ce41546d3c66ffc7dbc`. This is local source/build evidence; publication and Actions acknowledgement follow separately. Physical FW 12.00 remains NOT_RUN.
+
+
+## Dev.3 candidate additions (unpublished)
+
+| Capability | Software status | Physical PS5 status |
+|---|---|---|
+| Owned virtual-pad logout/relogin recovery; USB preserved | Host consensus/lifecycle/race tests | NOT_RUN H-14 |
+| IN/OUT ordering, late-cancel retirement and watchdog | Host fault/concurrency tests | NOT_RUN H-15 |
+| Authenticated diagnostic text export, bounded/redacted log | Host/report/HTTP/Chromium tests | NOT_RUN H-15 |
+| Payload Manager sidecar and mandatory versioned changelog | Packaging/format tests | No available dev.3 release asset |
+| Embedded optional Settings tile, one ELF | Existing host/native-stub/build tests retained | NOT_RUN H-13 |
+
+No automatic tile installation/account reassignment, new controller protocols or storage migration. SDKv0.43, /data/ghostpad, artwork, pairing/profile/motion/touch/haptic contracts and safe defaults retained.

@@ -406,3 +406,10 @@ Owner explicitly requires one ELF for dev.3, superseding the initially proposed 
 ADR-054 follow-up (M1-233): the optional installer must not add DT_NEEDED libSceAppInstUtil.sprx. Resolve the three installer APIs through SDK's dlopen/dlsym only after the authenticated confirmation. Missing module/symbol affects only the requested tile action. Checked terminate/dlclose; retain module and latch on cleanup failure. Add a readelf gate to both cross-build and DEV workflow so this startup dependency cannot silently return.
 
 ADR-054 M1-234: make the newly created sce_sys explicitly0755 despite inherited umask077. Do not chmod an existing directory. Embedded regular icon/metadata stay0644; marker/lock0600. The host regression verifies these bits.
+
+
+## ADR-055 — Confirmed user-session recovery, USB completion ownership and diagnostic export
+
+Use a small portable user-list consensus observer and existing worker/registry lifecycle. Re-register only proven owned virtual handles after a confirmed logout epoch and stable relogin; retain USB connection and Steam decoder state. Never infer account binding from activity, choose another account automatically, delete native controllers or treat API failures as logout. Failed deletion prevents a new Add. Creation reservations retain ownership across release races; an ambiguous alias inhibits all future Add for the process.
+
+Preserve consumed IN completions while synchronous output waits. Retire cancelled endpoint indices until FS teardown; keep existing session-owned buffers and watchdog. Bounded authenticated diagnostic reports use typed value snapshots and a filtered48-line application memory ring, never arbitrary files/system klog. Report actual runtime firmware and generated build SHA; dirty builds say unknown. Fixed JSON metadata accompanies the single ELF, with selected version/checksum and future release URL explicitly unpublished. Every future DEV/stable release requires exactly Bug Fixes and New Features / Improvements; immutable historical releases/tags remain unchanged. Physical API/USB/tile validation remains blocked; owner approval is required before dev.3 publication.

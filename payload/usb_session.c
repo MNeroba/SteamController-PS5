@@ -96,7 +96,10 @@ int usb_session_start_transfer(usb_resources_t *resources,
         errno = EBUSY;
         return USB_SESSION_BAD_STATE;
     }
-    return ops->start_transfer(resources->fd, configuration, context);
+    resources->starts++;
+    int operation = ops->start_transfer(resources->fd, configuration, context);
+    if (operation) usb_session_note_error(resources, errno ? errno : EIO);
+    return operation;
 }
 
 int usb_session_complete_any_transfer(usb_resources_t *resources,
@@ -107,19 +110,26 @@ int usb_session_complete_any_transfer(usb_resources_t *resources,
     if (!resources || !ops || !ops->complete_transfer ||
         !completed_endpoint_index)
         return USB_SESSION_ERROR;
-    if (resources->fd < 0 || resources->active_transfers == 0)
+    if (resources->fd < 0 || (resources->active_transfers | resources->retired_transfers) == 0)
         return USB_SESSION_BAD_STATE;
     uint8_t completed = UINT8_MAX;
     int result = ops->complete_transfer(resources->fd, configuration,
                                         &completed, context);
-    if (result != 0) return result;
+    if (result != 0) { usb_session_note_error(resources, errno ? errno : EIO); return result; }
 
+    if (completed < USB_RESOURCES_MAX_ENDPOINTS && (resources->retired_transfers & (UINT32_C(1) << completed))) {
+        resources->late_completions++;
+        *completed_endpoint_index = completed;
+        return USB_SESSION_CANCELLED_COMPLETION;
+    }
     if (completed >= USB_RESOURCES_MAX_ENDPOINTS ||
         usb_resources_note_transfer_complete(resources, completed) !=
             USB_RESOURCES_OK) {
         errno = EPROTO;
+        usb_session_note_error(resources, EPROTO);
         return USB_SESSION_BAD_STATE;
     }
+    resources->completions++;
     *completed_endpoint_index = completed;
     return USB_SESSION_OK;
 }
@@ -132,17 +142,26 @@ int usb_session_complete_transfer(usb_resources_t *resources,
     if (!resources || !ops || !completed_endpoint_index)
         return USB_SESSION_ERROR;
     if (resources->fd < 0 || endpoint_index >= USB_RESOURCES_MAX_ENDPOINTS ||
-        !(resources->opened_endpoints & (UINT32_C(1) << endpoint_index)) ||
-        !(resources->active_transfers & (UINT32_C(1) << endpoint_index)))
-        return USB_SESSION_BAD_STATE;
+        !(resources->opened_endpoints & (UINT32_C(1) << endpoint_index))) return USB_SESSION_BAD_STATE;
+    if (resources->completed_transfers & (UINT32_C(1) << endpoint_index)) {
+        (void)usb_resources_take_completion(resources, endpoint_index);
+        *completed_endpoint_index=endpoint_index;return USB_SESSION_OK;
+    }
+    if (!(resources->active_transfers & (UINT32_C(1) << endpoint_index))) return USB_SESSION_BAD_STATE;
     uint8_t completed = UINT8_MAX;
     int result = usb_session_complete_any_transfer(resources, ops,
                                                     configuration, &completed,
                                                     context);
-    if (result != USB_SESSION_OK) return result;
+    if (result != USB_SESSION_OK) {
+        if (result == USB_SESSION_CANCELLED_COMPLETION) *completed_endpoint_index = completed;
+        return result;
+    }
     *completed_endpoint_index = completed;
-    return completed == endpoint_index ? USB_SESSION_OK :
-           USB_SESSION_COMPLETED_OTHER;
+    if (completed == endpoint_index) {
+        (void)usb_resources_take_completion(resources, completed);
+        return USB_SESSION_OK;
+    }
+    return USB_SESSION_COMPLETED_OTHER;
 }
 
 int usb_session_stop_transfer(usb_resources_t *resources,
@@ -179,4 +198,17 @@ int usb_input_watchdog_expired(const usb_input_watchdog_t *w,
                                uint64_t now_ms, unsigned timeout_ms) {
     return !w || !timeout_ms || now_ms < w->last_input_ms ||
         now_ms - w->last_input_ms >= timeout_ms;
+}
+
+const char *usb_session_error_name(int error) {
+    if(error==EBUSY || error==EAGAIN || error==EWOULDBLOCK)return "pending";
+    if(error==ETIMEDOUT)return "timeout";
+    if(error==EPROTO || error==EMSGSIZE || error==EINVAL)return "protocol error";
+    return "USB failure";
+}
+void usb_session_note_error(usb_resources_t *r,int e) {
+    if(!r || !e || e==EBUSY || e==EAGAIN || e==EWOULDBLOCK)return;
+    if(e==ETIMEDOUT)r->timeouts++;
+    else if(e==EPROTO || e==EMSGSIZE || e==EINVAL)r->protocol_errors++;
+    else r->failures++;
 }

@@ -7,8 +7,8 @@
 #include <unistd.h>
 
 #ifdef __PROSPERO__
-#include <ps5/klog.h>
-#define LOG(...) klog_printf("[GC] " __VA_ARGS__)
+extern void ghostpad_status_log(const char *fmt, ...);
+#define LOG(...) ghostpad_status_log(__VA_ARGS__)
 #else
 #define LOG(...) fprintf(stderr, __VA_ARGS__)
 #endif
@@ -40,7 +40,7 @@ int usb_send_out(usb_resources_t *resources, const usb_session_ops_t *ops,
     /* Refuse before mutating metadata referenced by an earlier START. */
     uint32_t bit = UINT32_C(1) << endpoint_index;
     if (resources->fd < 0 || !resources->fs_initialized ||
-        !(resources->opened_endpoints & bit) || resources->active_transfers & bit) {
+        !(resources->opened_endpoints & bit) || (resources->active_transfers | resources->completed_transfers | resources->retired_transfers) & bit) {
         errno = EBUSY; return -EBUSY;
     }
     memcpy(resources->frame_data[endpoint_index], data, length);
@@ -76,14 +76,16 @@ int usb_send_out(usb_resources_t *resources, const usb_session_ops_t *ops,
                                                &complete,
                                                &completed_endpoint, context);
         if (result == USB_SESSION_OK) {
-            if (endpoint->status != 0)
-                return -1000 - endpoint->status;
+            if (!usb_completed_frame_valid(endpoint, length) || endpoint->pLength[0] != length) {
+                usb_session_note_error(resources, EPROTO);
+                return endpoint->status > 0 ? -1000 - endpoint->status : -EPROTO;
+            }
             return 0;
         }
-        if (result == USB_SESSION_COMPLETED_OTHER) continue;
+        if (result == USB_SESSION_COMPLETED_OTHER || result == USB_SESSION_CANCELLED_COMPLETION) continue;
 
         int saved_errno = errno ? errno : EIO;
-        if (saved_errno != EBUSY) {
+        if (saved_errno != EBUSY && saved_errno != EAGAIN && saved_errno != EWOULDBLOCK && saved_errno != ETIMEDOUT) {
             LOG("OUT %s COMPLETE fail errno=%d\n", tag ? tag : "?",
                 saved_errno);
             return stop_after_error(resources, ops, endpoint_index, tag,
@@ -92,6 +94,7 @@ int usb_send_out(usb_resources_t *resources, const usb_session_ops_t *ops,
         if (poll_interval_us != 0) usleep(poll_interval_us);
     }
 
+    usb_session_note_error(resources, ETIMEDOUT);
     LOG("OUT %s timeout after %u polls\n", tag ? tag : "?", max_polls);
     return stop_after_error(resources, ops, endpoint_index, tag, ETIMEDOUT,
                             context);

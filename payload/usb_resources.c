@@ -31,6 +31,8 @@ int usb_resources_note_fs_init_attempt(usb_resources_t *resources) {
     resources->fs_initialized = 0;
     resources->opened_endpoints = 0;
     resources->active_transfers = 0;
+    resources->completed_transfers = 0;
+    resources->retired_transfers = 0;
     return USB_RESOURCES_OK;
 }
 
@@ -49,6 +51,8 @@ int usb_resources_note_fs_uninit_result(usb_resources_t *resources, int success)
         resources->fs_initialized = 0;
         resources->opened_endpoints = 0;
         resources->active_transfers = 0;
+        resources->completed_transfers = 0;
+        resources->retired_transfers = 0;
     }
     return USB_RESOURCES_OK;
 }
@@ -73,8 +77,10 @@ int usb_resources_note_endpoint_close(usb_resources_t *resources,
     if (!resources || resources->fd < 0 || !resources->fs_initialized ||
         !(resources->opened_endpoints & bit))
         return USB_RESOURCES_BAD_STATE;
+    resources->retired_transfers |= resources->active_transfers & bit;
     resources->opened_endpoints &= ~bit;
     resources->active_transfers &= ~bit;
+    resources->completed_transfers &= ~bit;
     return USB_RESOURCES_OK;
 }
 
@@ -86,7 +92,7 @@ int usb_resources_note_transfer_start(usb_resources_t *resources,
     if (!resources || resources->fd < 0 || !resources->fs_initialized ||
         !(resources->opened_endpoints & bit))
         return USB_RESOURCES_BAD_STATE;
-    if (resources->active_transfers & bit) return USB_RESOURCES_BAD_STATE;
+    if ((resources->active_transfers | resources->completed_transfers | resources->retired_transfers) & bit) return USB_RESOURCES_BAD_STATE;
     resources->active_transfers |= bit;
     return USB_RESOURCES_OK;
 }
@@ -100,6 +106,7 @@ int usb_resources_note_transfer_complete(usb_resources_t *resources,
         !(resources->active_transfers & bit))
         return USB_RESOURCES_BAD_STATE;
     resources->active_transfers &= ~bit;
+    resources->completed_transfers |= bit;
     return USB_RESOURCES_OK;
 }
 
@@ -112,6 +119,7 @@ int usb_resources_note_transfer_stop(usb_resources_t *resources,
         !(resources->active_transfers & bit))
         return USB_RESOURCES_BAD_STATE;
     resources->active_transfers &= ~bit;
+    resources->retired_transfers |= bit;
     return USB_RESOURCES_OK;
 }
 
@@ -134,7 +142,10 @@ int usb_resources_finish_fs(usb_resources_t *resources,
         if (!(resources->active_transfers & bit)) continue;
         int result = ops->stop_transfer(resources->fd, (uint8_t)i, context);
         remember_error(&first_error, result);
-        if (result == 0) resources->active_transfers &= ~bit;
+        if (result == 0) {
+            resources->active_transfers &= ~bit;
+            resources->retired_transfers |= bit;
+        }
     }
 
     for (int i = USB_RESOURCES_MAX_ENDPOINTS - 1; i >= 0; i--) {
@@ -143,8 +154,10 @@ int usb_resources_finish_fs(usb_resources_t *resources,
         int result = ops->close_endpoint(resources->fd, (uint8_t)i, context);
         remember_error(&first_error, result);
         if (result == 0) {
+            resources->retired_transfers |= resources->active_transfers & bit;
             resources->opened_endpoints &= ~bit;
             resources->active_transfers &= ~bit;
+            resources->completed_transfers &= ~bit;
         }
     }
 
@@ -156,6 +169,8 @@ int usb_resources_finish_fs(usb_resources_t *resources,
             resources->fs_initialized = 0;
             resources->opened_endpoints = 0;
             resources->active_transfers = 0;
+            resources->completed_transfers = 0;
+            resources->retired_transfers = 0;
         }
     }
     return first_error;
@@ -179,5 +194,13 @@ int usb_resources_cleanup(usb_resources_t *resources,
     resources->fs_initialized = 0;
     resources->opened_endpoints = 0;
     resources->active_transfers = 0;
+    resources->completed_transfers = 0;
+    resources->retired_transfers = 0;
     return first_error;
+}
+
+int usb_resources_take_completion(usb_resources_t *r,uint8_t index) {
+    uint32_t bit;
+    if(endpoint_bit(index,&bit)!=USB_RESOURCES_OK || !r || !(r->completed_transfers&bit))return USB_RESOURCES_BAD_STATE;
+    r->completed_transfers&=~bit;return USB_RESOURCES_OK;
 }

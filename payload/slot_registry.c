@@ -176,7 +176,7 @@ int slot_registry_set_virtual(slot_registry_t *registry,
     if (!entry) result = SLOT_REGISTRY_STALE;
     else if (entry->state == SLOT_REGISTRY_RELEASING)
         result = SLOT_REGISTRY_BAD_STATE;
-    else if (entry->virtual_ready || entry->virtual_deleting)
+    else if (entry->virtual_ready || entry->virtual_deleting || entry->virtual_creating || entry->virtual_blocked)
         result = SLOT_REGISTRY_BAD_STATE;
     else {
         for (uint32_t i = 0; i < SLOT_REGISTRY_MAX_SLOTS; i++) {
@@ -208,7 +208,7 @@ int slot_registry_take_virtual(slot_registry_t *registry,
     pthread_mutex_lock(&registry->mutex);
     slot_registry_entry_t *entry = find_token_locked(registry, token);
     if (!entry) result = SLOT_REGISTRY_STALE;
-    else if (entry->state == SLOT_REGISTRY_RELEASING || entry->virtual_deleting)
+    else if (entry->state == SLOT_REGISTRY_RELEASING || entry->virtual_deleting || entry->virtual_creating)
         result = SLOT_REGISTRY_BUSY;
     else {
         *out_handle = entry->virtual_ready ? entry->virtual_handle : -1;
@@ -232,7 +232,7 @@ int slot_registry_delete_virtual(slot_registry_t *registry,
     pthread_mutex_lock(&registry->mutex);
     slot_registry_entry_t *entry = find_token_locked(registry, token);
     if (!entry) result = SLOT_REGISTRY_STALE;
-    else if (entry->virtual_deleting) result = SLOT_REGISTRY_BUSY;
+    else if (entry->virtual_deleting || entry->virtual_creating) result = SLOT_REGISTRY_BUSY;
     else if (entry->virtual_ready) {
         handle = entry->virtual_handle;
         entry->virtual_ready = 0;
@@ -271,7 +271,7 @@ int slot_registry_mark_confirmed(slot_registry_t *registry,
     pthread_mutex_lock(&registry->mutex);
     slot_registry_entry_t *entry = find_token_locked(registry, token);
     if (!entry) result = SLOT_REGISTRY_STALE;
-    else if (entry->state == SLOT_REGISTRY_RELEASING || entry->virtual_deleting)
+    else if (entry->state == SLOT_REGISTRY_RELEASING || entry->virtual_deleting || entry->virtual_creating)
         result = SLOT_REGISTRY_BUSY;
     else if (entry->confirmed) result = 0;
     else {
@@ -290,7 +290,7 @@ int slot_registry_release(slot_registry_t *registry,
     pthread_mutex_lock(&registry->mutex);
     slot_registry_entry_t *entry = find_token_locked(registry, token);
     if (!entry) result = SLOT_REGISTRY_STALE;
-    else if (entry->virtual_ready || entry->virtual_deleting)
+    else if (entry->virtual_ready || entry->virtual_deleting || entry->virtual_creating)
         result = SLOT_REGISTRY_BUSY;
     else if (entry->state != SLOT_REGISTRY_RELEASING)
         result = SLOT_REGISTRY_BAD_STATE;
@@ -308,4 +308,35 @@ uint32_t slot_registry_count_claimed(slot_registry_t *registry) {
         if (registry->entries[i].state != SLOT_REGISTRY_FREE) count++;
     pthread_mutex_unlock(&registry->mutex);
     return count;
+}
+
+int slot_registry_begin_virtual_create(slot_registry_t *r, slot_registry_token_t t) {
+    if(!r || !r->initialized)return SLOT_REGISTRY_ERROR;
+    pthread_mutex_lock(&r->mutex);
+    slot_registry_entry_t *e=find_token_locked(r,t);int rc=SLOT_REGISTRY_OK;
+    if(!e)rc=SLOT_REGISTRY_STALE;
+    else if(r->creation_blocked || (e->state!=SLOT_REGISTRY_ACTIVE && e->state!=SLOT_REGISTRY_RESERVED) || e->virtual_ready || e->virtual_deleting || e->virtual_creating || e->virtual_blocked)rc=SLOT_REGISTRY_BUSY;
+    else e->virtual_creating=1;
+    pthread_mutex_unlock(&r->mutex);return rc;
+}
+int slot_registry_finish_virtual_create(slot_registry_t *r,slot_registry_token_t t,int32_t h) {
+    if(!r || !r->initialized)return SLOT_REGISTRY_ERROR;
+    pthread_mutex_lock(&r->mutex);
+    slot_registry_entry_t *e=find_token_locked(r,t);int rc=SLOT_REGISTRY_OK;
+    if(!e)rc=SLOT_REGISTRY_STALE;
+    else if(!e->virtual_creating)rc=SLOT_REGISTRY_BAD_STATE;
+    else {
+        e->virtual_creating=0;
+        if(h<=0)rc=SLOT_REGISTRY_ERROR;
+        else {
+            for(unsigned i=0;i<SLOT_REGISTRY_MAX_SLOTS;i++) {
+                slot_registry_entry_t *other=&r->entries[i];
+                if(other!=e && other->state!=SLOT_REGISTRY_FREE && (other->virtual_ready || other->virtual_deleting) && other->virtual_handle==h) {
+                    e->virtual_blocked=1;r->creation_blocked=1;rc=SLOT_REGISTRY_HANDLE_IN_USE;break;
+                }
+            }
+            if(rc==SLOT_REGISTRY_OK) {e->virtual_handle=h;e->virtual_ready=1;e->confirmed=0;}
+        }
+    }
+    pthread_mutex_unlock(&r->mutex);return rc;
 }

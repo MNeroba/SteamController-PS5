@@ -19,6 +19,7 @@ enum {
     USB_SESSION_OK = 0,
     /* COMPLETE returned another active endpoint; that completion is tracked. */
     USB_SESSION_COMPLETED_OTHER = 1,
+    USB_SESSION_CANCELLED_COMPLETION = 2,
     USB_SESSION_ERROR = -1,
     USB_SESSION_BAD_STATE = -2
 };
@@ -69,3 +70,8 @@ void usb_input_watchdog_init(usb_input_watchdog_t *watchdog, uint64_t now_ms);
 void usb_input_watchdog_refresh(usb_input_watchdog_t *watchdog, uint64_t now_ms);
 int usb_input_watchdog_expired(const usb_input_watchdog_t *watchdog,
                                uint64_t now_ms, unsigned timeout_ms);
+
+/* Classify without treating idle/pending as a physical failure. All counters
+ * are worker-owned; diagnostics copies them at a report boundary. */
+void usb_session_note_error(usb_resources_t *resources, int error);
+const char *usb_session_error_name(int error);

@@ -12,3 +12,5 @@ __pycache__/
 *.pyc
 
 payload/settings_tile_assets.h
+
+payload/build_info.h

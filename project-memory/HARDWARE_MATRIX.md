@@ -19,6 +19,9 @@ No real PS5 hardware tests have been performed for this development tree. On 202
 
 | H-13 | Optional Media settings tile, icon, loopback browser, pairing/navigation and own-title Delete/retry | NOT_TESTED | 13.60 (owner-reported; unverified) | Stock DualSense retained / UNKNOWN | Local browser / app registration | NOT_RUN / SDKv0.43 | NOT_RUN / BLOCKED_HARDWARE | Single ELF; software transaction/stubs/HTTP/browser evidence only |
 
+| H-14 | Confirmed logout/relogin owned virtual-pad recovery, native DualSense coexistence, no USB restart | NOT_TESTED | 13.60 (owner-reported; unverified) | Steam Controller2026 / UNKNOWN | USB-C and official Puck | NOT_RUN / SDKv0.43 | NOT_RUN / BLOCKED_HARDWARE | Host observer/lifecycle/race evidence only |
+| H-15 | Simultaneous input/feedback, late cancellation, watchdog, diagnostics export/notifications | NOT_TESTED | 13.60 (owner-reported; unverified) | Steam Controller2026 / UNKNOWN | USB-C / Puck / enrolled WebUI | NOT_RUN / SDKv0.43 | NOT_RUN / BLOCKED_HARDWARE | Actual kernel cleanup/browser behavior unknown |
+
 ## Required for a first release
 
 The automatic release workflow requires `VERIFIED_HARDWARE` for H-01, H-02, H-03, H-04, H-05, H-09, and H-12, with a real payload commit, actual model/firmware values, and a test-log reference for each row. Host tests and the PS5 cross-build must also pass on the release tag. The check is intentionally fail-closed; editing a status without the required recorded evidence is not a substitute for performing the test.

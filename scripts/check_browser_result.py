@@ -28,8 +28,8 @@ def find_pass(value):
 
 def validate(value):
     result = find_pass(value)
-    if result is None or result['checks'] < 202:
-        raise ValueError('Browser regression must report PASS with at least 202 checks')
+    if result is None or result['checks'] < 220:
+        raise ValueError('Browser regression must report PASS with at least 220 checks')
     return result
 
 

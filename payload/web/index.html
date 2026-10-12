@@ -494,12 +494,16 @@ dialog.profile-guard::backdrop{background:#0009}
   <!-- SETTINGS & HELP -->
   <section id="tab-help" hidden>
     <nav class="sub" aria-label="Settings sections"><div class="subs">
-      <button data-sec="setup">Quick setup</button><button data-sec="tile">PS5 tile</button><button data-sec="pause">Pause</button><button data-sec="handoff">DualSense hand-off</button><button data-sec="ingame">In games</button><button data-sec="vibration">Vibration test</button><button data-sec="menu">On-console menu</button><button data-sec="bridge">Game bridge check</button><button data-sec="log">Troubleshooting log</button>
+      <button data-sec="setup">Quick setup</button><button data-sec="diagnostics">Diagnostics</button><button data-sec="tile">PS5 tile</button><button data-sec="pause">Pause</button><button data-sec="handoff">DualSense hand-off</button><button data-sec="ingame">In games</button><button data-sec="vibration">Vibration test</button><button data-sec="menu">On-console menu</button><button data-sec="bridge">Game bridge check</button><button data-sec="log">Troubleshooting log</button>
     </div></nav>
     <div class="help">
       <section class="sec wide card" data-sec="setup" id="sec-setup">
         <div class="ch"><div><h3>Quick setup</h3><p>Recommended: play with the Steam Controller as your main controller, with game rumble sent to it. Turn the Steam Controller off at any time and your DualSense takes over; wake the Steam Controller with its <b>Steam</b> button to switch back.</p></div></div>
         <div class="body"><div class="btns"><button class="primary" id="ghRec">Use recommended settings</button></div></div>
+      </section>
+      <section class="sec card" data-sec="diagnostics" id="sec-diagnostics">
+        <div class="ch"><div><h3>Diagnostics</h3><p>Download a bounded report of startup, USB input, virtual controller recovery, profiles and recent application logs. It is useful even when no controller is connected.</p></div></div>
+        <div class="body"><div class="btns"><button id="diagnosticsDownload">Download Diagnostic Report</button></div><p class="hint">Review the report before sharing it publicly. Credentials and serials are excluded, but profile names and USB paths may identify your setup. Console behavior remains unverified.</p><p id="diagnosticsStatus" role="status" aria-live="polite"></p></div>
       </section>
       <section class="sec card" data-sec="tile" id="sec-tile">
         <div class="ch"><div><h3>Settings on your PS5</h3><p>Create a Steam Controller Settings tile in Media using the included controller icon. It opens this interface on the console while the payload is running. Experimental: FW 13.60 console behavior has not been tested.</p></div></div>
@@ -1321,6 +1325,22 @@ function paintHap(){const h=status.hap,el=$("#hapDiag");if(!h){el.textContent=""
   const txt=!status.haptics?"Controller not connected to the payload.":
    `Queued ${h.q}, sent ${h.sent}, failed ${h.fail}. Last: ${h.q?(h.err?"error "+h.err:"OK")+" via "+via:"none yet"}. OUT endpoint: ${h.out>=0?"0x"+h.out.toString(16).padStart(2,"0"):"not available"}.`;
   if(el.textContent!==txt)el.textContent=txt}
+const APPLICATION_VERSION=/*__VERSION__*/"";
+$("#diagnosticsDownload").onclick=async()=>{
+  const button=$("#diagnosticsDownload");button.disabled=true;$("#diagnosticsStatus").textContent="Preparing diagnostic report…";
+  let objectUrl;
+  try{
+    const response=await authorizedFetch("/api/diagnostics",{cache:"no-store"});
+    if(!response.ok)throw new Error(await response.text());
+    const report=await response.text();
+    if(new TextEncoder().encode(report).length>24576)throw new Error("Diagnostic report exceeds the size limit");
+    objectUrl=URL.createObjectURL(new Blob([report],{type:"text/plain;charset=utf-8"}));
+    const link=document.createElement("a");link.href=objectUrl;link.download="SteamController-PS5-Diagnostics-"+APPLICATION_VERSION+".txt";
+    document.body.appendChild(link);link.click();link.remove();
+    $("#diagnosticsStatus").textContent="Downloaded. Review the report before sharing.";
+  }catch(error){$("#diagnosticsStatus").textContent="Diagnostic download failed: "+error.message}
+  finally{if(objectUrl)URL.revokeObjectURL(objectUrl);button.disabled=false}
+};
 $("#tileInstall").onclick=async()=>{
   if(!confirm("Create the Steam Controller Settings tile in PS5 Media? This writes its own app metadata and icon. FW 13.60 behavior is unverified. The payload must be running to open settings."))return;
   const button=$("#tileInstall");button.disabled=true;$("#tileStatus").textContent="Requesting tile registration…";

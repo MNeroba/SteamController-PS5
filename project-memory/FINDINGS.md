@@ -190,3 +190,12 @@ VERIFIED_PS5_BUILD/VERIFIED_HOST_TEST: readelf exposed mandatory libSceAppInstUt
 ## F107 — icon directory readability with restrictive umask (M1-234)
 
 VERIFIED_HOST_TEST/VERIFIED_CODE: inherited umask077 made newly created sce_sys0700 while icon/metadata were0644. New regression failed before fix and passes after chmod0755 on that newly created own directory only. Existing directories/foreign bytes remain untouched. Normal/sanitizer40 C plus7 DEV unit contracts and SDK/dependency gate PASS. Real Shell icon visibility remains H-13 NOT_RUN.
+
+
+## F108 — LibrePad dev.3 integration findings, 2026-10-12
+
+Pinned v1.1.2 reference and storage warning: M1-236/ADR-055. Confirmed local STOP→START reuse bug reproduced by the old-resource API then fixed with retired masks; multiplexed OUT helpers now preserve IN completions until consumed. Creation reservation closes duplicate Add/release-generation races. Three consistent empty list observations after prior login plus two stable login observations prevent false logout/recovery. No native account binding or klog handle guesses added. Upstream param word1 is described there as a creation flag, not an account ID; we preserve its ABI bytes and label meaning/positive receipt as hardware-unverified rather than assigning a guessed UID.
+
+Diagnostic export is an authenticated bounded text attachment, memory-only log tail with sensitive lines/addresses/long identifiers redacted, actual firmware/build version/SHA/SDK and initialization/USB/VDA/Steam snapshots. Metadata schema and historical changelogs validated against pinned/public sources and actual published dev.1/dev.2 source assets. Existing release history untouched. Candidate URLs are not available assets until approval/publication.
+
+Build review found a new first-target mistake: inserting build-info before all made default make generate a header only. Explicit .DEFAULT_GOAL:=all and a regression restore actual default ELF builds. SDK build passed; optional-dependency checker initially lacked Darwin llvm-readelf-18, rerun with the actual Homebrew LLVM18 path PASS. Chromium diagnostic regression initially asserted lowercase review before asynchronous completion; corrected wait/case and220 checks PASS. These development negatives are not release evidence. All physical behavior remains NOT_RUN.
