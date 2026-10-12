@@ -4,7 +4,7 @@ This checkpoint prepares documentation and contributor entry points. Repository 
 
 ## Reviewed state
 
-- Authoritative pre-update main: `3a99866d63c13744c6dc3df90439f70d1c713b90`, complete tree `6f81350afedb36c1c30d9e4218e1cbada2830f94`, 282 files. Host38229732850 and SDK38229733009 completed successfully; no open PRs were returned.
+- Authoritative pre-update main: `3a99866d63c13744c6dc3df90439f70d1c713b90`, complete tree `6f81350afedb36c1c30d9e4218e1cbada2830f94`, 282 files. Host38229733009 and SDK38229732850 completed successfully; no open PRs were returned.
 - Published experimental dev.3: source/tag `9aab6dbae166b28416a9a00e6346f85bf12e524e`, workflow38225113776 passed, seven release assets containing one ELF. Dev.1/dev.2 and all release tags/assets remain unchanged.
 - Downloaded dev.3 ELF: 2,029,288 bytes; SHA-256 `013e27f60091cd5de87577beb9acd40ac5ae5eeba08092b7dff65bf56847c752`. M1-238 records its independent download/source verification.
 - README/build/UI/feature guidance now identifies dev.3, SDK v0.43, 220 browser assertions and intended **FW13.60, unverified**. Earlier12.00 records are historical and retained.
@@ -37,3 +37,8 @@ Controller photos and the tile image have owner-authorized repository/release pu
 5. Review README, LICENSE, asset notices, CONTRIBUTING, SECURITY and the issue forms, then change visibility yourself when ready. No source or binary claims a compatible firmware or a tested loader.
 
 Hardware H-01–H-15 remain NOT_RUN/BLOCKED where applicable; native BLE remains research. Opening the source does not authorize console deployment, stock-radio operation or stable publication.
+
+
+## Documentation publication and validation
+
+Documentation source `e7f53f2cf1466bed0f8462bc350155b45b101eb9` published on main. Complete tree286 files retains every282 previous path;29 focused paths changed, four new guides/forms, no runtime source/asset/test/script/workflow changes. Current Host38243078629 and SDK38243078701 completed successfully, including normal, sanitizer, Chromium and cross-build checks. Targeted109 link checks, changelog5 and DEV package7 tests, issue-form YAML/ID/field validation and diff checks passed. This receipt corrects earlier workflow labels without changing results. Repository visibility/metadata/security settings remain unchanged.
