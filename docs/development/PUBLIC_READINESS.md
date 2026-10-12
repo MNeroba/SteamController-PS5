@@ -41,12 +41,12 @@ Controller photos and the tile image have owner-authorized repository/release pu
 
 1. Review the M1-240 scope and residual limitations above. Reachable branch/tag text history is covered; historical logs and maintainer username paths will become public.
 2. Retain all existing source/license/asset notices and experimental release warnings. An additional independent secret-scanner or exhaustive historical binary review may provide extra assurance; neither was claimed here.
-3. Enable and verify GitHub private vulnerability reporting if desired. SECURITY.md offers a conditional route until it is actually available; no invented contact email or response SLA is advertised.
-4. Update the GitHub **About** description, which still mentions12.00 at this checkpoint. Suggested text:
+3. After changing visibility to Public, enable and verify GitHub private vulnerability reporting. M1-241 checked the authenticated Security overview and Advanced Security settings: no private-reporting option is exposed while the repository remains private. [GitHub's guide](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository) specifies public repositories. SECURITY.md keeps its conditional route; no invented contact email or response SLA is advertised.
+4. **About updated and verified — M1-241.** The owner requested the update. The saved description is:
 
    > Experimental Steam Controller 2026 payload for PS5: USB-C/Puck, remapping, gyro, trackpads and haptics. One ELF; host-tested, PS5 hardware unverified.
 
-   Optional topics: `ps5`, `steam-controller`, `homebrew`, `usb`, `gamepad`, `experimental`. These metadata suggestions were not applied here.
+   The old12.00 description was replaced through the authenticated repository metadata form and verified in the rendered page and GitHub API. Optional topics remain unapplied. Repository visibility, releases and tags are unchanged.
 5. Review README, LICENSE, asset notices, CONTRIBUTING, SECURITY and the issue forms, then change visibility yourself when ready. No source or binary claims a compatible firmware or a tested loader.
 
 Hardware H-01–H-15 remain NOT_RUN/BLOCKED where applicable; native BLE remains research. Opening the source does not authorize console deployment, stock-radio operation or stable publication.

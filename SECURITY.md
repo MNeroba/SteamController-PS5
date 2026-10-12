@@ -11,6 +11,7 @@ The current experimental version is **v0.1.0-dev.3**. Report reproducible defect
 Do **not** put exploit details, tokens, pairing codes, private captures or console identifiers in a public issue or PR.
 
 1. If GitHub displays **Security → Report a vulnerability**, use that private form. Private reporting availability depends on repository settings; this document does not assert that it is enabled.
+   GitHub provides this feature for public repositories. While this repository is private, the option is unavailable; after changing visibility, the maintainer must enable and verify it. See [GitHub's configuration guide](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository).
 2. If that option is absent, contact the maintainer through a private channel you already know. If no private channel is available, open an issue containing only **“Private security contact requested”** and wait for a private route before sharing technical details. Do not put a proof of concept or sensitive files in that issue.
 
 Provide the affected release/source SHA, area, expected/observed behavior, minimal sanitized reproducer, impact and actual test environment. State explicitly whether the issue was observed on a host fixture or a physical console. Retain error codes and timing, but remove credentials, serials, account names, Bluetooth addresses and bonding keys.
