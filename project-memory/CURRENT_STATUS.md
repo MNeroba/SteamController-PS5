@@ -4,13 +4,13 @@
 
 **UNPUBLISHED. Owner review/explicit approval is required before dev.3 dispatch, tag or release. Dev.1/dev.2 releases are unchanged.** This supersedes historical publication next actions below.
 
-- Baseline main6dc554633b133c0dd8c865168010306e38e66384 verified complete267 blobs; old f480e58 push gates both now PASS (queue resolved).
+- Current implementation/main source **9aab6dbae166b28416a9a00e6346f85bf12e524e**, tree1512f3fcb9e694d54e55a4d5c8afb982e2d0ca65;282 blobs/45 C,267 previous files retained. Baseline6dc554633b133c0dd8c865168010306e38e66384 was complete267 blobs; old f480e58 push gates both now PASS (queue resolved).
 - Implemented portable user-list consensus and existing-worker owned VDA recovery, serialized Add/release ownership, IN/OUT completion retention and cancellation retirement,500ms watchdog, authenticated bounded/redacted diagnostic download, truthful limited connection notices, matching Payload Manager metadata and mandatory two-section changelogs.
 - Existing single ELF/tile/artwork/pairing/profiles/gyro/touch/haptics preserved. Tile remains explicitly confirmed. SDKv0.43, /data/ghostpad, safe defaults retained. No automatic account binding/native DualSense mutation, storage migration, new generic controller support or radio operation added.
-- Local normal/sanitizer44 C suites plus existing Python contracts/9 artwork/7 DEV/5 changelog checks; Chromium220; clean45-C SDKv0.43 and optional-dependency checks recorded in TEST_LOG. Fresh-source/source-SHA package and new main push acknowledgement follow.
+- Local normal/sanitizer44 C suites plus existing Python contracts/9 artwork/7 DEV/5 changelog checks; Chromium220; clean45-C SDKv0.43 and optional-dependency checks recorded in TEST_LOG. Fresh282-file export matches remote; repeat normal host + exact-SHA SDK build and seven-file/one-ELF local package PASS. ELF2028864 bytes, SHA256fc71b6acbf9ac857e3fe13259b37bdfecc0cb150a313db355222d3b4258188af at output/dev3-review (not a GitHub release download). Push SDK38223580419 PASS; Host38223580325 PASS.
 - H-13 Settings tile, H-14 user recovery/native coexistence and H-15 actual USB cancellation/watchdog/diagnostic browser/notification behavior remain NOT_RUN/BLOCKED_HARDWARE. Positive Add receipt semantics and terminal USB close require physical confirmation. Stable gate still fails closed.
 
-Next: finish exact-source export/packaging/diff review; push complete tested source with expected main parent and zero deletions, record full source SHA/CI/checksum, then stop for owner review. **Do not dispatch dev-release.yml or create dev.3 tag.**
+Both exact-source push checks are green. Review DEV3_REVIEW.md/CHANGELOG/local output/dev3-review and wait for explicit owner publication approval. **Do not dispatch dev-release.yml or create dev.3 tag.**
 
 ---
 

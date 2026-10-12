@@ -82,3 +82,8 @@ Prepared metadata URL is a future dev.3 download, unavailable before publication
 - `tests/test_webui_server.c`
 - `tests/webui_remap_browser.js`
 - `docs/development/DEV3_REVIEW.md`
+
+
+## Source and local artifact acknowledgement
+
+Implementation: `9aab6dbae166b28416a9a00e6346f85bf12e524e`; tree `1512f3fcb9e694d54e55a4d5c8afb982e2d0ca65`. Main update acknowledged,282 blobs/all267 previous files retained/45 C/zero deletions. Fresh complete export normal host and exact-SHA SDK build PASS. Local review artifacts: `output/dev3-review/` (ignored, not GitHub release assets). One ELF2028864 bytes, SHA-256 `fc71b6acbf9ac857e3fe13259b37bdfecc0cb150a313db355222d3b4258188af`; actual checksum and matching metadata/source/version/tile bytes verified. Linux workflow hashes may differ by build path/toolchain; publication will verify its own actual artifact. SDK push38223580419 PASS; Host38223580325 PASS. No dev.3 tag/release; waiting owner review/approval.
