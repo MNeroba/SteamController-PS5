@@ -4,7 +4,7 @@ DEV entries describe software and build verification. They do not establish phys
 
 ## v0.1.0-dev.3
 
-Unpublished release candidate; publication requires the owner's explicit approval.
+Published on 2026-10-12 from `9aab6dbae166b28416a9a00e6346f85bf12e524e`; physical PS5 testing was not performed.
 
 ### Bug Fixes
 

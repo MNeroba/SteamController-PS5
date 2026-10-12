@@ -6,7 +6,7 @@ DEV builds are experimental software/build deliverables. They do not satisfy the
 
 Before publication, update CHANGELOG.md relative to the previous published version, with exactly **Bug Fixes** and **New Features / Improvements** (write `None.` when empty). Match payload/version.h, metadata and selected workflow version; never rewrite historical releases/tags. Both DEV packaging and stable tagged release workflows fail closed on a missing/mismatched entry. Notes include those two sections, actual source SHA and development/hardware status.
 
-**dev.3 is an unpublished candidate. The 2026-10-12 owner instruction requires explicit approval before workflow dispatch, tag creation or release publication. A green push does not grant publication approval.**
+**dev.3 was explicitly approved and published on 2026-10-12 from `9aab6dbae166b28416a9a00e6346f85bf12e524e` via workflow38225113776. Future candidates still require explicit owner approval before publication; a green push does not grant approval.**
 
 ## Manual publication
 
