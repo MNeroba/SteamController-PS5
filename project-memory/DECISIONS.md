@@ -418,3 +418,8 @@ Preserve consumed IN completions while synchronous output waits. Retire cancelle
 ## ADR-056 — Public documentation and privacy scope (2026-10-12)
 
 Keep the landing page centered on the latest immutable experimental release, exact one-ELF packaging and separate host/build/hardware evidence. Current summaries supersede stale checkpoints; preserve dated tests, negative results, source attribution and historical12.00 release records. Add issue forms and conditional private vulnerability reporting guidance without inventing contact details or claiming enabled repository settings. Do not change visibility, rewrite history, relabel asset rights or publish another release as part of documentation preparation. Record heuristic current-tree findings and explicitly leave full reachable-history/attachment review to an authenticated fresh-clone audit before visibility change.
+
+
+## ADR-057 — Public-source review scope (M1-240, 2026-10-12)
+
+ACCEPTED: audit remote reachable refs/parent graph and every text/image blob before giving a scoped Public readiness assessment. Use matched Git object SHA when the text-only connector cannot fetch an image. Preserve historical negative evidence, owner paths, existing tags/releases and separate artwork notices; no silent history rewrite. No confirmed publication blocker was found. The assessment does not certify arbitrary secret formats, upstream media, every historical binary or PS5 runtime behavior. Visibility remains an owner decision; stable hardware gates remain unchanged. Evidence F110/M1-240/PUBLIC_READINESS.

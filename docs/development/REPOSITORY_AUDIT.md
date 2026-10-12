@@ -261,3 +261,8 @@ The pre-consolidation PROJECT_MEMORY summary is preserved verbatim at docs/archi
 ## Public-facing documentation checkpoint — M1-239 (2026-10-12)
 
 Pre-update main3a99866d63c13744c6dc3df90439f70d1c713b90 contains282 blobs,45 production C units. Reviewed documentation/template changes preserve every original path and all source/assets/tests/workflows; no files moved/removed, archives and release history untouched. Added SECURITY.md, two issue forms and PUBLIC_READINESS.md. Updated active README/build/feature/spec/UI/source/BLE/continuation guidance, contributor checklist and manifest review narrative; safety flags/SDK/firmware_verified/critical-blocker list unchanged. Current privacy scope, historical local-path findings and remaining full-history/metadata/security actions are recorded in PUBLIC_READINESS. Exact changed-path inventory and complete-tree verification accompany the publication record.
+
+
+## Public-history checkpoint — M1-240 (2026-10-12)
+
+Reviewed authoritative mainaf183a2/tree703c039 with286 retained blobs; both branches/all3 tags cover140 complete trees/commits and1,476 distinct blobs. All1,413 text objects scanned;63 images SHA-matched/metadata inspected. No files moved/removed, history rewrite, release/tag/asset mutation or runtime/test/workflow change. Focused edits update PUBLIC_READINESS and current/append-only project memory with scope, negative attempts and remaining owner metadata/security/visibility actions. See F110/M1-240.

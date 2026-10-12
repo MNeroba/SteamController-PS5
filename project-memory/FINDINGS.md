@@ -204,3 +204,8 @@ Build review found a new first-target mistake: inserting build-info before all m
 ## F109 — Public documentation and scoped privacy inventory (M1-239)
 
 VERIFIED_CODE: current active docs mixed publisheddev.2 and unpublisheddev.3, FW12.00 build guidance, old cross-build artifact and181/214 current browser gates. Reconciled with release9aab/workflow38225113776/220 and target13.60-unverified without rewriting historical results. Current full-tree signature scan found no matching credentials; historical local username paths/synthetic MAC fixtures and separately licensed artwork remain described. Tile image metadata contains technical resolution/color/dimension/toolkit fields, no GPS/creator/IPTC identity found. This is not a complete Git-history security audit; history/attachments and owner About/security/visibility actions remain NOT_RUN or pending per PUBLIC_READINESS.
+
+
+## F110 — Reachable remote-history privacy review (M1-240)
+
+Remote mainaf183a2 plus fix/p0-safety and all3 DEV tags form140 commits/trees with complete parent closure. All1,413 UTF-8 blobs scanned;63 images resolved to matching Git SHA and metadata inspected. No credential-pattern matches; only classified fixtures/private-network examples/maintainer execution paths and GitHub noreply identity. No project discussion attachment returned; inherited upstream media not examined. Dev.2/dev.3 downloaded ELF digests and ASCII signatures rechecked. Exact-main Host38243782521/SDK38243782563 PASS. No confirmed Public blocker in reviewed scope; custom rules are not exhaustive/third-party scanning and dev.1/sidecar bytes were not freshly re-audited. Visibility and About/security settings unchanged. See PUBLIC_READINESS for residual scope and owner actions.
