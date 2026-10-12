@@ -1,0 +1,34 @@
+name: Feature or improvement
+description: Discuss a focused improvement within the Steam Controller 2026 scope.
+title: "[Feature] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Current scope is one Steam Controller 2026 over USB-C or the official Valve Puck.
+        Native BLE, firmware/system changes and controller ownership require separate evidence and safety review.
+        Do not include secrets or private captures.
+  - type: textarea
+    id: problem
+    attributes:
+      label: User problem
+      description: Explain the concrete workflow or limitation.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: Describe the smallest useful change, alternatives and existing functionality to preserve.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence and verification
+      description: Link primary sources with exact revisions where relevant. Distinguish host tests, upstream claims and actual hardware results; describe remaining requirements.
+  - type: textarea
+    id: boundaries
+    attributes:
+      label: Safety and provenance
+      description: Note device ownership, rollback, network exposure, licensing or asset implications. A request does not authorize invasive hardware experiments.

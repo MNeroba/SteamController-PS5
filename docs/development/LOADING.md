@@ -2,6 +2,8 @@
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
+Current experimental download: [dev/v0.1.0-dev.3](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3), one ELF built from `9aab6dbae166b28416a9a00e6346f85bf12e524e`. Its SHA-256 is `013e27f60091cd5de87577beb9acd40ac5ae5eeba08092b7dff65bf56847c752`. Download the matching checksum from that same release; do not substitute a local build digest.
+
 ## Before loading
 
 This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using these instructions. Independently confirm that your development environment, exact installed firmware and payload loader support this type of ELF. The project has not established a working loader/runtime combination on FW 13.60. Do not update firmware to follow an upstream example.
@@ -66,3 +68,8 @@ For a test report, record the exact payload SHA, ELF checksum, SDK, measured con
 After pairing, open **Settings & help → PS5 tile → Create tile on PS5**, read the experimental warning and confirm. The embedded icon and metadata register only `SCPS50001` in Media. No second ELF, FTP or separate image upload is needed. Keep the payload running; the tile opens `http://127.0.0.1:8090/`, not the payload itself. The PS5 browser has its own session, so pair there again using the current console code or recovery token. Remove the tile through the PS5 normal Delete action. This installer does not perform native uninstallation or database editing.
 
 See [SETTINGS_TILE.md](SETTINGS_TILE.md) for failure/retry behavior and required FW 13.60 hardware checks. Do not treat an accepted registration request as a tested on-console launch.
+
+
+## Download a diagnostic report
+
+After enrollment, open Settings & help → Diagnostics → Download Diagnostic Report. The fixed-name text export includes available startup, USB, user-recovery, virtual-controller, profile/motion/haptic and build/runtime information, plus a bounded filtered application log tail. It works with incomplete initialization or no connected Steam Controller. It does not read arbitrary system files. Review profile names, USB paths and other context before attaching it to an issue; never include credentials or console identifiers. Use SECURITY.md for vulnerabilities rather than posting exploits publicly.

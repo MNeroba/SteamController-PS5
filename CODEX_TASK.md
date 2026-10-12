@@ -1,6 +1,6 @@
 # SteamController-PS5 — active execution specification
 
-Revision 1.3 · 2026-10-12 · Target: owner-reported **PS5 FW 13.60**, hardware-unverified · **SDK v0.43**
+Revision 1.4 · 2026-10-12 · Target: owner-reported **PS5 FW 13.60**, hardware-unverified · **SDK v0.43**
 
 The [full original specification](docs/archive/CODEX_TASK-1.1.md) is preserved verbatim and remains authoritative for detailed contracts, safety rules, evidence labels and acceptance criteria. Read it in full before substantial implementation. This file consolidates the current execution order; it does not revoke uncompleted requirements. Historical setup/PR instructions are superseded by the owner's direct-main solo-development policy and separate experimental DEV authorization.
 
@@ -21,7 +21,7 @@ Details: [current status](project-memory/CURRENT_STATUS.md), [feature table](STE
 
 ## Current execution order
 
-- **Active dev.3 candidate: LibrePad v1.1.2 findings** — confirmed user-list consensus and owned virtual-pad recovery, USB completion ownership, authenticated bounded diagnostics, concise notifications, Payload Manager metadata and mandatory two-category changelogs. Preserve the single ELF/optional tile and all dev.2 features; no storage migration or general-controller protocol import. See ADR-055 and M1-235/236. **Do not dispatch or publish dev.3 until the owner explicitly approves the reviewed candidate.**
+- **Published dev.3: LibrePad v1.1.2 findings** — confirmed user-list consensus and owned virtual-pad recovery, USB completion ownership, authenticated bounded diagnostics, concise notifications, Payload Manager metadata and mandatory two-category changelogs. Preserve the single ELF/optional tile and all dev.2 features; no storage migration or general-controller protocol import. See ADR-055 and M1-235/236. Owner approved publication; dev/v0.1.0-dev.3 is published from9aab6dbae166b28416a9a00e6346f85bf12e524e via successful workflow38225113776. Future DEV publication requires separate explicit approval.
 - First launch/dev.2 is published; [full historical owner task](docs/development/FIRST_LAUNCH_TASK.md) and M1-229 retain its evidence.
 - **Audit remediation P0–P3** — [confirmed findings](docs/development/STATIC_AUDIT.md). Resolve the listed code defects before DEV publication; preserve critical-blocker checks. New first-launch work does not establish hardware compatibility.
 
@@ -43,11 +43,11 @@ At end: inspect diff, run diff-check/tests/sanitizers/build/browser as relevant,
 
 ### Owner target update — 2026-10-11 (M1-231)
 
-Owner reports upgrading from FW12.00 to13.60. Use13.60 for future measured hardware/launcher/BLE checks; no update was performed by this agent. Keep SDKv0.43 and safety gates. Published dev.2 metadata remains unchanged. Before another DEV release, update the current12.00 packaging policy/warning/regression and current guides together; never relabel old test results.
+Owner reports upgrading from FW12.00 to13.60. Use13.60 for future measured hardware/launcher/BLE checks; no update was performed by this agent. Keep SDKv0.43 and safety gates. Published dev.2 metadata remains unchanged. Current packaging policy and warning now target13.60 unverified; preserve historical12.00 results and published dev.2 records. Never relabel old test results.
 
 ### Current dev.3 task — M1-232
 
-Owner requests supplied icon and on-console settings launcher in **one ELF**. Implemented optional authenticated confirmation, embedded icon/metadata and owned exact-title registration; local software/build evidence only. Finalize fresh-source and remote gates, publish experimental dev/v0.1.0-dev.3, record exact release acknowledgement. Current console target owner-reported FW13.60, unmeasured; SDKv0.43 and safety defaults retained. H-13 is hardware-gated. Historical12.00/dev.2 records remain unchanged. See ADR-054 and SETTINGS_TILE.md.
+Owner requests supplied icon and on-console settings launcher in **one ELF**. Implemented optional authenticated confirmation, embedded icon/metadata and owned exact-title registration; local software/build evidence only. Fresh-source and remote gates passed; experimental dev/v0.1.0-dev.3 is published and recorded in M1-238. Current console target owner-reported FW13.60, unmeasured; SDKv0.43 and safety defaults retained. H-13 is hardware-gated. Historical12.00/dev.2 records remain unchanged. See ADR-054 and SETTINGS_TILE.md.
 
 
 ## Dev.3 acceptance additions — 2026-10-12

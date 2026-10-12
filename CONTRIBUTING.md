@@ -2,6 +2,8 @@
 
 Thanks for helping improve the project. Contributions should make the Steam Controller 2026 path safer, easier to test, and easier to continue. This repository is still in development; read the status and hardware limits in [README.md](README.md) before proposing runtime claims.
 
+Security vulnerabilities follow [SECURITY.md](SECURITY.md); do not disclose exploits or credentials in a public PR/issue. Ordinary bugs and proposals can use the [issue forms](https://github.com/MNeroba/SteamController-PS5/issues/new/choose). The owner currently develops directly on main; external contributions still use reviewed PRs.
+
 ## Before you start
 
 1. Read [AGENTS.md](AGENTS.md), the relevant section of [CODEX_TASK.md](CODEX_TASK.md), and the related architecture, evidence, test, and project-memory documents.
@@ -37,9 +39,11 @@ Before opening a PR, run the relevant host checks and report their actual outcom
 
 ```sh
 make -C tests clean test
-make -C tests clean sanitize
+make -C tests sanitize
 git diff --check
 ```
+
+For UI/authentication/profile changes, also run `bash scripts/run_webui_browser.sh` after the host build; do not clean its fixture while the browser scenario is running. For release changes, validate `CHANGELOG.md` and matching metadata using `python3 scripts/check_changelog.py --version <version>`.
 
 For concurrency changes, run the targeted ThreadSanitizer command documented for that suite in [`project-memory/TEST_LOG.md`](project-memory/TEST_LOG.md). For payload changes, follow [docs/BUILDING.md](docs/BUILDING.md) and report the SDK version, compiler version, build result, and ELF SHA-256. Do not describe CI as passing unless the current PR head has a completed successful workflow run.
 

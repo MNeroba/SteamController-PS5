@@ -16,7 +16,7 @@ Reference LibrePadPS5 v1.1.2 commit7466317b4b356249e07770f3914c995e1a4d633a: act
 
 Local gates:44 C suites + Python normal/ASan/UBSan; Chromium220;9 artwork/generator tests;7 DEV policy/package plus5 changelog/metadata checks;45-C clean SDKv0.43/LLVM18 build, deterministic assets, optional-dependency and diff checks. Packaging creates seven files containing exactly one ELF. Actual selected source/digest are recorded after commit. Physical H-13/H-14/H-15 and all stable hardware gates remain NOT_RUN. Positive VDA receipt semantics, native account picker/coexistence, actual USB close/cancellation timing and PS5 browser/notification behavior require a console.
 
-The metadata URL now resolves to the published dev.3 asset; this private repository requires authorized access. The sidecar is not a Payload Manager catalog wrapper. No console deployment, tile registration or radio operation was performed.
+The metadata URL now resolves to the published dev.3 asset; authorized access is needed while the repository remains private. The sidecar is not a Payload Manager catalog wrapper. No console deployment, tile registration or radio operation was performed.
 
 ## Exact changed paths
 

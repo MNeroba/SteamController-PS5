@@ -1,5 +1,9 @@
 # Native PS5 Bluetooth LE evidence decision
 
+**Current target checkpoint — 2026-10-12:** intended FW13.60 is owner-reported and unverified. Native BLE B1–B6 remain NOT_RUN; no radio experiment was performed. The original12.00 assessment below is historical evidence, not the current hardware target. Follow [BLE_FEASIBILITY.md](BLE_FEASIBILITY.md) before any future passive study.
+
+## Historical source assessment
+
 **Status:** Research only; no active native-radio operation performed.
 
 **Decision date:** 2026-10-08

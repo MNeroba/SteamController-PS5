@@ -256,3 +256,8 @@ KEEP means preserved at its path (some documentation/build files will be updated
 ## Implementation follow-up
 
 The pre-consolidation PROJECT_MEMORY summary is preserved verbatim at docs/archive/PROJECT_MEMORY-before-dev.md while its active entry is condensed. Additional files are authored documentation, release scripts/workflow and unit tests. Six upstream documents and the starter note retain their original Git blob SHAs at archive destinations. CODEX_TASK-1.1.md and BUILDING-history.md retain the original bytes as well. No source module, regression or legal notice is removed.
+
+
+## Public-facing documentation checkpoint — M1-239 (2026-10-12)
+
+Pre-update main3a99866d63c13744c6dc3df90439f70d1c713b90 contains282 blobs,45 production C units. Reviewed documentation/template changes preserve every original path and all source/assets/tests/workflows; no files moved/removed, archives and release history untouched. Added SECURITY.md, two issue forms and PUBLIC_READINESS.md. Updated active README/build/feature/spec/UI/source/BLE/continuation guidance, contributor checklist and manifest review narrative; safety flags/SDK/firmware_verified/critical-blocker list unchanged. Current privacy scope, historical local-path findings and remaining full-history/metadata/security actions are recorded in PUBLIC_READINESS. Exact changed-path inventory and complete-tree verification accompany the publication record.

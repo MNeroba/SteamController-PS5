@@ -1,0 +1,64 @@
+name: Bug report
+description: Report a reproducible software or development-console problem.
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For security vulnerabilities, use SECURITY.md instead of this public form.
+        Do not attach pairing codes, bearer tokens, serials, account identifiers, Bluetooth addresses or bonding keys.
+        Host fixtures and SDK builds are not PS5 runtime evidence. Review diagnostic reports before uploading them.
+  - type: input
+    id: version
+    attributes:
+      label: Version and source SHA
+      description: Release tag, full commit SHA and ELF checksum when applicable.
+      placeholder: v0.1.0-dev.3 / commit / SHA-256
+    validations:
+      required: true
+  - type: dropdown
+    id: environment
+    attributes:
+      label: Where was the problem observed?
+      options:
+        - Host tests or browser fixture
+        - PS5 cross-build
+        - Physical PS5 development console
+        - Documentation or release assets
+    validations:
+      required: true
+  - type: textarea
+    id: setup
+    attributes:
+      label: Environment
+      description: Host OS/toolchain/SDK, or measured PS5 firmware/model, loader, controller/Puck firmware and USB-C/Puck transport. Omit private identifiers.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Give exact commands or a minimal repeatable sequence. Do not run invasive console experiments to fill this form.
+    validations:
+      required: true
+  - type: textarea
+    id: result
+    attributes:
+      label: Expected and actual results
+      description: Include error codes, timing and whether the native DualSense remained usable, where observed.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Sanitized evidence
+      description: Relevant logs, reviewed diagnostic report, screenshots and checks actually executed. Mark unavailable checks NOT_RUN.
+  - type: checkboxes
+    id: review
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched existing issues and reviewed the current release limitations.
+          required: true
+        - label: I removed credentials and private device/account identifiers from this report and attachments.
+          required: true

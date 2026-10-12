@@ -6,18 +6,20 @@ Community **PS5 Payload SDK v0.43**, source `d9c9519116944a7f1c22d262012c53b80b3
 a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb
 ```
 
-A PS5 cross-build verifies compilation/linking only. FW **12.00 remains an unverified target**. Historical output hashes and intermediate results are preserved in [build history](archive/BUILDING-history.md) and [TEST_LOG](../project-memory/TEST_LOG.md).
+A PS5 cross-build verifies compilation/linking only. FW **13.60 is the intended, unverified test target**; historical FW12.00 records are retained. Historical output hashes and intermediate results are preserved in [build history](archive/BUILDING-history.md) and [TEST_LOG](../project-memory/TEST_LOG.md).
 
 ## Prerequisites
 
 - Python 3, `make`, Clang, pthreads; no Sony SDK.
 - LLVM **18** and unzip/curl for the community SDK.
 - Node **24** and pinned Playwright CLI **0.1.22** only for browser checks.
-- Repository access while this project is private.
+- Authorized access is needed if the repository is still private; no special repository permission is needed for cloning after it is public.
 
 ```sh
 git clone https://github.com/MNeroba/SteamController-PS5.git
 cd SteamController-PS5
+# Optional: rebuild the exact published version rather than current main.
+git checkout dev/v0.1.0-dev.3
 ```
 
 Ubuntu 24.04:
@@ -63,7 +65,9 @@ shasum -a 256 payload/ghost-control-ps5.elf
 
 `webui_html.h` is **generated, untracked**. Both payload and host Makefiles regenerate it from `web/index.html`, all PNG/WebP assets and `layouts.json`. Do not edit the header or copy it from a previous build. Payload clean removes ELF and generated header, never source assets. Changes to local headers also rebuild the payload.
 
-The internal ELF/data paths retain upstream names for compatibility. DEV assets are named `SteamController-PS5-v0.1.0-dev.1.elf`. Separate toolchains/paths may produce different debug metadata; no claim of byte-identical ELF across platforms is made. Asset embedding is deterministic.
+`build_info.h` and `settings_tile_assets.h` are generated and untracked too. Build identity is derived from the checked-out source; modified/unknown trees must not be described as the published release. Release automation supplies the selected full `SOURCE_SHA` and `DEV_VERSION`; do not override them to mislabel local changes.
+
+The internal ELF/data paths retain upstream names for compatibility. Current published DEV assets use `SteamController-PS5-v0.1.0-dev.3.elf`. The internal build output remains `ghost-control-ps5.elf`. Separate toolchains/paths may produce different debug metadata; no claim of byte-identical ELF across platforms is made. Asset embedding is deterministic.
 
 ## Host and sanitizer checks
 
@@ -84,7 +88,7 @@ playwright-cli install-browser chromium --with-deps
 bash scripts/run_webui_browser.sh
 ```
 
-The script starts a loopback-only RAM fixture, runs the production C profile parser/formatter behind mocked console routes and requires at least **181 assertions**. Logs/screenshots go to ignored `output/playwright/`; the existing browser scenario also refreshes real UI documentation screenshots. It stops its own fixture/browser. Do not clean `tests/build` while the fixture is running. Edge fallback/manual commands and scope limits: [WEBUI_REMAP](WEBUI_REMAP.md).
+The script starts a loopback-only RAM fixture, runs the production C profile parser/formatter behind mocked console routes and requires at least **220 assertions**. Logs/screenshots go to ignored `output/playwright/`; the existing browser scenario also refreshes real UI documentation screenshots. It stops its own fixture/browser. Do not clean `tests/build` while the fixture is running. Edge fallback/manual commands and scope limits: [WEBUI_REMAP](WEBUI_REMAP.md).
 
 ## Fresh-source and asset checks
 
@@ -100,4 +104,4 @@ A fresh checkout does not contain ELF, SDK, caches, generated header or tokens. 
 
 ## Loading and remaining physical tests
 
-Read [LOADING](development/LOADING.md) before sending anything to a development console. No persistent installer is provided. Loader compatibility, measured firmware, USB/Puck, native DualSense, motion/touch/haptics and cleanup require physical testing under [TEST_PLAN](TEST_PLAN.md). The stable hardware gate remains closed until matching actual evidence exists.
+Read [LOADING](development/LOADING.md) before sending anything to a development console. No persistent payload boot service is provided. The optional Settings tile persists launcher metadata only and does not start the ELF. Loader compatibility, measured firmware, USB/Puck, native DualSense, motion/touch/haptics and cleanup require physical testing under [TEST_PLAN](TEST_PLAN.md). The stable hardware gate remains closed until matching actual evidence exists.

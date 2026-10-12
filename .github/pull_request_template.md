@@ -1,3 +1,5 @@
+<!-- Vulnerabilities: use SECURITY.md; do not put exploit details or credentials in a public PR. -->
+
 ## Summary
 
 <!-- What changes, and why? Keep this PR focused on one coherent issue. -->
@@ -34,9 +36,11 @@ Result:
 ```
 
 - [ ] `make -C tests clean test`
-- [ ] `make -C tests clean sanitize`
+- [ ] `make -C tests sanitize`
 - [ ] Targeted ThreadSanitizer run for concurrency changes (command and result below)
 - [ ] PS5 SDK cross-build for payload changes (SDK/compiler version and ELF SHA-256 below)
+- [ ] `bash scripts/run_webui_browser.sh` for UI/authentication/profile changes
+- [ ] Matching two-section CHANGELOG entry/metadata for release changes
 - [ ] `git diff --check`
 
 Not run and why:

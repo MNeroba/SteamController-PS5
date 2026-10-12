@@ -21,7 +21,7 @@ Before publication, update CHANGELOG.md relative to the previous published versi
 
 - `SteamController-PS5-v0.1.0-dev.3.elf` — real SDK output, copied from the validated build.
 - Its `.elf.sha256` — digest with the download filename.
-- Its `.elf.json` — Payload Manager metadata with matching filename/version/release URL and actual SHA-256. The committed candidate URL is unavailable until publication; this private repository also requires authorized access.
+- Its `.elf.json` — Payload Manager metadata with matching filename/version/release URL and actual SHA-256. The source metadata URL now identifies the published dev.3 asset; authorized access is needed while the repository remains private.
 - `RELEASE_NOTES.md`, `LOADING.md`, `NOTICES.md`, `LICENSE` — warning, evidence, configuration and attribution.
 - GitHub's matching source archives at the exact release tag. Full source, asset notices, SDK source pin and generator remain available for rebuilds.
 

@@ -142,6 +142,10 @@ T-P60 publication: source `6914442f6b813f90d1156f93d18f532919ff13e8`, tree `4bff
 
 T-P61: retain regression negatives for formatter overflow, incomplete store load, inactive trigger masks, Long+Turbo off phase, stale Load and interrupted HTTP write. Host tests must cover maximum masks/all activators, required capacity including NUL, default/max store round-trips, incomplete/oversized/NUL/invalid/duplicate data, failed open/write/close/rename preserving old snapshots, effective Shift/cross/analog/digital pressure, release/reset/profile generations and supported Long modifiers. Browser gate now requires 181 assertions: reverse responses, later draft, failed Load, guard Cancel/Escape/Discard/failed Save/successful Save, game-list/Now Playing cancellation without orphan, pending Save, returning to the same ID, delayed Delete and pending Back/Forward. H-09 must repeat these through the real authenticated portal and measure full page bytes/time on the measured firmware; all physical rows remain unverified.
 
+## Current dev.3 software evidence — M1-238
+
+Published source `9aab6dbae166b28416a9a00e6346f85bf12e524e`: [DEV workflow38225113776](https://github.com/MNeroba/SteamController-PS5/actions/runs/38225113776) passed normal44 C/Python suites, ASan/UBSan, Chromium220, deterministic assets, clean SDKv0.43/LLVM18, metadata/changelog and checksum gates. Earlier assertion counts and firmware targets in dated records remain historical. All physical rows remain NOT_RUN; current intended firmware is13.60, unmeasured.
+
 ## Stable release source binding (dev.2 audit hardening)
 
 Each required hardware matrix row must link to its own `### H-xx` section in the unchanged stable `project-memory/TEST_LOG.md` path. Record measured values with these labels: `Firmware: <exact version>`, `SDK: v0.43`, `Payload commit: <full 40-character SHA>` and `Result: VERIFIED_HARDWARE`, plus PS5 model, controller model/firmware and transport matching the matrix. Do not turn an unrun row into evidence.

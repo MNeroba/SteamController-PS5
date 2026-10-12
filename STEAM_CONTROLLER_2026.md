@@ -13,7 +13,7 @@ This page describes the Steam Controller 2026 work in **SteamController-PS5**. I
 | **Buttons, sticks, triggers, and profiles** | Steam report model, mapping/binding and profile persistence/selection logic | Production-module host tests, sanitizer coverage, parser property tests | End-to-end profile selection and controller behavior on PS5 |
 | **Trackpads, rear controls, and motion** | Extended Steam input state, trackpad/motion mapping modules, gyro aiming and flick-stick paths | Portable mapping/motion tests and concurrency checks | Real sensor units/orientation, calibration, PS5 touch/motion event semantics, and gameplay |
 | **Haptics and trigger translation** | Bounded feedback encoding, a single-SC2 session lease, queue ownership, and trigger-effect-to-haptic logic | Host tests for encoding, ownership, bounds, and concurrency | USB output reports, game-hook routing, physical rumble, and effect quality on the Steam Controller |
-| **Profiles and portal** | Atomic profile patches, explicit backed-up Default recovery, first-launch notification pairing, bearer-protected APIs/icons, strict admission, four bounded clients and local IPv4 peer policy | Production-module host/concurrency tests plus 214 image-based remap/browser checks, including hostile imports, canonical Save readback, concurrent edits and geometric touch selection on the loopback fixture | Prospero filesystem/socket behavior, real-console browser integration, and on-console enrollment. Portal traffic is plain HTTP and should remain on a trusted network. |
+| **Profiles and portal** | Atomic profile patches, explicit backed-up Default recovery, first-launch notification pairing, bearer-protected APIs/icons, strict admission, four bounded clients and local IPv4 peer policy | Production-module host/concurrency tests plus 220 image-based remap/browser checks, including hostile imports, canonical Save readback, concurrent edits and geometric touch selection on the loopback fixture | Prospero filesystem/socket behavior, real-console browser integration, and on-console enrollment. Portal traffic is plain HTTP and should remain on a trusted network. |
 | **Shutdown, privilege, and optional hooks** | Safe defaults, checked credential scopes, owned VDA cleanup, coordinated worker shutdown, transactional optional hook installation, refused retained-page reuse, and bounded rollback attempts | Fault-injection, source-contract, ASan/UBSan, and selected TSan host checks | Kernel/API semantics, remote-call latency, target-side leases, hook rollback, and DualSense recovery on PS5 |
 | **Optional PS5 settings tile (dev.3)** | One ELF embeds owner-supplied icon and fixed SCPS50001 Media/deeplink metadata; installation requires authenticated explicit confirmation, owned exact files and exact-title registration | Portable transaction/native-stub tests, production HTTP protection, browser confirmation/retry and SDKv0.43 build; [setup/removal](docs/development/SETTINGS_TILE.md) | H-13: measured FW13.60 ABI, visibility, browser loopback, enrollment/navigation and console Delete; tile does not autostart payload |
 | **Native PS5 Bluetooth LE** | No native PS5 BLE transport is implemented | Public-source/API and licensing review only; no radio operation was run | Every native PS5 BLE gate, starting with passive console diagnostics |
@@ -31,7 +31,9 @@ The current readiness matrix and test records are in [README](README.md), the [t
 
 ## Build outputs
 
-The [PS5 cross-build workflow](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) uploads `ghost-control-ps5-cross-build` with an ELF and SHA-256 file after a successful build. Actions artifacts are temporary and expire under GitHub's retention policy. The repository is private, so access is required. An artifact is a build output, not an install package or a verified release.
+[Experimental dev.3](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3) is published from `9aab6dbae166b28416a9a00e6346f85bf12e524e`, with seven assets containing exactly one ELF. Release workflow38225113776 passed all repeated software gates. The published ELF SHA-256 is `013e27f60091cd5de87577beb9acd40ac5ae5eeba08092b7dff65bf56847c752`; physical PS5 testing remains NOT_RUN.
+
+The [PS5 cross-build workflow](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) uploads `SteamController-PS5-cross-build` with an ELF and SHA-256 file after a successful build. Actions artifacts are temporary and expire under GitHub's retention policy. Authorized access is required while the repository is private; this restriction disappears for public downloads after visibility changes. An artifact is a build output, not an install package or a verified release.
 
 Use the [build instructions](docs/BUILDING.md) for portable tests and the SDK cross-build. The ELF loading procedure is documented in docs/development/LOADING.md, but this project's deploy/runtime path has not been tested on hardware. There is no supported stock-console installation procedure.
 
@@ -44,14 +46,14 @@ The project is focused on one Steam Controller 2026 connected by USB-C or the of
 `VERIFIED_HOST_TEST`: full normal and ASan/UBSan suites PASS; profile 52 assertions, atomic storage 71, binding/proportional-pressure 165 and HTTP/auth 110. Nine portable artwork/generator contracts and 181 Edge/Playwright browser assertions PASS (all original 162 retained). The maximum-complexity stored profile is 14,573 bytes; complete 24-input/22-output/activator round-trip succeeds within the 24 KiB capacity. Final generated page: 685,503 UTF-8 bytes, 41 icons/four unchanged controller images. Clean SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `5bdd18153301213e7a4b82e3038dff24563fdc7e0e474ce41546d3c66ffc7dbc`. This is local source/build evidence; publication and Actions acknowledgement follow separately. Physical FW 12.00 remains NOT_RUN.
 
 
-## Dev.3 candidate additions (unpublished)
+## Published dev.3 additions
 
 | Capability | Software status | Physical PS5 status |
 |---|---|---|
 | Owned virtual-pad logout/relogin recovery; USB preserved | Host consensus/lifecycle/race tests | NOT_RUN H-14 |
 | IN/OUT ordering, late-cancel retirement and watchdog | Host fault/concurrency tests | NOT_RUN H-15 |
 | Authenticated diagnostic text export, bounded/redacted log | Host/report/HTTP/Chromium tests | NOT_RUN H-15 |
-| Payload Manager sidecar and mandatory versioned changelog | Packaging/format tests | No available dev.3 release asset |
+| Payload Manager sidecar and mandatory versioned changelog | Packaging/format tests | Published metadata/checksum; manager installation unverified |
 | Embedded optional Settings tile, one ELF | Existing host/native-stub/build tests retained | NOT_RUN H-13 |
 
 No automatic tile installation/account reassignment, new controller protocols or storage migration. SDKv0.43, /data/ghostpad, artwork, pairing/profile/motion/touch/haptic contracts and safe defaults retained.

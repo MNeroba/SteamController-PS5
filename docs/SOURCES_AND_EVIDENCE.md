@@ -46,7 +46,7 @@
 - Do not retrieve, embed, publish or redistribute confidential SDK headers, firmware files, keys or protected documentation. A Sony Spresense BLE SDK is for an unrelated device, not PS5.
 - Apply license review at file level: Puckbridge README says GPL-3.0-or-later; OmniPad lists GPLv3; BTstack has explicit noncommercial limitations; upstream artwork may have separate terms.
 
-## Missing proof ledger
+## Historical missing proof ledger — original 2026-10-08 target
 
 - `libSceBluetoothHid` exported entry points **resolved and tested on the reported FW 12.00 target**: NOT_VERIFIED.
 - System-managed arbitrary BLE Central scan/connect/GATT on native FW 12.00: NOT_VERIFIED.
@@ -62,6 +62,9 @@ Record new evidence as append-only items with exact links, date, source revision
 
 Tagbb60defad681563742448faaefa29b440ea83a0e → commit7466317b4b356249e07770f3914c995e1a4d633a; actual inspected src/ps5/virtual_controller.c:375–435/470–650 (host logout recovery; hardware unconfirmed), src/input/usb_device.c:184–252 (multiplexed completions/output validation), src/dashboard/http_server.c:315–365 (download concept) and config/payload/LibrePadPS5.elf.json (metadata concept). No implementation copied. Root GPL3 reviewed. Release notes now explicitly warn of symbolic-link storage startup failure and recommend1.1.3; do not adopt migration. Our independently authored observer/lifecycle/report extend existing modules and retain /data/ghostpad.
 
-Payload Manager schema verified at itsPLK/ps5-payload-manager e4e72dc9d831dd09ee8fabc222ad1e7f5139050e CUSTOM_REPOSITORIES.md: name/filename/url/description/version/category/checksum; top-level catalog wrapper is separate. Candidate sidecar uses a future dev.3 URL, not an already available asset. No physical compatibility is inferred from either reference.
+Payload Manager schema verified at itsPLK/ps5-payload-manager e4e72dc9d831dd09ee8fabc222ad1e7f5139050e CUSTOM_REPOSITORIES.md: name/filename/url/description/version/category/checksum; top-level catalog wrapper is separate. The sidecar URL was a future asset during review; dev.3 was published on2026-10-12 from9aab6dbae166b28416a9a00e6346f85bf12e524e and the URL now identifies its release asset. No physical compatibility is inferred from either reference.
 
 FreeBSD kernel reference (engineering evidence, no code copied): freebsd/freebsd-src 12b769ed36a115da3b5013c92cdf294a3a5de98d sys/dev/usb/usb_generic.c:1444–1463 demonstrates STOP may queue a late cancel completion; :213–231 ugen_close performs transfer teardown; usb_dev.c:939–976 close callback releases USB FIFOs. Pinned bytes match releng/12.0 fetched source. This supports retiring cancelled indices and retaining session buffers through terminal close; it does not prove ProsperoOS behavior. Failed-close is a terminal relinquishment (no retry on potentially reused fd); H-15 must confirm kernel teardown. SDKv0.43 libSceUserService stub exports sceUserServiceGetLoginUserIdList (llvm-nm checked); actual return semantics remain H-14.
+
+
+Current target checkpoint (M1-239,2026-10-12): FW13.60 is owner-reported and unmeasured. The original12.00 source ledger above is historical; no native BLE, Edge or per-device ShellUI gate has physical verification on13.60 either. Dev.3 publication provides software/build evidence only.

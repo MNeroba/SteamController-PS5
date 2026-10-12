@@ -1,5 +1,12 @@
 # Issues and blockers — project register
 
+## Current checkpoint — M1-239 (2026-10-12)
+
+Dev.3 publication/runner/approval blockers in older entries are resolved: workflow38225113776 passed and release source9aab6dbae166b28416a9a00e6346f85bf12e524e is published. No newly confirmed critical code defect was found in this documentation review. Physical USB/VDA/user recovery, privilege/hooks/filesystem and tile/browser behavior remain unverified. The current intended firmware is13.60, not the earlier12.00 target.
+
+P2-PUBLIC-DOCS-01: stale dev.2/12.00/artifact/browser-count/candidate wording corrected in active docs; external issue forms and SECURITY policy added. Public preparation remains scoped: full reachable Git history/attachments NOT_RUN, About still mentions12.00, private vulnerability reporting not confirmed. Owner actions and retained local-path/artwork-rights findings are in docs/development/PUBLIC_READINESS.md. Repository visibility remains private. Historical issues/results below are preserved.
+
+
 Severity refers to possible impact **if relevant code is part of chosen base**. These are not automatically open issues for a future derivative. Codex must first establish presence and reproducer on pinned source.
 
 | ID | Priority | Status | Issue or blocker | Evidence / required action |
