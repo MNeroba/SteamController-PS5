@@ -31,7 +31,56 @@ static void *race(void *ctx) {
         return (void *)1;
     return 0;
 }
+static int uncertain_create(uint32_t slot, int32_t *h, int *bind, void *ctx) {
+    fake_t *f = ctx;
+    assert(slot == f->t.index);
+    f->creates++; /* The backend may have created a device without a receipt. */
+    *h = f->next;
+    *bind = 0;
+    return -1;
+}
+static void test_unattributable_creation_never_retries(void) {
+    const int32_t outcomes[] = {0, -1, (int32_t)0x803B0006u};
+    for (unsigned i = 0; i < sizeof(outcomes) / sizeof(outcomes[0]); ++i) {
+        slot_registry_t r;
+        assert(slot_registry_init(&r) == 0);
+        fake_t f = {.r = &r, .next = outcomes[i]};
+        assert(slot_registry_claim(&r, "uncertain", 0x28de, 0x1304, &f.t) == 0);
+        assert(slot_registry_activate(&r, f.t) == 0);
+        slot_lifecycle_ops_t ops = {.create_virtual = uncertain_create, .delete_virtual = del};
+        for (int n = 0; n < 32; ++n)
+            assert(slot_lifecycle_attach(&r, f.t, &ops, &f, 0) != 0);
+        assert(f.creates == 1 && f.deletes == 0);
+        assert(slot_lifecycle_release(&r, f.t, del, &f) == 0);
+        /* Hotplug/new generations and account recovery cannot clear the latch. */
+        assert(slot_registry_claim(&r, "reconnect", 0x28de, 0x1302, &f.t) == 0);
+        assert(slot_registry_activate(&r, f.t) == 0);
+        assert(slot_lifecycle_attach(&r, f.t, &ops, &f, 0) != 0);
+        assert(f.creates == 1 && f.deletes == 0);
+        assert(slot_lifecycle_release(&r, f.t, del, &f) == 0);
+        slot_registry_destroy(&r);
+    }
+}
+static void test_global_creation_reservation(void) {
+    slot_registry_t r;
+    slot_registry_token_t a,b;
+    assert(slot_registry_init(&r)==0);
+    assert(slot_registry_claim(&r,"pending-a",0x28de,0x1302,&a)==0);
+    assert(slot_registry_claim(&r,"pending-b",0x28de,0x1304,&b)==0);
+    assert(slot_registry_activate(&r,a)==0 && slot_registry_activate(&r,b)==0);
+    assert(slot_registry_begin_virtual_create(&r,a)==0);
+    /* Reserve through callback result recording, not just the raw SDK call. */
+    assert(slot_registry_begin_virtual_create(&r,b)==SLOT_REGISTRY_BUSY);
+    assert(slot_registry_finish_virtual_create(&r,a,-1)==SLOT_REGISTRY_ERROR);
+    assert(slot_registry_begin_virtual_create(&r,b)==SLOT_REGISTRY_BUSY);
+    fake_t f={0};
+    assert(slot_lifecycle_release(&r,a,del,&f)==0);
+    assert(slot_lifecycle_release(&r,b,del,&f)==0 && f.deletes==0);
+    slot_registry_destroy(&r);
+}
 int main(void) {
+    test_global_creation_reservation();
+    test_unattributable_creation_never_retries();
     slot_registry_t r;
     assert(slot_registry_init(&r) == 0);
     slot_registry_token_t t;
@@ -95,6 +144,12 @@ int main(void) {
     }
     assert(winners == 1);
     assert(slot_registry_finish_virtual_create(&r, f.t, -1) == SLOT_REGISTRY_ERROR);
+    assert(slot_registry_begin_virtual_create(&r, f.t) == SLOT_REGISTRY_BUSY);
+    assert(slot_lifecycle_release(&r, f.t, del, &f) == 0);
+    slot_registry_destroy(&r);
+    assert(slot_registry_init(&r) == 0); /* independent positive-receipt race */
+    assert(slot_registry_claim(&r, "release-race", 0x28de, 0x1302, &f.t) == 0);
+    assert(slot_registry_activate(&r, f.t) == 0);
     f.release_during_create = 1;
     assert(slot_lifecycle_attach(&r, f.t, &ops, &f, 0) == 0);
     assert(slot_registry_snapshot(&r, f.t, &e) == 0 && e.state == SLOT_REGISTRY_RELEASING &&

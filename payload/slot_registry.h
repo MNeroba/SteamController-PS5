@@ -100,6 +100,8 @@ int slot_registry_release(slot_registry_t *registry,
 uint32_t slot_registry_count_claimed(slot_registry_t *registry);
 
 /* Reserve creation before any side effect. Finish retains a positive owned
- * handle even if release was requested during AddDevice, for later cleanup. */
+ * handle even if release was requested during AddDevice, for later cleanup.
+ * A nonpositive or aliased receipt inhibits further creation for this registry
+ * lifetime: it does not prove AddDevice had no system-side effect. */
 int slot_registry_begin_virtual_create(slot_registry_t *registry, slot_registry_token_t token);
 int slot_registry_finish_virtual_create(slot_registry_t *registry, slot_registry_token_t token, int32_t handle);

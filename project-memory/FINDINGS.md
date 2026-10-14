@@ -209,3 +209,8 @@ VERIFIED_CODE: current active docs mixed publisheddev.2 and unpublisheddev.3, FW
 ## F110 — Reachable remote-history privacy review (M1-240)
 
 Remote mainaf183a2 plus fix/p0-safety and all3 DEV tags form140 commits/trees with complete parent closure. All1,413 UTF-8 blobs scanned;63 images resolved to matching Git SHA and metadata inspected. No credential-pattern matches; only classified fixtures/private-network examples/maintainer execution paths and GitHub noreply identity. No project discussion attachment returned; inherited upstream media not examined. Dev.2/dev.3 downloaded ELF digests and ASCII signatures rechecked. Exact-main Host38243782521/SDK38243782563 PASS. No confirmed Public blocker in reviewed scope; custom rules are not exhaustive/third-party scanning and dev.1/sidecar bytes were not freshly re-audited. Visibility and About/security settings unchanged. See PUBLIC_READINESS for residual scope and owner actions.
+
+
+## F111 — Final kernel-sensitive runtime audit (M1-242)
+
+Three expected-red regressions established repeated unattributable Add/global reservation gap, missing live-fd identity check before USB detach, and signed OUT status overflow. Existing modules now latch ambiguous creation, reserve globally, revalidate exact reopened transport/18-byte descriptors and bound arithmetic. Software/build gates PASS; no hardware causation claim. Current analogous pins and SDK accessors inspected; no stronger proven ownership backend suitable for safe wholesale replacement found. External dev.2/FW5.50 screenshot failure remains unverified without logs/digest. Old assets unchanged and explicit README/Unreleased notice distinguishes new source fixes. Report PUBLIC_RUNTIME_REVIEW, decisions ADR-058.

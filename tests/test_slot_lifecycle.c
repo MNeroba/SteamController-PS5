@@ -166,6 +166,11 @@ int main(void) {
     CHECK(manager.delete_calls == 0);
     CHECK(slot_registry_count_claimed(&registry) == 0);
 
+    /* A failed create cannot prove no side effect; later scenarios use a
+     * separate runtime registry instead of silently retrying that Add. */
+    CHECK(registry.creation_blocked);
+    slot_registry_destroy(&registry);
+    CHECK(slot_registry_init(&registry) == SLOT_REGISTRY_OK);
     token = claim(&registry, &manager, "worker-failure");
     manager.create_result = 0;
     manager.create_handle = 11;

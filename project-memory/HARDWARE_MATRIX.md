@@ -41,3 +41,8 @@ The local fixture now passes 114 browser checks, including calibrated DualSense 
 M1-216 source publication on main: `408900592f50b1eb39b0003c357c95a137410f2f`. Host/Chromium/normal/ASan-UBSan Actions `38067268430` and PS5 SDK cross-build Action `38067268427` pass. This does not satisfy H-09 or any console/hardware row. FW 12.00 operation, live highlighting and persisted target profiles remain NOT_RUN / BLOCKED_HARDWARE.
 
 M1-231 target update (2026-10-11): owner reports an upgrade to FW13.60. Current unrun rows now target13.60; historical12.00 host/UI follow-ups above are preserved. No row became VERIFIED_HARDWARE.
+
+
+## External failure report — 2026-10-14 (M1-242)
+
+Owner supplied a third-party screenshot reporting dev.2/FAT/FW5.50 via Payload Manager: detected USB-C/Puck with no input, device-limit message, token-storage error and intermittent native DualSense loss at user selection. Only the comment is available; no ELF SHA/log/error code/independent reproduction. This is an unverified external report, not VERIFIED_HARDWARE or a changed result for the intended13.60 rows. Three source defects were host-fixed after dev.3, but their causal relation to this report is unproven. Follow PUBLIC_RUNTIME_REVIEW and H04/H05/H09/H12/H14/H15 before any separately authorized retest.

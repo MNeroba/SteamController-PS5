@@ -136,3 +136,10 @@ P1-DIAGNOSTICS-01 IMPLEMENTED_HOST/BROWSER: bounded authenticated/redacted repor
 ## Public readiness follow-up — M1-240
 
 Previous full reachable-history scope gap is resolved for remote branches/tags and all1,413 text/63 image blobs; no matched credential or project-discussion attachment. No confirmed Public blocker identified. Residual assurance: independent Gitleaks/TruffleHog and exhaustive historical release byte scans NOT_RUN; inherited upstream media not inspected. About still12.00, private vulnerability reporting NOT_VERIFIED because connector endpoint is unsupported. SECURITY.md remains conditional. Visibility private, unchanged. Stable/physical-console blockers remain unchanged.
+
+
+## Final runtime audit — M1-242, 2026-10-14
+
+P0-VDA-UNATTRIBUTED-03 FIXED_HOST: absent/nonpositive receipts allowed repeating Add; registry-wide pending reservation/lifetime latch now stops repeats without deleting guesses. P1-USB-REOPEN-03 FIXED_HOST: reread opened fd identity before descriptor map/detach, strict complete device descriptor. P1-USB-STATUS-03 FIXED_HOST: INT_MAX status overflow reproduced by UBSan, bounded conversion. Normal44 C/Python, ASan/UBSan, Chromium220 and SDKv0.43 gates PASS locally; source publication/CI recorded separately. Published dev.3/older binaries do not contain these changes.
+
+EXTERNAL-FW550-01 UNVERIFIED_FAILURE_REPORT: supplied dev.2/FAT5.50 comment says no input, token-storage error and native DualSense disruption at user picker. Owner has no log/code/ELF digest. No established cause or hardware fix claimed. Keep open for authorized measured reproduction/log collection. It is not a fake critical-code finding and does not justify permission relaxation, guessed handles or unproven version gates. See PUBLIC_RUNTIME_REVIEW.

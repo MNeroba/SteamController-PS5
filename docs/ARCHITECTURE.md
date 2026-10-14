@@ -6,6 +6,8 @@ The diagrams describe logical contracts, including research boundaries. USB-C/Pu
 
 ## Target dependency direction
 
+M1-242: the registry reserves Add globally until its result is recorded. A nonpositive/aliased receipt blocks future creation for that registry lifetime without guessing/deleting a handle; hotplug does not clear the latch. The USB worker rechecks identity from its reopened fd before mapping/detach, using a complete18-byte device descriptor when that read path is selected. See [runtime review](development/PUBLIC_RUNTIME_REVIEW.md). Published dev.3 predates these fixes.
+
 ```text
 Official Steam Controller 2026 (USB-C / Valve Puck / BLE)
      |

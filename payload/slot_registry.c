@@ -314,8 +314,11 @@ int slot_registry_begin_virtual_create(slot_registry_t *r, slot_registry_token_t
     if(!r || !r->initialized)return SLOT_REGISTRY_ERROR;
     pthread_mutex_lock(&r->mutex);
     slot_registry_entry_t *e=find_token_locked(r,t);int rc=SLOT_REGISTRY_OK;
+    int creating=0;
+    for(unsigned i=0;i<SLOT_REGISTRY_MAX_SLOTS;i++)
+        creating |= r->entries[i].virtual_creating;
     if(!e)rc=SLOT_REGISTRY_STALE;
-    else if(r->creation_blocked || (e->state!=SLOT_REGISTRY_ACTIVE && e->state!=SLOT_REGISTRY_RESERVED) || e->virtual_ready || e->virtual_deleting || e->virtual_creating || e->virtual_blocked)rc=SLOT_REGISTRY_BUSY;
+    else if(r->creation_blocked || creating || (e->state!=SLOT_REGISTRY_ACTIVE && e->state!=SLOT_REGISTRY_RESERVED) || e->virtual_ready || e->virtual_deleting || e->virtual_blocked)rc=SLOT_REGISTRY_BUSY;
     else e->virtual_creating=1;
     pthread_mutex_unlock(&r->mutex);return rc;
 }
@@ -327,7 +330,14 @@ int slot_registry_finish_virtual_create(slot_registry_t *r,slot_registry_token_t
     else if(!e->virtual_creating)rc=SLOT_REGISTRY_BAD_STATE;
     else {
         e->virtual_creating=0;
-        if(h<=0)rc=SLOT_REGISTRY_ERROR;
+        if(h<=0) {
+            /* Add may have side effects even without an attributable receipt.
+             * Never fill the system pool with retries or delete a guessed ID.
+             * Keep the latch across releases/hotplug for this registry lifetime. */
+            e->virtual_blocked=1;
+            r->creation_blocked=1;
+            rc=SLOT_REGISTRY_ERROR;
+        }
         else {
             for(unsigned i=0;i<SLOT_REGISTRY_MAX_SLOTS;i++) {
                 slot_registry_entry_t *other=&r->entries[i];

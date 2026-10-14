@@ -7,6 +7,20 @@
 #define USB_DESC_ENDPOINT  0x05
 #define USB_EP_INTERRUPT   0x03
 
+int steam_usb_device_identity(const uint8_t *data, unsigned length,
+                              uint16_t *vendor_id, uint16_t *product_id) {
+    if (!data || !vendor_id || !product_id || length != 18 ||
+        data[0] != 18 || data[1] != 1) return 0;
+    *vendor_id = (uint16_t)(data[8] | ((uint16_t)data[9] << 8));
+    *product_id = (uint16_t)(data[10] | ((uint16_t)data[11] << 8));
+    return 1;
+}
+int steam_usb_identity_matches(uint16_t expected_vid, uint16_t expected_pid,
+                               uint16_t actual_vid, uint16_t actual_pid) {
+    return steam_usb_is_sc2_device(expected_vid,expected_pid) &&
+        expected_vid==actual_vid && expected_pid==actual_pid;
+}
+
 int steam_usb_parse_config(const uint8_t *data, unsigned length,
                            int puck_only, steam_usb_map_t *out) {
     unsigned total, offset, interface_count = 0;

@@ -266,3 +266,8 @@ Pre-update main3a99866d63c13744c6dc3df90439f70d1c713b90 contains282 blobs,45 pro
 ## Public-history checkpoint — M1-240 (2026-10-12)
 
 Reviewed authoritative mainaf183a2/tree703c039 with286 retained blobs; both branches/all3 tags cover140 complete trees/commits and1,476 distinct blobs. All1,413 text objects scanned;63 images SHA-matched/metadata inspected. No files moved/removed, history rewrite, release/tag/asset mutation or runtime/test/workflow change. Focused edits update PUBLIC_READINESS and current/append-only project memory with scope, negative attempts and remaining owner metadata/security/visibility actions. See F110/M1-240.
+
+
+## Post-dev.3 runtime audit — M1-242, 2026-10-14
+
+Baseline1da839a6/tree9480e78c complete286 blobs. Added only PUBLIC_RUNTIME_REVIEW.md; no source relocation/deletion, generated header tracking, image/license removal or old-release mutation. Existing registry/USB helpers/adapter and focused regressions updated for three confirmed defects. Docs/memory/Unreleased/DEV review narrative reconciled. Review complete expected-parent tree before non-force main update; do not publish inherited desktop .git wholesale.

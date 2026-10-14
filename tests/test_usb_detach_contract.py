@@ -8,6 +8,21 @@ MAIN = (ROOT / "payload/gc_main.c").read_text()
 
 
 class UsbDetachContract(unittest.TestCase):
+    def test_reopened_device_identity_is_checked_before_configuration_or_detach(self):
+        start = MAIN.index("static void *usb_hid_thread(")
+        end = MAIN.index("/* ── Controller manager thread", start)
+        worker = MAIN[start:end]
+        opened = worker.index("fd = usb_resources.fd;")
+        rechecked = worker.index("get_vid_pid(fd, dev_path, &actual_vid, &actual_pid)")
+        matched = worker.index("steam_usb_identity_matches(vid, pid, actual_vid, actual_pid)")
+        mapped = worker.index("sc2_ep_map(fd,")
+        detached = worker.index("detach_sc2_map_interfaces(fd,")
+        self.assertLess(opened, rechecked)
+        self.assertLess(rechecked, matched)
+        self.assertLess(matched, mapped)
+        self.assertLess(mapped, detached)
+        self.assertIn("goto exit_slot;", worker[matched:mapped])
+
     def test_probe_is_identity_only_and_never_initializes_usbfs(self):
         start = MAIN.index("static int probe_one_path(")
         end = MAIN.index("/* ── Create VDA", start)

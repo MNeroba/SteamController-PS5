@@ -2,6 +2,7 @@
 #include "usb_helpers.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -78,7 +79,8 @@ int usb_send_out(usb_resources_t *resources, const usb_session_ops_t *ops,
         if (result == USB_SESSION_OK) {
             if (!usb_completed_frame_valid(endpoint, length) || endpoint->pLength[0] != length) {
                 usb_session_note_error(resources, EPROTO);
-                return endpoint->status > 0 ? -1000 - endpoint->status : -EPROTO;
+                return endpoint->status > 0 && endpoint->status <= INT_MAX-1000
+                    ? -1000 - endpoint->status : -EPROTO;
             }
             return 0;
         }

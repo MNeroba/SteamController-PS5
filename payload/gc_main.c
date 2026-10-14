@@ -403,9 +403,8 @@ static int get_vid_pid(int fd, const char *path, uint16_t *vid, uint16_t *pid) {
     int e1 = errno;
 
     struct usb_device_descriptor dd; memset(&dd,0,sizeof(dd));
-    if (ioctl(fd,USB_GET_DEVICE_DESC,&dd) == 0 && dd.bLength >= 12) {
-        *vid = UGETW(dd.idVendor); *pid = UGETW(dd.idProduct); return 2;
-    }
+    if (ioctl(fd,USB_GET_DEVICE_DESC,&dd) == 0 &&
+        steam_usb_device_identity((const uint8_t *)&dd, sizeof(dd), vid, pid)) return 2;
     int e2 = errno;
 
     uint8_t raw[18]; memset(raw,0,sizeof(raw));
@@ -416,11 +415,8 @@ static int get_vid_pid(int fd, const char *path, uint16_t *vid, uint16_t *pid) {
     USETW(req.ucr_request.wValue,  0x0100);        /* DEVICE descriptor */
     USETW(req.ucr_request.wIndex,  0);
     USETW(req.ucr_request.wLength, sizeof(raw));
-    if (ioctl(fd,USB_DO_REQUEST,&req) == 0 && raw[1] == 0x01) {
-        *vid = (uint16_t)(raw[8]  | (raw[9]  << 8));
-        *pid = (uint16_t)(raw[10] | (raw[11] << 8));
-        return 3;
-    }
+    if (ioctl(fd,USB_DO_REQUEST,&req) == 0 &&
+        steam_usb_device_identity(raw, req.ucr_actlen, vid, pid)) return 3;
     int e3 = errno;
 
     if (!ugen_err_logged(path, 2000 + e1 * 100 + e2 * 10 + e3))
@@ -478,7 +474,7 @@ static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
     if (handle>=0)
         gp_log("slot[%d] VDI handle=0x%x ready\n", slot, (uint32_t)handle);
     else
-        gp_log("slot[%d] ERROR: AddDevice did not return an attributable handle; refusing handle scan\n", slot);
+        gp_log("slot[%d] ERROR: AddDevice did not return an attributable handle; further creation is inhibited, no guessed device will be deleted\n", slot);
     pthread_mutex_unlock(&g_vda_create_lock);
     return handle;
 }
@@ -545,6 +541,7 @@ static int sc2_vda_attach(slot_registry_token_t token, int slot,
     slot_lifecycle_ops_t ops={.create_virtual=worker_create_virtual};
     int result=slot_lifecycle_attach(&g_slots,token,&ops,NULL,&bind_ok);
     if(result!=0) {
+        if(result==SLOT_REGISTRY_BUSY)return 0; /* latch/pending work: no repeated error spam */
         gp_log("slot[%d] SC2 owned registration unavailable (result=%d); no handle scan\n",slot,result);
         return 0;
     }
@@ -881,6 +878,17 @@ static void *usb_hid_thread(void *arg) {
             goto exit_slot;
         }
         fd = usb_resources.fd;
+
+        /* A USB path can be reused between the manager probe and worker open.
+         * Trust the identity of this live descriptor, before claiming drivers. */
+        uint16_t actual_vid=0, actual_pid=0;
+        diagnostics_usb_stage(slot_token,"revalidate opened USB identity",0);
+        if (!get_vid_pid(fd, dev_path, &actual_vid, &actual_pid) ||
+            !steam_usb_identity_matches(vid, pid, actual_vid, actual_pid)) {
+            diagnostics_usb_stage(slot_token,NULL,ENODEV);
+            gp_log("slot[%d] opened USB identity changed or unreadable; refusing interface detach\n",slot);
+            goto exit_slot;
+        }
 
         uint8_t addrs[SC2_MAX_EPS];
         diagnostics_usb_stage(slot_token,"validate USB configuration",0);

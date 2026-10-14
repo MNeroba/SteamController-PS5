@@ -68,3 +68,8 @@ FreeBSD kernel reference (engineering evidence, no code copied): freebsd/freebsd
 
 
 Current target checkpoint (M1-239,2026-10-12): FW13.60 is owner-reported and unmeasured. The original12.00 source ledger above is historical; no native BLE, Edge or per-device ShellUI gate has physical verification on13.60 either. Dev.3 publication provides software/build evidence only.
+
+
+## Final Public runtime review — 2026-10-14, M1-242
+
+Puckbridge78460113 and OmniPadb7682ef remain their actual HEADs. Latest LibrePad main28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc inspected; v1.1.3 release reports storage/startup testing on12.60 but explicitly no input retest and no recovery/13.60 confirmation. No copied implementation. SDKv0.43 d9c9519 crt/kernel.c has5.50/13.60 layout cases and checked credential accessors; this does not prove our VDA/USB/runtime behavior. Three new defects reproduced and fixed in existing modules; external dev.2/FW5.50 comment cannot establish cause without log/digest. Exact source lines and comparison rationale: development/PUBLIC_RUNTIME_REVIEW.md.

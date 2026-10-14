@@ -193,6 +193,23 @@ static void test_fixed_standard_descriptor_lengths(void) {
 }
 
 int main(void) {
+    CHECK(steam_usb_identity_matches(0x28de,0x1302,0x28de,0x1302));
+    CHECK(steam_usb_identity_matches(0x28de,0x1304,0x28de,0x1304));
+    CHECK(!steam_usb_identity_matches(0x28de,0x1304,0x28de,0x1302));
+    CHECK(!steam_usb_identity_matches(0x28de,0x1302,0x054c,0x0ce6));
+    CHECK(!steam_usb_identity_matches(0x054c,0x0ce6,0x054c,0x0ce6));
+    CHECK(!steam_usb_identity_matches(0x28de,0x1302,0,0));
+    uint8_t device[18]={18,1,0,2,0,0,0,64,0xde,0x28,2,0x13,0,1,0,0,0,1};
+    uint16_t vid=0,pid=0;
+    CHECK(steam_usb_device_identity(device,sizeof(device),&vid,&pid));
+    CHECK(vid==0x28de && pid==0x1302);
+    for(unsigned n=0;n<18;n++)CHECK(!steam_usb_device_identity(device,n,&vid,&pid));
+    CHECK(!steam_usb_device_identity(device,19,&vid,&pid));
+    CHECK(!steam_usb_device_identity(NULL,18,&vid,&pid));
+    CHECK(!steam_usb_device_identity(device,18,NULL,&pid));
+    device[0]=12;CHECK(!steam_usb_device_identity(device,18,&vid,&pid));
+    device[0]=18;device[1]=2;CHECK(!steam_usb_device_identity(device,18,&vid,&pid));
+    CHECK(vid==0x28de && pid==0x1302); /* failure doesn't invent an identity */
     test_complete_configuration_map();
     test_puck_interface_filter();
     test_sc2_detach_interface_policy();

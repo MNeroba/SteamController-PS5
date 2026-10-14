@@ -2,6 +2,20 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. Historical releases and tags remain unchanged.
 
+## Unreleased
+
+Source changes after dev.3; not included in published release assets.
+
+### Bug Fixes
+
+- Stopped repeated virtual-controller creation after an ambiguous result, including concurrent registration attempts (host-tested).
+- Rechecked an opened USB device before claiming its interfaces after hotplug (host-tested; PS5 ioctl validation pending).
+- Fixed an overflow while handling an invalid USB feedback status (UBSan-tested).
+
+### New Features / Improvements
+
+None.
+
 ## v0.1.0-dev.3
 
 Published on 2026-10-12 from `9aab6dbae166b28416a9a00e6346f85bf12e524e`; physical PS5 testing was not performed.

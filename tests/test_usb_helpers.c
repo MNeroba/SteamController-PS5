@@ -1,6 +1,7 @@
 #include "usb_helpers.h"
 
 #include <errno.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -28,6 +29,7 @@ typedef struct {
     int close_fd_calls;
     uint8_t completed[4];
     int completion_count;
+    int completion_status;
     struct usb_fs_endpoint *endpoint;
     const void *observed_buffer;
 } fake_usb_t;
@@ -69,6 +71,7 @@ static int fake_complete(int fd, void *configuration,
         endpoint = fake->completed[fake->completion_count++];
     ((struct usb_fs_complete *)configuration)->ep_index = endpoint;
     *completed_endpoint_index = endpoint;
+    if (fake->endpoint) fake->endpoint->status = fake->completion_status;
     return 0;
 }
 
@@ -180,6 +183,12 @@ int main(void) {
     CHECK(resources.active_transfers == 0 && fake.stop_calls == 1);
     CHECK(usb_session_cleanup(&resources, &ops, &fake) == 0);
 
+    fake = (fake_usb_t){ .endpoint=&endpoints[1], .completed={1}, .completion_status=INT_MAX };
+    init_session(&resources,1);
+    CHECK(usb_send_out(&resources,&ops,&endpoints[1],1,report,
+                       sizeof(report),"invalid-status",0,2,&fake)==-EPROTO);
+    CHECK(resources.protocol_errors==1 && resources.active_transfers==0);
+    CHECK(usb_session_cleanup(&resources,&ops,&fake)==0);
     printf("USB OUT session checks passed (%d checks)\n", checks);
     return 0;
 }
