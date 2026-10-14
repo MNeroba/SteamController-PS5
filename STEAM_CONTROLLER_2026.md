@@ -31,7 +31,7 @@ The current readiness matrix and test records are in [README](README.md), the [t
 
 ## Build outputs
 
-[Experimental dev.3](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3) is published from `9aab6dbae166b28416a9a00e6346f85bf12e524e`, with seven assets containing exactly one ELF. Release workflow38225113776 passed all repeated software gates. The published ELF SHA-256 is `013e27f60091cd5de87577beb9acd40ac5ae5eeba08092b7dff65bf56847c752`; physical PS5 testing remains NOT_RUN.
+[Experimental dev.4](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4) is published from `a5c20346392eac0eb9fa04cc201cd214e2957363`, with seven assets containing exactly one ELF. Workflow38588689667 passed all repeated software gates. Published ELF SHA-256: `34ae9fa0d55f8fdadbec4384d4171b029243e2fc6d0eb94a3d0120a6165f9ea4`. It includes the three host-verified M1-242 runtime safety fixes and retains the dev.3 features below; physical PS5 testing remains NOT_RUN.
 
 The [PS5 cross-build workflow](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) uploads `SteamController-PS5-cross-build` with an ELF and SHA-256 file after a successful build. Actions artifacts are temporary and expire under GitHub's retention policy. Authorized access is required while the repository is private; this restriction disappears for public downloads after visibility changes. An artifact is a build output, not an install package or a verified release.
 
@@ -46,7 +46,7 @@ The project is focused on one Steam Controller 2026 connected by USB-C or the of
 `VERIFIED_HOST_TEST`: full normal and ASan/UBSan suites PASS; profile 52 assertions, atomic storage 71, binding/proportional-pressure 165 and HTTP/auth 110. Nine portable artwork/generator contracts and 181 Edge/Playwright browser assertions PASS (all original 162 retained). The maximum-complexity stored profile is 14,573 bytes; complete 24-input/22-output/activator round-trip succeeds within the 24 KiB capacity. Final generated page: 685,503 UTF-8 bytes, 41 icons/four unchanged controller images. Clean SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `5bdd18153301213e7a4b82e3038dff24563fdc7e0e474ce41546d3c66ffc7dbc`. This is local source/build evidence; publication and Actions acknowledgement follow separately. Physical FW 12.00 remains NOT_RUN.
 
 
-## Published dev.3 additions
+## Dev.3 additions retained in dev.4
 
 | Capability | Software status | Physical PS5 status |
 |---|---|---|

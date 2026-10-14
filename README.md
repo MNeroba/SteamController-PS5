@@ -5,7 +5,7 @@
 **Steam Controller 2026 → virtual DualSense on PS5**<br>
 USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
-[Download dev.3](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3) · [Get started](docs/development/LOADING.md) · [Build](docs/BUILDING.md) · [Changelog](CHANGELOG.md) · [Contribute](CONTRIBUTING.md)
+[Download dev.4](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4) · [Get started](docs/development/LOADING.md) · [Build](docs/BUILDING.md) · [Changelog](CHANGELOG.md) · [Contribute](CONTRIBUTING.md)
 
 [![Host tests](https://github.com/MNeroba/SteamController-PS5/actions/workflows/host-tests.yml/badge.svg)](https://github.com/MNeroba/SteamController-PS5/actions/workflows/host-tests.yml)
 [![PS5 build](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml/badge.svg)](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml)
@@ -16,7 +16,7 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 > **Experimental prerelease.** Host tests and SDK builds pass; the payload has **not been tested on a physical PS5**. FW **13.60** is the intended, unverified test target. A stock console cannot load this ELF. Use an independently confirmed compatible development loader and keep your native DualSense available.
 
-> **14 October safety update:** `main` contains fixes for ambiguous virtual-device creation, USB hotplug identity and invalid feedback status. Published dev.3 and earlier ELFs predate these fixes. A supplied dev.2/FW5.50 comment reports no input, token-storage errors and native DualSense disruption; its cause is unconfirmed. Read the [runtime review](docs/development/PUBLIC_RUNTIME_REVIEW.md) before console testing. The owner approved a dev.4 candidate containing these fixes; publication is pending the full DEV gates. dev.3 remains the latest published download until GitHub acknowledges dev.4.
+> **14 October safety update:** dev.4 contains host-verified fixes for ambiguous virtual-device creation, USB hotplug identity and invalid feedback status. Older ELFs predate these fixes. A supplied dev.2/FW5.50 comment reports no input, token-storage errors and native DualSense disruption; its cause remains unconfirmed. Read the [runtime review](docs/development/PUBLIC_RUNTIME_REVIEW.md) before console testing.
 
 ## Overview
 
@@ -24,17 +24,17 @@ One native ELF connects **one Steam Controller 2026** over USB-C or the official
 
 The project builds on audited PuckbridgePS5 code. Steam-specific input stays in a reusable core; USB ownership, virtual-controller lifecycle and firmware-sensitive operations have separate responsibilities.
 
-## Latest release — v0.1.0-dev.3
+## Latest release — v0.1.0-dev.4
 
-[Release notes and all downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3) · [Loading and recovery guide](docs/development/LOADING.md)
+[Release notes and all downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4) · [Loading and recovery guide](docs/development/LOADING.md)
 
-- **[SteamController-PS5-v0.1.0-dev.3.elf](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.3/SteamController-PS5-v0.1.0-dev.3.elf)** — the only runtime binary.
-- **[Matching SHA-256](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.3/SteamController-PS5-v0.1.0-dev.3.elf.sha256)** — verify before loading.
+- **[SteamController-PS5-v0.1.0-dev.4.elf](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.4/SteamController-PS5-v0.1.0-dev.4.elf)** — the only runtime binary.
+- **[Matching SHA-256](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.4/SteamController-PS5-v0.1.0-dev.4.elf.sha256)** — verify before loading.
 - Payload Manager JSON, loading instructions, release notes, notices and license accompany the ELF. They are metadata/documentation, not additional payloads.
 
-Released on **12 October 2026** from [`9aab6dbae166b28416a9a00e6346f85bf12e524e`](https://github.com/MNeroba/SteamController-PS5/tree/9aab6dbae166b28416a9a00e6346f85bf12e524e). [Release validation](https://github.com/MNeroba/SteamController-PS5/actions/runs/38225113776) passed normal host tests, ASan/UBSan, **220 Chromium assertions**, deterministic assets and a clean **SDK v0.43 / LLVM 18** build.
+Released on **14 October 2026** from [`a5c20346392eac0eb9fa04cc201cd214e2957363`](https://github.com/MNeroba/SteamController-PS5/tree/a5c20346392eac0eb9fa04cc201cd214e2957363). [Release validation](https://github.com/MNeroba/SteamController-PS5/actions/runs/38588689667) passed normal host tests, ASan/UBSan, **220 Chromium assertions**, deterministic assets and a clean **SDK v0.43 / LLVM 18** build.
 
-Dev.3 adds owned virtual-controller recovery after confirmed logout/login, authenticated diagnostic downloads, USB completion hardening, clearer connection messages and an optional PS5 Settings tile. These changes are tested on the host; their console behavior is unverified. [Full changelog →](CHANGELOG.md)
+Dev.4 stops repeated or concurrent virtual-device creation after an ambiguous result, rechecks USB identity before claiming interfaces after hotplug, and handles invalid USB feedback status without overflow. It retains dev.3 diagnostics, logout/login recovery and the optional Settings tile. These changes are host-tested; their console behavior is unverified. [Full changelog →](CHANGELOG.md)
 
 ## Features and verification
 
@@ -97,7 +97,7 @@ Requirements: Python 3, make, host Clang, **LLVM 18** and community **PS5 Payloa
 git clone https://github.com/MNeroba/SteamController-PS5.git
 cd SteamController-PS5
 # To rebuild the published version:
-git checkout dev/v0.1.0-dev.3
+git checkout dev/v0.1.0-dev.4
 # Install the pinned SDK and export PS5_PAYLOAD_SDK/LLVM_CONFIG
 # using docs/BUILDING.md, then:
 make -C tests clean test
@@ -126,7 +126,7 @@ Transport owns I/O; the Steam decoder owns device details; mapping is independen
 
 ## Progress and roadmap
 
-- **Delivered:** audited foundation, host runtime hardening, reusable protocol/session/slot modules, mapping/profiles, embedded WebUI and experimental dev.1–dev.3 releases.
+- **Delivered:** audited foundation, host runtime hardening, reusable protocol/session/slot modules, mapping/profiles, embedded WebUI and experimental dev.1–dev.4 releases.
 - **Next:** measure actual firmware and validate USB-C/Puck, native DualSense coexistence, user recovery, game input, motion/touch/feedback, storage and shutdown on a physical console.
 - **Stable release:** blocked until the required hardware evidence matches the tested source. A passing SDK build does not establish firmware compatibility.
 - **Research:** passive native BLE feasibility, stable cross-transport identity and advanced platform integration. Active stock-radio experiments require separate approval.

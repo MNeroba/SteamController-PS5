@@ -21,6 +21,7 @@ Details: [current status](project-memory/CURRENT_STATUS.md), [feature table](STE
 
 ## Current execution order
 
+- **Published dev.4 runtime safety update** — ambiguous Add creation latch/global serialization, live-fd USB identity check and bounded feedback status. Owner explicitly approved; sourcea5c20346392eac0eb9fa04cc201cd214e2957363, workflow38588689667, seven assets/one ELF. Host/sanitizer/Chromium220/SDKv0.43 gates pass; external dev.2/FW5.50 report and physical acceptance remain unresolved. No radio/storage migration or safety-policy relaxation.
 - **Published dev.3: LibrePad v1.1.2 findings** — confirmed user-list consensus and owned virtual-pad recovery, USB completion ownership, authenticated bounded diagnostics, concise notifications, Payload Manager metadata and mandatory two-category changelogs. Preserve the single ELF/optional tile and all dev.2 features; no storage migration or general-controller protocol import. See ADR-055 and M1-235/236. Owner approved publication; dev/v0.1.0-dev.3 is published from9aab6dbae166b28416a9a00e6346f85bf12e524e via successful workflow38225113776. Future DEV publication requires separate explicit approval.
 - First launch/dev.2 is published; [full historical owner task](docs/development/FIRST_LAUNCH_TASK.md) and M1-229 retain its evidence.
 - **Audit remediation P0–P3** — [confirmed findings](docs/development/STATIC_AUDIT.md). Resolve the listed code defects before DEV publication; preserve critical-blocker checks. New first-launch work does not establish hardware compatibility.

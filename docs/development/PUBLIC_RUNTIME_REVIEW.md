@@ -8,7 +8,7 @@ Three reproducible source defects were fixed and regression-tested. This review 
 
 Reviewed baseline: main `1da839a6fa6059716181c9a3009adbef5a5b67e6`, tree `9480e78c8a3ad833d7dd41b165a304b74ec64647`,286 files. Its Host38287206901 and PS5 cross-build38287206908 passed. All production bytes matched the local workspace; only the two append-only logs had known local publication receipts. Final fix commit and remote checks are recorded in project memory after publication.
 
-**Published dev.3 and earlier ELFs do not contain these new fixes.** No old tag or release asset is replaced. A new experimental binary needs its own tested source and explicit owner publication approval. See [unreleased changes](../../CHANGELOG.md).
+**Published dev.4 contains these fixes; dev.3 and earlier ELFs do not.** The owner approved publication, and workflow38588689667 passed all repeated software/build gates. Previous tags and release assets are unchanged. See the [dev.4 changelog](../../CHANGELOG.md) and the publication receipt below. Physical PS5 behavior remains unverified.
 
 ## Confirmed findings and fixes
 
@@ -58,3 +58,8 @@ Until actual logs/approved console access exist: do not ask the tester to repeat
 ## Source publication receipt
 
 Fix source [c204524cbd14cc232c11289677e7bb6607e59a0e](https://github.com/MNeroba/SteamController-PS5/commit/c204524cbd14cc232c11289677e7bb6607e59a0e) published on main:287 blobs, all286 previous files and45 production C units retained. Fresh SHA-verified export repeats normal/sanitizer/SDK/dependency checks successfully; exact source identity embedded. Clang static analysis of credential guard, slot registry, USB resources/session and Steam USB returned no diagnostics. Chromium220 tests apply to unchanged browser/UI bytes. Host38581146662 and SDK38581146350 are queued at2026-10-14 14:32 UTC; this is not a remote CI pass. The experimental release workflow was not run.
+
+
+## M1-243 — Published dev.4, 2026-10-14
+
+Owner explicitly approved creation/publication. Tag dev/v0.1.0-dev.4 points to a5c20346392eac0eb9fa04cc201cd214e2957363; DEV workflow38588689667 completed/success and all three jobs passed. GitHub release412878689, prerelease=true/draft=false, published 2026-10-14T15:29:58Z; seven assets contain exactly one ELF (2029632 bytes, SHA25634ae9fa0d55f8fdadbec4384d4171b029243e2fc6d0eb94a3d0120a6165f9ea4). Selected source has287 blobs/45 production C; prior releases/tags/assets remain unchanged. Exact-source push Host38587348600/SDK38587348499 and repeated DEV normal44 C/Python, ASan/UBSan, Chromium220, deterministic assets, SDKv0.43 build/dependency/package/checksum gates passed. Earlier local browser fixture version mismatch and checksum command wrong-directory negatives retained; corrected reruns passed. Fresh local exact-source normal/sanitizer/build/package PASS; local ELFc236bf1aff8cd842eea092f06568f9b45a9d48fb5404028c9dd84e8414607650 is separate from published Linux output. Three M1-242 safety fixes included; full dev.3 functionality retained. Firmware13.60 unmeasured, physical hardware NOT_RUN, external dev.2/FW5.50 cause/token-storage/native-input problem unconfirmed. Repo visibility unchanged; no console/radio/firmware/tile action. Latest setup/download/changelog/security/status documents updated after publication acknowledgement. Next: review existing tester gc_status.log/.prev or authenticated diagnostic report when supplied; do not ask for secrets or rerun the failing old ELF. Tester reply prepared; no Reddit destination URL known and no external comment posted.

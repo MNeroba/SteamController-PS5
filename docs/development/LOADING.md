@@ -2,7 +2,7 @@
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
-Selected experimental version: [dev/v0.1.0-dev.4](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4), one ELF containing the runtime safety fixes described in [PUBLIC_RUNTIME_REVIEW.md](PUBLIC_RUNTIME_REVIEW.md). Use the matching checksum, source SHA and warnings supplied by that release. The download becomes available after the owner-approved DEV workflow completes.
+Current experimental download: [dev/v0.1.0-dev.4](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4), one ELF built from `a5c20346392eac0eb9fa04cc201cd214e2957363`. Its SHA-256 is `34ae9fa0d55f8fdadbec4384d4171b029243e2fc6d0eb94a3d0120a6165f9ea4`. Download the matching checksum from the same release; do not substitute a local build digest. This version contains the host-verified [runtime safety fixes](https://github.com/MNeroba/SteamController-PS5/blob/a5c20346392eac0eb9fa04cc201cd214e2957363/docs/development/PUBLIC_RUNTIME_REVIEW.md); physical PS5 compatibility remains unverified.
 
 ## Before loading
 

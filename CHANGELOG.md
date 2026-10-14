@@ -4,7 +4,7 @@ DEV entries describe software and build verification. They do not establish phys
 
 ## v0.1.0-dev.4
 
-Release candidate approved by the owner on 2026-10-14; publication follows the complete DEV validation workflow. Physical PS5 testing was not performed.
+Published on 2026-10-14 from `a5c20346392eac0eb9fa04cc201cd214e2957363`; physical PS5 testing was not performed.
 
 ### Bug Fixes
 
