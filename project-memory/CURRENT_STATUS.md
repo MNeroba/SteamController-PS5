@@ -1,6 +1,10 @@
 # Current status — 2026-10-14
 
 
+## dev.4 approved release preparation — M1-243
+
+Owner explicitly requested create/publish dev.4 before updating the tester reply. Authoritative main310a1f60dccb8ac18cd97661e83cdcee37fbc274/tree9b07c06ce20cae265b91b4727070e8c8fb45a40d has287 files. Runtime c204524 Host38581146662/SDK38581146350 and receipt310a1f Host38581734371/SDK38581734544 are completed/success; this supersedes earlier queued observations. No dev.4 release/tag yet. Version/metadata/changelog and version-aware package tests updated; preserve all existing functionality, SDKv0.43 and /data/ghostpad. Local normal44 C/Python, ASan/UBSan, Chromium220 repeat (old version fixture failure retained), deterministic embedding, SDK45 C/dependency and release/link/diff checks PASS. Next: complete reviewed main commit, own green push gates, manual DEV dispatch, seven assets/one ELF/source/checksum verification, publication receipts and tester reply. No Public visibility change or console operation authorized here.
+
 ## Final runtime safety review — M1-242 (unreleased source)
 
 Three confirmed post-dev.3 defects fixed: unattributable Add retry/global reservation gap, reopened USB identity before detach, invalid OUT status overflow. Full normal44 C/Python, ASan/UBSan, Chromium220, clean SDKv0.43/dependency and link114/changelog/DEV/diff gates PASS locally. Sourcec204524cbd14cc232c11289677e7bb6607e59a0e published with all287 blobs retained. Fresh exact export repeats normal/sanitizer/SDK/dependency PASS; five-module static analysis clean. Host38581146662/SDK38581146350 queued at14:32 UTC; remote success not claimed. No new binary/tag/version; published dev.3/earlier assets lack these fixes and README says so. See docs/development/PUBLIC_RUNTIME_REVIEW.md and CHANGELOG Unreleased.

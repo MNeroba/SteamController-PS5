@@ -12,16 +12,16 @@ Before publication, update CHANGELOG.md relative to the previous published versi
 
 1. Review `ISSUES.md`, this task's full file audit, safety defaults and `dev-release.json`. A known unresolved critical **code** defect must be added to `critical_code_blockers`; the workflow then fails closed. Hardware-dependent risks stay explicit in the notes and matrix.
 2. Publish a complete reviewed main tree using a non-force update. Wait for both Host tests and PS5 cross-build push runs on that exact commit to succeed.
-3. Open **Actions → Experimental DEV prerelease → Run workflow**, use branch **main**, paste the full lowercase 40-character tested source SHA and a new version such as `v0.1.0-dev.3`.
+3. Open **Actions → Experimental DEV prerelease → Run workflow**, use branch **main**, paste the full lowercase 40-character tested source SHA and a new version such as `v0.1.0-dev.4`.
 4. The workflow requires main ancestry, the latest successful Host/PS5 push gates for that SHA and an unused `dev/` tag. It then checks out that exact revision, reruns normal host, ASan/UBSan and Chromium tests, verifies deterministic embedding, downloads checksum-pinned SDK v0.43, cleans/builds and packages the real ELF. Missing files, checksum mismatch or failed tests prevent publication.
-5. Publication downloads the tested artifact and verifies its checksum again. It creates only a prerelease tagged `dev/v0.1.0-dev.3`, points the tag to the selected source SHA and leaves GitHub's latest stable release unchanged. Stable `v*` publication also requires normal/sanitizer/Chromium/assets/checksum gates and hardware evidence bound to the released source. Only a descendant with unchanged payload, scripts, tests and workflow inputs may reuse a hardware-tested SHA; documentation-only evidence commits are permitted.
+5. Publication downloads the tested artifact and verifies its checksum again. It creates only a prerelease tagged `dev/v0.1.0-dev.4`, points the tag to the selected source SHA and leaves GitHub's latest stable release unchanged. Stable `v*` publication also requires normal/sanitizer/Chromium/assets/checksum gates and hardware evidence bound to the released source. Only a descendant with unchanged payload, scripts, tests and workflow inputs may reuse a hardware-tested SHA; documentation-only evidence commits are permitted.
 6. Verify the remote tag commit, `prerelease: true`, source SHA, all seven assets, checksum and Actions conclusion; append the actual acknowledgement to TEST_LOG/SESSION_LOG/current status. Do not claim a download exists before GitHub acknowledges it.
 
 ## Assets and source
 
-- `SteamController-PS5-v0.1.0-dev.3.elf` — real SDK output, copied from the validated build.
+- `SteamController-PS5-v0.1.0-dev.4.elf` — real SDK output, copied from the validated build.
 - Its `.elf.sha256` — digest with the download filename.
-- Its `.elf.json` — Payload Manager metadata with matching filename/version/release URL and actual SHA-256. The source metadata URL now identifies the published dev.3 asset; authorized access is needed while the repository remains private.
+- Its `.elf.json` — Payload Manager metadata with matching filename/version/release URL and actual SHA-256. The source metadata URL identifies the selected dev.4 asset after publication; authorized access is needed while the repository remains private.
 - `RELEASE_NOTES.md`, `LOADING.md`, `NOTICES.md`, `LICENSE` — warning, evidence, configuration and attribution.
 - GitHub's matching source archives at the exact release tag. Full source, asset notices, SDK source pin and generator remain available for rebuilds.
 
@@ -33,7 +33,7 @@ The currently connected GitHub tools can publish Git objects and inspect Actions
 
 ```sh
 gh workflow run dev-release.yml --repo MNeroba/SteamController-PS5 --ref main \
-  -f source_sha=<tested-full-commit-sha> -f version=v0.1.0-dev.3
+  -f source_sha=<tested-full-commit-sha> -f version=v0.1.0-dev.4
 ```
 
 Retain history: earlier SHA references are evidence, provenance and regression context. A cosmetic squash gives no build benefit. There is no proposed ref rewrite or force push.
@@ -52,3 +52,7 @@ Still one ELF/seven assets. The PNG and Media/deeplink metadata are embedded in 
 Metadata uses the documented Payload Manager fields at itsPLK/ps5-payload-manager e4e72dc9d831dd09ee8fabc222ad1e7f5139050e CUSTOM_REPOSITORIES.md. The sidecar is not a repository catalog; a catalog wrapper can be added separately by the owner after approval. It adds no second ELF or installer binary. Packaging rejects a nonempty output directory and mismatched ELF embedded source/version.
 
 Settings & help → Diagnostics → Download Diagnostic Report requires browser enrollment and existing protected API admission. Reports contain actual firmware (or unavailable), build source, startup/USB/virtual/Steam snapshots and the latest48 filtered memory log records. Review profile names/USB paths before public sharing. No unrelated files, credentials, serials, bonding keys or raw system logs are read. Physical console/browser download support remains H-15 NOT_RUN.
+
+## dev.4 safety update
+
+Owner explicitly approved creation and publication on 2026-10-14. This candidate includes the three host-verified fixes in PUBLIC_RUNTIME_REVIEW.md; preserve the previous release assets/tags. Select the full new versioned main SHA only after its own successful Host/PS5 push checks. Existing dev.3 functionality and safety defaults are retained. No physical FW5.50 or FW13.60 result is inferred; the external dev.2 token-storage/native-input report remains unresolved.

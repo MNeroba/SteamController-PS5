@@ -31,7 +31,7 @@ def validate_identifiers(source_sha, version):
     if not re.fullmatch(r'[0-9a-f]{40}', source_sha):
         raise ValueError('Select a full lowercase source commit SHA')
     if not re.fullmatch(r'v\d+\.\d+\.\d+-dev\.\d+', version):
-        raise ValueError('Version must have the form v0.1.0-dev.3')
+        raise ValueError('Version must have the form v0.1.0-dev.N')
 
 
 def validate_elf(data):

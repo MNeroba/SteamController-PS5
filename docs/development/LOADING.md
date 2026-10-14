@@ -2,7 +2,7 @@
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
-Current experimental download: [dev/v0.1.0-dev.3](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3), one ELF built from `9aab6dbae166b28416a9a00e6346f85bf12e524e`. Its SHA-256 is `013e27f60091cd5de87577beb9acd40ac5ae5eeba08092b7dff65bf56847c752`. Download the matching checksum from that same release; do not substitute a local build digest.
+Selected experimental version: [dev/v0.1.0-dev.4](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4), one ELF containing the runtime safety fixes described in [PUBLIC_RUNTIME_REVIEW.md](PUBLIC_RUNTIME_REVIEW.md). Use the matching checksum, source SHA and warnings supplied by that release. The download becomes available after the owner-approved DEV workflow completes.
 
 ## Before loading
 
@@ -13,16 +13,16 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 
    ```sh
    # Linux
-   sha256sum --check SteamController-PS5-v0.1.0-dev.3.elf.sha256
+   sha256sum --check SteamController-PS5-v0.1.0-dev.4.elf.sha256
    # macOS
-   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.3.elf.sha256
+   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.4.elf.sha256
    ```
 
 3. Keep the native DualSense available. Use a recoverable development environment; retain local console access. Do not enable hooks or built-in-radio experiments for a first test.
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.3.elf
+   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.4.elf
    ```
 
    Port 9021 is an inherited convenience default, not a compatibility guarantee. This project has not tested the transfer or loading procedure on physical hardware. Do not repeatedly send the payload when a loader has failed or become unresponsive.

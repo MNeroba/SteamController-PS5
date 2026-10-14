@@ -2,9 +2,9 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. Historical releases and tags remain unchanged.
 
-## Unreleased
+## v0.1.0-dev.4
 
-Source changes after dev.3; not included in published release assets.
+Release candidate approved by the owner on 2026-10-14; publication follows the complete DEV validation workflow. Physical PS5 testing was not performed.
 
 ### Bug Fixes
 

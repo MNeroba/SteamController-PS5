@@ -537,15 +537,16 @@ async (page) => {
   await page.unroute('**/api/profile?id=default');await page.unroute('**/api/recover-default');
   // Diagnostic export: authenticated bounded text, failures retain retry control.
   await page.evaluate(()=>{switchTab('help');goSec('diagnostics',true)});
+  const applicationVersion=await page.evaluate(()=>APPLICATION_VERSION);
   let diagnosticAuth=false;
   await page.route('**/api/diagnostics',route=>{
     diagnosticAuth=!!route.request().headers().authorization;
-    return route.fulfill({status:200,contentType:'text/plain',body:'SteamController-PS5 diagnostic report\nVersion: v0.1.0-dev.3\nNo controller detected.\n'});
+    return route.fulfill({status:200,contentType:'text/plain',body:`SteamController-PS5 diagnostic report\nVersion: ${applicationVersion}\nNo controller detected.\n`});
   });
   const diagnosticDownload=page.waitForEvent('download');
   await page.locator('#diagnosticsDownload').click();
   const downloadedReport=await diagnosticDownload;
-  check(downloadedReport.suggestedFilename()==='SteamController-PS5-Diagnostics-v0.1.0-dev.3.txt','diagnostic export uses versioned text filename');
+  check(downloadedReport.suggestedFilename()===`SteamController-PS5-Diagnostics-${applicationVersion}.txt`,'diagnostic export uses versioned text filename');
   check(diagnosticAuth,'diagnostic export carries existing bearer');
   await page.waitForFunction(()=>document.querySelector('#diagnosticsStatus').textContent.includes('Downloaded'));
   check(await page.locator('#diagnosticsStatus').textContent().then(t=>t.includes('Review')),'diagnostic export reminds users to review before sharing');

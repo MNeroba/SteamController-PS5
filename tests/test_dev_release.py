@@ -5,6 +5,7 @@ import contextlib
 import io
 from unittest.mock import patch
 import json
+import re
 import struct
 import sys
 import tempfile
@@ -16,6 +17,8 @@ sys.path.insert(0, str(ROOT / 'scripts'))
 from package_dev_release import package, validate_policy, validate_elf, validate_identifiers, WARNING
 from check_browser_result import validate as validate_browser
 from check_settings_tile_elf import validate_dynamic_output
+
+VERSION = re.search(r'STEAMCONTROLLER_VERSION "([^"]+)"', (ROOT / 'payload/version.h').read_text()).group(1)
 
 
 class DevRelease(unittest.TestCase):
@@ -52,7 +55,7 @@ class DevRelease(unittest.TestCase):
         data = bytearray(128)
         data[:7] = b'\x7fELF\x02\x01\x01'
         struct.pack_into('<HH', data, 16, 3, 62)
-        data += b'a' * 40 + b'v0.1.0-dev.3'
+        data += b'a' * 40 + VERSION.encode()
         data += (ROOT / 'payload/settings-tile/icon0.png').read_bytes()
         data += (ROOT / 'payload/settings-tile/param.json').read_bytes()
         with tempfile.TemporaryDirectory() as temp:
@@ -68,15 +71,15 @@ class DevRelease(unittest.TestCase):
                 target.write_bytes((ROOT / name).read_bytes())
             (fixture_root / 'docs/development/dev-release.json').write_text(json.dumps(dict(self.policy, critical_code_blockers=[])))
             with patch('package_dev_release.ROOT', fixture_root), contextlib.redirect_stdout(io.StringIO()):
-                incomplete = Path(temp) / 'missing-icon.elf'; incomplete.write_bytes(data[:128] + b'a'*40 + b'v0.1.0-dev.3')
+                incomplete = Path(temp) / 'missing-icon.elf'; incomplete.write_bytes(data[:128] + b'a'*40 + VERSION.encode())
                 with self.assertRaisesRegex(ValueError, 'Missing embedded'):
-                    package('a' * 40, 'v0.1.0-dev.3', incomplete, out)
-                package('a' * 40, 'v0.1.0-dev.3', elf, out)
+                    package('a' * 40, VERSION, incomplete, out)
+                package('a' * 40, VERSION, elf, out)
             notes = (out / 'RELEASE_NOTES.md').read_text()
             self.assertIn(WARNING, notes)
             self.assertIn('a' * 40, notes)
             self.assertIn(hashlib.sha256(data).hexdigest(), notes)
-            asset = out / 'SteamController-PS5-v0.1.0-dev.3.elf'
+            asset = out / f'SteamController-PS5-{VERSION}.elf'
             self.assertEqual(asset.read_bytes(), data)
             self.assertEqual((out / (asset.name + '.sha256')).read_text(),
                              f'{hashlib.sha256(data).hexdigest()}  {asset.name}\n')
