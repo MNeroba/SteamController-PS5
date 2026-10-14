@@ -3,7 +3,7 @@
 
 ## Final runtime safety review — M1-242 (unreleased source)
 
-Three confirmed post-dev.3 defects fixed: unattributable Add retry/global reservation gap, reopened USB identity before detach, invalid OUT status overflow. Full normal44 C/Python, ASan/UBSan, Chromium220, clean SDKv0.43/dependency and link114/changelog/DEV/diff gates PASS locally. Exact source/CI receipt follows publication. No new binary/tag/version; published dev.3/earlier assets lack these fixes and README says so. See docs/development/PUBLIC_RUNTIME_REVIEW.md and CHANGELOG Unreleased.
+Three confirmed post-dev.3 defects fixed: unattributable Add retry/global reservation gap, reopened USB identity before detach, invalid OUT status overflow. Full normal44 C/Python, ASan/UBSan, Chromium220, clean SDKv0.43/dependency and link114/changelog/DEV/diff gates PASS locally. Sourcec204524cbd14cc232c11289677e7bb6607e59a0e published with all287 blobs retained. Fresh exact export repeats normal/sanitizer/SDK/dependency PASS; five-module static analysis clean. Host38581146662/SDK38581146350 queued at14:32 UTC; remote success not claimed. No new binary/tag/version; published dev.3/earlier assets lack these fixes and README says so. See docs/development/PUBLIC_RUNTIME_REVIEW.md and CHANGELOG Unreleased.
 
 Owner-supplied dev.2/FAT5.50 failure comment lacks logs/digest/error code and remains unverified; no cause or successful hardware correction claimed. Intended13.60 and all physical gates still NOT_RUN. Private source visibility unchanged. Next: verify focused main push Host/SDK CI; owner Public decision and separately approved new DEV binary. Keep stock DualSense, no console/radio/tile operation.
 

@@ -53,3 +53,8 @@ Until actual logs/approved console access exist: do not ask the tester to repeat
 `VERIFIED_HOST_TEST`: normal44 C/Python suites, full ASan/UBSan, targeted expected-failure regressions then fixes, Chromium220. `VERIFIED_PS5_BUILD`: clean SDKv0.43/LLVM18 build and optional-dependency check. Link/changelog/package/diff checks and exact source/remote CI receipts are recorded in M1-242 TEST_LOG. Initial sandbox HTTP bind failure was environmental; authorized loopback rerun passed. The initial dependency-check command could not find Linux-named llvm-readelf-18; rerun with the installed Homebrew LLVM18 readelf passed. These negatives remain in memory.
 
 `NOT_RUN`: every physical-console scenario. No Kernel Panic immunity, firmware compatibility or successful native DualSense coexistence is claimed. Public source access can proceed with these limits; a hardware-verified stable release still cannot.
+
+
+## Source publication receipt
+
+Fix source [c204524cbd14cc232c11289677e7bb6607e59a0e](https://github.com/MNeroba/SteamController-PS5/commit/c204524cbd14cc232c11289677e7bb6607e59a0e) published on main:287 blobs, all286 previous files and45 production C units retained. Fresh SHA-verified export repeats normal/sanitizer/SDK/dependency checks successfully; exact source identity embedded. Clang static analysis of credential guard, slot registry, USB resources/session and Steam USB returned no diagnostics. Chromium220 tests apply to unchanged browser/UI bytes. Host38581146662 and SDK38581146350 are queued at2026-10-14 14:32 UTC; this is not a remote CI pass. The experimental release workflow was not run.

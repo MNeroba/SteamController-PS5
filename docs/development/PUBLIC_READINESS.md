@@ -55,3 +55,8 @@ Hardware H-01–H-15 remain NOT_RUN/BLOCKED where applicable; native BLE remains
 ## Documentation publication and validation
 
 Documentation source `e7f53f2cf1466bed0f8462bc350155b45b101eb9` published on main. Complete tree286 files retains every282 previous path;29 focused paths changed, four new guides/forms, no runtime source/asset/test/script/workflow changes. Current Host38243078629 and SDK38243078701 completed successfully, including normal, sanitizer, Chromium and cross-build checks. Targeted109 link checks, changelog5 and DEV package7 tests, issue-form YAML/ID/field validation and diff checks passed. This receipt corrects earlier workflow labels without changing results. Repository visibility/metadata/security settings remain unchanged.
+
+
+## Final runtime audit follow-up — M1-242, 2026-10-14
+
+Three post-dev.3 source defects were reproduced and fixed on mainc204524: ambiguous Add retries/global reservation gap, reopened USB identity before driver claim, and invalid OUT-status signed overflow. Fresh exact source normal/sanitizer/SDK checks and five-module static analysis pass; Chromium220 retained. Remote Host38581146662/SDK38581146350 queued at14:32 UTC. Published dev.3/older ELFs lack these changes; README and Unreleased changelog disclose this. Owner-supplied dev.2/FW5.50 comment reports failures but has no log/digest; no hardware cause/fix claimed. See [runtime review](PUBLIC_RUNTIME_REVIEW.md). No source-publication blocker found after scoped fixes; firmware/VDA/native-coexistence guarantees still require hardware. Visibility remains private; no new release/tag approved or published.
