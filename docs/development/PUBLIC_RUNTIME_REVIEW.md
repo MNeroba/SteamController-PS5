@@ -2,6 +2,8 @@
 
 2026-10-14 · M1-242 · SDK v0.43 · intended FW13.60, hardware unverified
 
+**2026-10-15 update:** external dev.4 and complete previous-run logs now exist. Puck decoding is observed, but VDA ownership and token initialization fail. This supersedes the earlier comment-only evidence limitation and blocks future DEV publication. See [external runtime analysis](EXTERNAL_RUNTIME_REPORT.md). The source fixes below remain host-verified; they do not establish a working console backend.
+
 ## Outcome
 
 Three reproducible source defects were fixed and regression-tested. This review supports publishing the **experimental source**. It does not certify that an ELF cannot cause Kernel Panic: virtual-pad ABI, kernel/loader behavior and USB cancellation still need a physical console.

@@ -2,9 +2,11 @@
 
 Read [CURRENT_STATUS](CURRENT_STATUS.md) first, then the append-only evidence below. Historical pre-consolidation summary is preserved verbatim at [PROJECT_MEMORY-before-dev](../docs/archive/PROJECT_MEMORY-before-dev.md); it contains earlier/intermediate statements, not current publication status.
 
-## Current checkpoint — M1-243
+## External dev.4 logs — M1-244, 2026-10-15
 
-Experimental dev.4 is published, sourcea5c20346392eac0eb9fa04cc201cd214e2957363, workflow38588689667, seven assets/one ELF. Full software gates pass. Runtime safety fixes and all dev.3 features retained. Hardware NOT_RUN; FW13.60 is only an intended unmeasured target. External dev.2/FW5.50 report remains unresolved. Read CURRENT_STATUS and latest test/session records. Visibility is unchanged.
+Main remains aa9d4fa881b13c101edd1965baac7cbeb8b79655 at intake; Host38590488943/SDK38590488466 completed/success, no open PR. Published dev.4/sourcea5c2034 is unchanged. Complete public Gist snapshot reviewed: new log7572 bytes, previous1990922 bytes/36188 lines. EXTERNAL_HARDWARE: Puck input/battery/buttons/gyro decoded; one Add returns803b0006 and latch inhibits creation, no owned VDA/input injection. Older unidentified Ghost-Control v5 log has11975 Adds (14 pending-style/11961 subsequent803b0003) and14 VDA log identifiers. Temporal events do not prove ownership; device exhaustion/native UI cause remains HYPOTHESIS. Token initialization fails before listener; exact operation/errno unavailable. Default profile also rejected; no confirmed storage cause. Raw klog samples expose account IDs even with hand-off disabled; no identifier values/log bytes committed.
+
+Future DEV gate blocked by P0-VDA-PENDING-04; P1-STORAGE-DIAG-04 and P2-KLOG-PRIVACY-04 recorded. No guessed handles, new ABI calls, MBus writes, storage deletion/permission relaxation, physical test or new release. Next: establish proven pending Add receipt contract, add secret-free per-stage storage diagnostics/fault tests and raw-klog gating/redaction; request already-used ELF SHA and confirmed FW/loader only. Do not ask for another uncontrolled failing run. Detailed evidence/hashes: docs/development/EXTERNAL_RUNTIME_REPORT.md. Existing FW13.60 hardware rows remain NOT_RUN; prior FW5.50 report is not a measured current run.
 
 ## Historical continuation summary
 

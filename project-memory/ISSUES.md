@@ -1,5 +1,13 @@
 # Issues and blockers — project register
 
+## Current runtime blockers — M1-244 (2026-10-15)
+
+- P0-VDA-PENDING-04 — OPEN / BLOCKS FUTURE DEV: external dev.4 Add returns803b0006, asynchronous VDA event follows, but positive-only ownership cannot attach a handle. Actual input is decoded but not injected. Resolve proven ABI/ownership and cleanup; do not promote unowned klog IDs or retry Add. No physical cause/compatibility pass inferred.
+- P1-STORAGE-DIAG-04 — OPEN: token initialization and Default-profile load fail in supplied trace; storage errors collapse without operation/errno. Add secret-free phase/error diagnostics with fault coverage before proposing filesystem recovery. No unsafe token replacement/migration or mode relaxation.
+- P2-KLOG-PRIVACY-04 — OPEN: disabled hand-off still forwards passive system events into raw logs, including account identifiers. Gate/redact raw-log ingress and cover it on the host; do not mistake this label for active hand-off.
+
+Complete sanitized findings: [external runtime analysis](../docs/development/EXTERNAL_RUNTIME_REPORT.md). Previous comment-only/no-logs statements below are historical; new evidence is EXTERNAL_HARDWARE, not VERIFIED_HARDWARE. Published artifacts unchanged; main critical manifest now blocks further DEV publication.
+
 ## Current checkpoint — M1-239 (2026-10-12)
 
 Dev.3 publication/runner/approval blockers in older entries are resolved: workflow38225113776 passed and release source9aab6dbae166b28416a9a00e6346f85bf12e524e is published. No newly confirmed critical code defect was found in this documentation review. Physical USB/VDA/user recovery, privilege/hooks/filesystem and tile/browser behavior remain unverified. The current intended firmware is13.60, not the earlier12.00 target.

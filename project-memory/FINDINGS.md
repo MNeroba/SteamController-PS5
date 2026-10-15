@@ -214,3 +214,12 @@ Remote mainaf183a2 plus fix/p0-safety and all3 DEV tags form140 commits/trees wi
 ## F111 — Final kernel-sensitive runtime audit (M1-242)
 
 Three expected-red regressions established repeated unattributable Add/global reservation gap, missing live-fd identity check before USB detach, and signed OUT status overflow. Existing modules now latch ambiguous creation, reserve globally, revalidate exact reopened transport/18-byte descriptors and bound arithmetic. Software/build gates PASS; no hardware causation claim. Current analogous pins and SDK accessors inspected; no stronger proven ownership backend suitable for safe wholesale replacement found. External dev.2/FW5.50 screenshot failure remains unverified without logs/digest. Old assets unchanged and explicit README/Unreleased notice distinguishes new source fixes. Report PUBLIC_RUNTIME_REVIEW, decisions ADR-058.
+
+
+## F112 — External dev.4 runtime logs (M1-244)
+
+## External dev.4 logs — M1-244, 2026-10-15
+
+Main remains aa9d4fa881b13c101edd1965baac7cbeb8b79655 at intake; Host38590488943/SDK38590488466 completed/success, no open PR. Published dev.4/sourcea5c2034 is unchanged. Complete public Gist snapshot reviewed: new log7572 bytes, previous1990922 bytes/36188 lines. EXTERNAL_HARDWARE: Puck input/battery/buttons/gyro decoded; one Add returns803b0006 and latch inhibits creation, no owned VDA/input injection. Older unidentified Ghost-Control v5 log has11975 Adds (14 pending-style/11961 subsequent803b0003) and14 VDA log identifiers. Temporal events do not prove ownership; device exhaustion/native UI cause remains HYPOTHESIS. Token initialization fails before listener; exact operation/errno unavailable. Default profile also rejected; no confirmed storage cause. Raw klog samples expose account IDs even with hand-off disabled; no identifier values/log bytes committed.
+
+Future DEV gate blocked by P0-VDA-PENDING-04; P1-STORAGE-DIAG-04 and P2-KLOG-PRIVACY-04 recorded. No guessed handles, new ABI calls, MBus writes, storage deletion/permission relaxation, physical test or new release. Next: establish proven pending Add receipt contract, add secret-free per-stage storage diagnostics/fault tests and raw-klog gating/redaction; request already-used ELF SHA and confirmed FW/loader only. Do not ask for another uncontrolled failing run. Detailed evidence/hashes: docs/development/EXTERNAL_RUNTIME_REPORT.md. Existing FW13.60 hardware rows remain NOT_RUN; prior FW5.50 report is not a measured current run.

@@ -16,7 +16,7 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 > **Experimental prerelease.** Host tests and SDK builds pass; the payload has **not been tested on a physical PS5**. FW **13.60** is the intended, unverified test target. A stock console cannot load this ELF. Use an independently confirmed compatible development loader and keep your native DualSense available.
 
-> **14 October safety update:** dev.4 contains host-verified fixes for ambiguous virtual-device creation, USB hotplug identity and invalid feedback status. Older ELFs predate these fixes. A supplied dev.2/FW5.50 comment reports no input, token-storage errors and native DualSense disruption; its cause remains unconfirmed. Read the [runtime review](docs/development/PUBLIC_RUNTIME_REVIEW.md) before console testing.
+> **15 October runtime report:** external dev.4 logs show Puck input decoding, but virtual DualSense registration and WebUI token setup fail. The retry-storm protection is visible; working PS5 input is not established. Further DEV publication is blocked while these failures are investigated. Read the [log analysis](docs/development/EXTERNAL_RUNTIME_REPORT.md); avoid repeated launches of the failing build.
 
 ## Overview
 

@@ -46,3 +46,8 @@ M1-231 target update (2026-10-11): owner reports an upgrade to FW13.60. Current 
 ## External failure report — 2026-10-14 (M1-242)
 
 Owner supplied a third-party screenshot reporting dev.2/FAT/FW5.50 via Payload Manager: detected USB-C/Puck with no input, device-limit message, token-storage error and intermittent native DualSense loss at user selection. Only the comment is available; no ELF SHA/log/error code/independent reproduction. This is an unverified external report, not VERIFIED_HARDWARE or a changed result for the intended13.60 rows. Three source defects were host-fixed after dev.3, but their causal relation to this report is unproven. Follow PUBLIC_RUNTIME_REVIEW and H04/H05/H09/H12/H14/H15 before any separately authorized retest.
+
+
+## External runtime logs — 2026-10-15 (M1-244)
+
+EXTERNAL_HARDWARE adverse report, not a gate pass. Supplied comment: Payload Manager v0.5.1; earlier FAT/FW5.50 report has not been remeasured for these logs. Dev.4 banner but no ELF SHA: Puck decoded input and gyro/battery, one unattributable803b0006 VDA result, WebUI token failure, no owned virtual-ready/VDI progress. Old unidentified log:11975 Adds/14 VDA identifiers; native UI disruption cause remains unproven. Full hashes and sanitized counts in EXTERNAL_RUNTIME_REPORT. No existing13.60 NOT_RUN row changes. Do not request another uncontrolled run; retain native DualSense and only collect already-existing metadata/logs.
