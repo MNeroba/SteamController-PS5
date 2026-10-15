@@ -51,3 +51,6 @@ Owner supplied a third-party screenshot reporting dev.2/FAT/FW5.50 via Payload M
 ## External runtime logs — 2026-10-15 (M1-244)
 
 EXTERNAL_HARDWARE adverse report, not a gate pass. Supplied comment: Payload Manager v0.5.1; earlier FAT/FW5.50 report has not been remeasured for these logs. Dev.4 banner but no ELF SHA: Puck decoded input and gyro/battery, one unattributable803b0006 VDA result, WebUI token failure, no owned virtual-ready/VDI progress. Old unidentified log:11975 Adds/14 VDA identifiers; native UI disruption cause remains unproven. Full hashes and sanitized counts in EXTERNAL_RUNTIME_REPORT. No existing13.60 NOT_RUN row changes. Do not request another uncontrolled run; retain native DualSense and only collect already-existing metadata/logs.
+
+
+M1-245 dev.5: protected-storage/logging changes have host/build evidence only. The actual tester storage errno and pending VDA receipt ABI remain unknown. No H-row changes, no compatibility assertion; candidate/source prepared without publication. H09 must inspect precise storage stage/error and verify privacy in raw/diagnostic logs; H14 must establish owned pending receipt/assignment before any release.

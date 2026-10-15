@@ -2,6 +2,21 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. Historical releases and tags remain unchanged.
 
+## v0.1.0-dev.5
+
+Unpublished candidate. VDA ownership on the observed pending-assignment path remains blocked; physical PS5 operation is unverified.
+
+### Bug Fixes
+
+- Avoided unnecessary permission changes when the settings directory and new credential file already have the required private permissions (host-tested).
+- Removed account identifiers from raw application logs and disabled the optional system-log observer in Safe Mode (host-tested).
+- Preserved the original storage error through cleanup and cleared partial credentials after failed initialization (host-tested).
+
+### New Features / Improvements
+
+- Added precise storage-stage and errno diagnostics without exposing credentials or account IDs.
+- Distinguished pending virtual-controller assignment from generic creation errors; kept ownership restrictions and the no-repeat safeguard. This does not establish working PS5 registration.
+
 ## v0.1.0-dev.4
 
 Published on 2026-10-14 from `a5c20346392eac0eb9fa04cc201cd214e2957363`; physical PS5 testing was not performed.

@@ -90,8 +90,14 @@ static void reply(int fd, int code, const char *type, const char *body, size_t n
 
 static int initialize_webui_auth(void) {
     int created = 0;
-    if (webui_auth_load_or_create(WEBUI_AUTH_DIRECTORY, g_webui_token, &created) != 0)
+    storage_status_t storage;
+    int result=webui_auth_load_or_create_report(WEBUI_AUTH_DIRECTORY,g_webui_token,&created,&storage);
+    diagnostics_storage(&storage);
+    if (result!=0) {
+        LOG("webui: storage initialization failed stage=%s errno=%d\n",
+            storage_stage_name(storage.stage),storage.error);
         return -1;
+    }
     if (created) LOG("webui: generated a private portal token at %s\n", WEBUI_TOKEN_PATH);
     return 0;
 }
@@ -595,9 +601,12 @@ static void *server_thread(void *arg) {
 int webui_start(webui_notify_fn notify) {
     if(!g_webui_thread_started)diagnostics_webui(-1);
     if (g_webui_thread_started) return -1;
-    if (!notify || initialize_webui_auth() != 0) {
-        LOG("webui: disabled; private token storage or local notification unavailable\n");
-        if (notify) notify("SteamController-PS5 — WebUI unavailable: token storage error");
+    if (!notify) {
+        LOG("webui: disabled; local notification callback unavailable\n");
+        return -1;
+    }
+    if (initialize_webui_auth() != 0) {
+        notify("SteamController-PS5 — WebUI unavailable: protected storage setup failed; see storage stage/errno in log");
         return -1;
     }
     uint64_t now;

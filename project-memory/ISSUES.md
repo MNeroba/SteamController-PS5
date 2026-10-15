@@ -151,3 +151,10 @@ Previous full reachable-history scope gap is resolved for remote branches/tags a
 P0-VDA-UNATTRIBUTED-03 FIXED_HOST: absent/nonpositive receipts allowed repeating Add; registry-wide pending reservation/lifetime latch now stops repeats without deleting guesses. P1-USB-REOPEN-03 FIXED_HOST: reread opened fd identity before descriptor map/detach, strict complete device descriptor. P1-USB-STATUS-03 FIXED_HOST: INT_MAX status overflow reproduced by UBSan, bounded conversion. Normal44 C/Python, ASan/UBSan, Chromium220 and SDKv0.43 gates PASS locally; source publication/CI recorded separately. Published dev.3/older binaries do not contain these changes.
 
 EXTERNAL-FW550-01 UNVERIFIED_FAILURE_REPORT: supplied dev.2/FAT5.50 comment says no input, token-storage error and native DualSense disruption at user picker. Owner has no log/code/ELF digest. No established cause or hardware fix claimed. Keep open for authorized measured reproduction/log collection. It is not a fake critical-code finding and does not justify permission relaxation, guessed handles or unproven version gates. See PUBLIC_RUNTIME_REVIEW.
+
+
+## M1-245 dev.5 remediation (2026-10-15)
+
+P1-STORAGE-DIAG-04 FIXED_HOST: fixed stages/errno, original failure through cleanup, zeroed partial credentials and no redundant fchmod for already private owned directory/new token.1226 injected/real filesystem checks plus full normal/sanitizer/server/build coverage. Actual Prospero failure cause remains unverified.
+P2-KLOG-PRIVACY-04 FIXED_HOST: raw-sink identity filter, no Safe Mode system observer, disabled handoff early return, optional bridge text/table redaction. Historic external logs unchanged; opt-in binary captures not guaranteed anonymized.
+P0-VDA-PENDING-04 BLOCKED: pending803b0006/no receipt distinguished and output-change mask exposed without values or ownership promotion. This is diagnostics/containment, not restored PS5 injection. Analog sources lack an adequate safe receipt ABI; AGENTS ownership/unknown-side-effect hard stops remain. Next release still blocked.

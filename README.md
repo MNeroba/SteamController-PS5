@@ -18,6 +18,8 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 > **15 October runtime report:** external dev.4 logs show Puck input decoding, but virtual DualSense registration and WebUI token setup fail. The retry-storm protection is visible; working PS5 input is not established. Further DEV publication is blocked while these failures are investigated. Read the [log analysis](docs/development/EXTERNAL_RUNTIME_REPORT.md); avoid repeated launches of the failing build.
 
+> **dev.5 candidate:** protected-storage error diagnostics, redundant-chmod handling and account-log filtering are host-tested. VDA pending-assignment ownership remains blocked. [Candidate status](docs/development/DEV5_CANDIDATE.md) — no dev.5 release or download is published.
+
 ## Overview
 
 One native ELF connects **one Steam Controller 2026** over USB-C or the official Valve Puck and translates its input into a virtual DualSense. The embedded WebUI lets you edit profiles and mappings without installing a separate web server or copying image assets.

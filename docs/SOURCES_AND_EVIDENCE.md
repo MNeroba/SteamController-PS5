@@ -73,3 +73,8 @@ Current target checkpoint (M1-239,2026-10-12): FW13.60 is owner-reported and unm
 ## Final Public runtime review — 2026-10-14, M1-242
 
 Puckbridge78460113 and OmniPadb7682ef remain their actual HEADs. Latest LibrePad main28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc inspected; v1.1.3 release reports storage/startup testing on12.60 but explicitly no input retest and no recovery/13.60 confirmation. No copied implementation. SDKv0.43 d9c9519 crt/kernel.c has5.50/13.60 layout cases and checked credential accessors; this does not prove our VDA/USB/runtime behavior. Three new defects reproduced and fixed in existing modules; external dev.2/FW5.50 comment cannot establish cause without log/digest. Exact source lines and comparison rationale: development/PUBLIC_RUNTIME_REVIEW.md.
+
+
+## dev.5 source review — 2026-10-15 (M1-245)
+
+Actual Puck78460113/Omnib7682ef/Libre28a3bfe HEADs remain unchanged. LibrePad core/storage.c blob1ba3260253800fdb324ad4cfd404f081f045ed4b preserves operation stages/errno; app/main.c:52–64 reports them. Reference only; no storage migration or implementation copied. Its virtual_controller:519–590 and OmniPad firmware guide use klog/MBus/Shell techniques which do not prove this payload's device ownership. Public OpenOrbis Pad.h declares VDA unreversed and PS5 export stubs only prove symbol availability. Keep the safe-receipt hardware/source blocker; no guessed fallback or compatibility claim.

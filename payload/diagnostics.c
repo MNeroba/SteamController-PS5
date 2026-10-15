@@ -29,11 +29,13 @@ typedef struct {
 typedef struct {
     char startup[64];
     int startup_error, webui;
+    storage_status_t storage;
     uint32_t firmware;
     runtime_policy_t policy;
     user_session_snapshot_t users;
     unsigned usb_sessions, vda_creates, vda_deletes, vda_create_failures, vda_delete_failures;
     int vda_create_result, vda_delete_result;
+    vda_result_t vda_observation;
     diagnostic_usb_t usb[SLOT_REGISTRY_MAX_SLOTS];
     char logs[LOG_LINES][LOG_LINE_MAX];
     unsigned log_head, log_count;
@@ -53,6 +55,34 @@ static int contains(const char *s, const char *word) {
             return 1;
     }
     return 0;
+}
+void diagnostics_sanitize_raw_log(char *out, size_t capacity, const char *line) {
+    static const char *const private_fields[]={
+        "userid", "user_id", "user id", "user-id", "fguser", "inject_uid",
+        "foreground_user", "initial_user", "login_user", "user=", "user:", "user 0x",
+        "uid=", "uid:", "accountid", "account_id",
+        "authorization", "bearer ", "pairing code:", "serial=", "serial:",
+        "bondingkey", "webui.token=", "webui.token:", NULL
+    };
+    if (!capacity || !out) return;
+    if (!line) { out[0]=0; return; }
+    /* Drop the whole identity-bearing event, including decimal/hex copies.
+     * snprintf cannot safely copy overlapping buffers. */
+    for (unsigned i=0;private_fields[i];i++) if (contains(line,private_fields[i])) {
+        copy(out,capacity,"[GC] [redacted private event]\n"); return;
+    }
+    size_t n=0;while(n+1<capacity && line[n])n++;
+    memmove(out,line,n);out[n]=0;
+}
+void diagnostics_storage(const storage_status_t *status) {
+    pthread_mutex_lock(&lock);
+    state.storage=status ? *status : (storage_status_t){STORAGE_OK,0};
+    pthread_mutex_unlock(&lock);
+}
+void diagnostics_vda_observation(vda_result_t result) {
+    pthread_mutex_lock(&lock);
+    state.vda_observation=result;
+    pthread_mutex_unlock(&lock);
 }
 /* Omit sensitive/context-untrusted lines rather than trying to retain a secret
  * value. Escape all controls; also scrub long numeric/hex and address literals. */
@@ -309,6 +339,7 @@ int diagnostics_report(char *out, size_t cap, const diagnostics_steam_t *steam) 
         "Startup result: %d (0x%08x)\nWebUI status: %d (1=running, 0=stopped/disabled, "
         "-1=unavailable)\n",
         snap.startup_error, (unsigned)snap.startup_error, snap.webui);
+    add(&w,"WebUI storage stage: %s; errno=%d\n",storage_stage_name(snap.storage.stage),snap.storage.error);
     add(&w,
         "Policy: safe=%d webui=%d hooks=%d bridge=%d handoff=%d\nUSB session starts: %u (includes "
         "rediscovery; not a physical reconnect measurement)\n",
@@ -327,6 +358,8 @@ int diagnostics_report(char *out, size_t cap, const diagnostics_steam_t *steam) 
         "validation.\n",
         snap.vda_creates, snap.vda_create_failures, (unsigned)snap.vda_create_result,
         snap.vda_deletes, snap.vda_delete_failures, (unsigned)snap.vda_delete_result);
+    if(snap.vda_creates) add(&w,"VDA outcome: %s; changed output-word mask=0x%02x "
+        "(not handle evidence)\n",vda_result_name(snap.vda_observation.kind),snap.vda_observation.changed_words);
     add(&w, "\n--- USB and virtual controller ---\n");
     int devices = 0;
     for (unsigned i = 0; i < SLOT_REGISTRY_MAX_SLOTS; i++) {

@@ -6,7 +6,7 @@ SC2_SCAN_GC_SECTIONS := -Wl,-dead_strip
 else
 SC2_SCAN_GC_SECTIONS := -Wl,--gc-sections
 endif
-TESTS := $(BUILD)/test_diagnostics $(BUILD)/test_usb_completion $(BUILD)/test_slot_recovery $(BUILD)/test_user_session $(BUILD)/test_settings_tile_ps5 $(BUILD)/test_settings_tile $(BUILD)/test_webui_server $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_usb_helpers $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue $(BUILD)/test_runtime_control $(BUILD)/test_runtime_instance $(BUILD)/test_credential_guard $(BUILD)/test_runtime_policy
+TESTS := $(BUILD)/test_storage_diagnostics $(BUILD)/test_vda_result $(BUILD)/test_diagnostics $(BUILD)/test_usb_completion $(BUILD)/test_slot_recovery $(BUILD)/test_user_session $(BUILD)/test_settings_tile_ps5 $(BUILD)/test_settings_tile $(BUILD)/test_webui_server $(BUILD)/test_webui_http $(BUILD)/test_webui_peer_policy $(BUILD)/test_webui_route $(BUILD)/test_webui_json $(BUILD)/test_steam_usb $(BUILD)/test_steam_protocol $(BUILD)/test_steam_parser_fuzz $(BUILD)/test_sc2_usb_scan $(BUILD)/test_game_list_concurrency $(BUILD)/test_diag_once $(BUILD)/test_steam_legacy_session $(BUILD)/test_steam_mapping $(BUILD)/test_steam_motion $(BUILD)/test_steam_feedback $(BUILD)/test_sc2_profile $(BUILD)/test_sc2_profile_selection $(BUILD)/test_sc2_profile_store $(BUILD)/test_sc2_menu_storage $(BUILD)/test_sc2_binding $(BUILD)/test_sc2_control $(BUILD)/test_slot_registry $(BUILD)/test_slot_lifecycle $(BUILD)/test_usb_resources $(BUILD)/test_usb_session $(BUILD)/test_usb_helpers $(BUILD)/test_game_hook_safety $(BUILD)/test_ds_handoff $(BUILD)/test_sc2_status $(BUILD)/test_game_hooks $(BUILD)/test_sc2_gyro_state $(BUILD)/test_sc2_flick $(BUILD)/test_sc2_trigfx_state $(BUILD)/test_sc2_haptics_queue $(BUILD)/test_runtime_control $(BUILD)/test_runtime_instance $(BUILD)/test_credential_guard $(BUILD)/test_runtime_policy
 
 .PHONY: all test sanitize clean browser-fixture
 
@@ -22,6 +22,8 @@ $(BUILD)/webui_profile_fixture: webui_profile_fixture.c ../payload/sc2_profile.c
 	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -pthread -o $@
 
 test: $(TESTS)
+	./$(BUILD)/test_storage_diagnostics
+	./$(BUILD)/test_vda_result
 	./$(BUILD)/test_diagnostics
 	./$(BUILD)/test_usb_completion
 	./$(BUILD)/test_slot_recovery
@@ -66,6 +68,7 @@ test: $(TESTS)
 	./$(BUILD)/test_runtime_instance
 	./$(BUILD)/test_credential_guard
 	./$(BUILD)/test_runtime_policy
+	python3 test_log_privacy.py
 	python3 test_vda_ownership.py
 	python3 test_shutdown_contract.py
 	python3 test_privilege_contract.py
@@ -229,3 +232,11 @@ $(BUILD)/test_diagnostics: test_diagnostics.c ../payload/diagnostics.c | $(BUILD
 
 # Shared contracts invalidate all portable test binaries.
 $(TESTS): $(wildcard ../payload/*.h)
+
+$(BUILD)/test_storage_diagnostics: test_storage_diagnostics.c ../payload/webui_auth.c ../payload/webui_auth.h ../payload/private_file.h ../payload/storage_status.h | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload $< -pthread -o $@
+
+$(BUILD)/test_vda_result: test_vda_result.c ../payload/slot_registry.c ../payload/vda_result.h | $(BUILD)
+	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -pthread -o $@
+
+$(BUILD)/test_diagnostics $(BUILD)/test_webui_http $(BUILD)/test_webui_server: ../payload/storage_status.h ../payload/vda_result.h

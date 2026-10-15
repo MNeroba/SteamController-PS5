@@ -1,8 +1,8 @@
 {
   "name": "SteamController-PS5",
-  "filename": "SteamController-PS5-v0.1.0-dev.4.elf",
-  "url": "https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.4/SteamController-PS5-v0.1.0-dev.4.elf",
+  "filename": "SteamController-PS5-v0.1.0-dev.5.elf",
+  "url": "https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.5/SteamController-PS5-v0.1.0-dev.5.elf",
   "description": "Experimental Steam Controller 2026 USB-C/Puck payload with authenticated WebUI on port 8090. Physical PS5 compatibility is unverified.",
-  "version": "v0.1.0-dev.4",
+  "version": "v0.1.0-dev.5",
   "category": "Controller"
 }

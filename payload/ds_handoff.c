@@ -240,6 +240,10 @@ static uint64_t open_pad_id(const char *line) {
 }
 
 void ds_handoff_klog_line(const char *line) {
+    pthread_mutex_lock(&g_lock);
+    int disabled=!g_allowed || !g_enabled || g_stopping;
+    pthread_mutex_unlock(&g_lock);
+    if (disabled || !line) return;
     if (strstr(line, "[GC]") || strstr(line, "[Ghostpad]")) return;   /* our own echoes */
     int added = strstr(line, "DEVICE_ADDED") != NULL;
     int deleted = !added && (strstr(line, "DEVICE_DELETED") || strstr(line, "DEVICE_REMOVED"));

@@ -5,10 +5,16 @@
 #include "slot_lifecycle.h"
 #include "usb_resources.h"
 #include "version.h"
+#include "storage_status.h"
+#include "vda_result.h"
 #include <stddef.h>
 #include <stdint.h>
 #define DIAGNOSTICS_REPORT_MAX 24576
 #define DIAGNOSTICS_FILENAME "SteamController-PS5-Diagnostics-" STEAMCONTROLLER_VERSION ".txt"
+/* Sanitize before all raw sinks too; works in place and does not log itself. */
+void diagnostics_sanitize_raw_log(char *out, size_t capacity, const char *line);
+void diagnostics_storage(const storage_status_t *status);
+void diagnostics_vda_observation(vda_result_t result);
 /* Only application-owned memory. No file reader or caller-supplied paths. */
 void diagnostics_runtime(const char *stage, int error, uint32_t actual_firmware,
                          const runtime_policy_t *policy);

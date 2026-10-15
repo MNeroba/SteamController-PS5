@@ -9,23 +9,37 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <unistd.h>
+#include "storage_status.h"
 
-static inline int private_directory_open(const char *path) {
+static inline int private_directory_open_report(const char *path, storage_status_t *status) {
+    storage_status_clear(status);
     int fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
     struct stat st;
     if (fd < 0 && errno == ENOENT) {
         if (mkdir(path, 0700) != 0 && errno != EEXIST)
-            return -1;
+            return storage_failure(status, STORAGE_DIRECTORY_CREATE, errno);
         fd = open(path, O_RDONLY | O_DIRECTORY | O_NOFOLLOW);
     }
     if (fd < 0)
-        return -1;
-    if (fstat(fd, &st) || !S_ISDIR(st.st_mode) || st.st_uid != geteuid() ||
-        fchmod(fd, 0700) || fstat(fd, &st) || (st.st_mode & 077)) {
-        close(fd);
-        return -1;
+        return storage_failure(status, STORAGE_DIRECTORY_OPEN, errno);
+    storage_stage_t stage=STORAGE_OK; int error=0;
+    if (fstat(fd, &st)) { stage=STORAGE_DIRECTORY_STAT; error=errno; }
+    else if (!S_ISDIR(st.st_mode)) { stage=STORAGE_DIRECTORY_TYPE; error=EINVAL; }
+    else if (st.st_uid!=geteuid()) { stage=STORAGE_DIRECTORY_OWNER; error=EACCES; }
+    /* A private directory on a filesystem without chmod support is already
+     * safe. Repair permissions only when they actually need changing. */
+    else if ((st.st_mode & 07777)!=0700 && fchmod(fd,0700)) {
+        stage=STORAGE_DIRECTORY_CHMOD; error=errno;
     }
+    else if (fstat(fd,&st)) { stage=STORAGE_DIRECTORY_STAT; error=errno; }
+    else if (!S_ISDIR(st.st_mode) || st.st_uid!=geteuid() || (st.st_mode & 07777)!=0700) {
+        stage=STORAGE_DIRECTORY_MODE; error=EACCES;
+    }
+    if (stage!=STORAGE_OK) { close(fd); return storage_failure(status,stage,error); }
     return fd;
+}
+static inline int private_directory_open(const char *path) {
+    return private_directory_open_report(path,NULL);
 }
 static inline int private_regular_open(int directory, const char *name) {
     int fd = openat(directory, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);

@@ -3,6 +3,7 @@
 
 #include <pthread.h>
 #include <stdint.h>
+#include "storage_status.h"
 
 #define WEBUI_TOKEN_HEX_LENGTH 64
 
@@ -15,6 +16,9 @@ int webui_auth_path_allows(const char *path, const char *authorization,
 int webui_auth_load_or_create(const char *directory,
                               char token[WEBUI_TOKEN_HEX_LENGTH + 1],
                               int *created);
+int webui_auth_load_or_create_report(const char *directory,
+                                     char token[WEBUI_TOKEN_HEX_LENGTH + 1],
+                                     int *created, storage_status_t *status);
 
 #define WEBUI_PAIR_CODE_LENGTH 8
 #define WEBUI_PAIR_TTL_MS 300000u

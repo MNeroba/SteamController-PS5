@@ -36,6 +36,7 @@
 #include "wireless_ds4.h"
 #include "../game_hook_safety.h"
 #include "../credential_kernel.h"
+#include "../diagnostics.h"
 
 #ifndef POORDS4_RC_VERSION
 #define POORDS4_RC_VERSION 0
@@ -4601,13 +4602,13 @@ game_bridge_dump_client_table_report(
     TBL_PRINT("================================================================================\n");
     TBL_PRINT("PID:              %d\n", target);
     TBL_PRINT("Firmware:         0x%08x\n", fw);
-    TBL_PRINT("Source User ID:   0x%08x\n", (uint32_t)source_user_id);
+    TBL_PRINT("Source account:   [redacted]\n");
     TBL_PRINT("Source Pad Index: %d\n", source_pad_index);
     TBL_PRINT("Table Address:    0x%lx\n", (unsigned long)table);
     TBL_PRINT("Table Stride:     0x%x\n", table_stride);
     TBL_PRINT("--------------------------------------------------------------------------------\n");
     TBL_PRINT("%-4s %-10s %-10s %-5s %-5s %-5s %-11s %-12s %s\n",
-              "Slot", "Handle", "UserID", "Idx", "Conn", "Val", "VID:PID", "Type", "Notes");
+              "Slot", "Handle", "UserMatch", "Idx", "Conn", "Val", "VID:PID", "Type", "Notes");
     TBL_PRINT("--------------------------------------------------------------------------------\n");
 
     for (unsigned slot = 0; slot < 24u; ++slot) {
@@ -4651,8 +4652,8 @@ game_bridge_dump_client_table_report(
             snprintf(notes, sizeof(notes), "MATCH_IDX");
         }
 
-        TBL_PRINT("%-4u 0x%-8x 0x%-8x %-5d %-5d %-5d 0x%04x:0x%04x %-12s %s\n",
-                  slot, (uint32_t)handle, (uint32_t)user_id, inferred_index,
+        TBL_PRINT("%-4u 0x%-8x %-10d %-5d %-5d %-5d 0x%04x:0x%04x %-12s %s\n",
+                  slot, (uint32_t)handle, matches_user, inferred_index,
                   connected, valid, vendor, product, ctrl_type, notes);
     }
 
@@ -6212,9 +6213,8 @@ report_printf(int fd, const char *format, ...)
     va_end(arguments);
     if (length <= 0)
         return;
-    size_t write_length = (size_t)length;
-    if (write_length >= sizeof(buffer))
-        write_length = sizeof(buffer) - 1;
+    diagnostics_sanitize_raw_log(buffer,sizeof(buffer),buffer);
+    size_t write_length = strlen(buffer);
     if (fd >= 0)
         (void)write(fd, buffer, write_length);
     if (g_report_archive_fd >= 0 && g_report_archive_fd != fd)

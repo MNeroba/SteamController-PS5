@@ -87,6 +87,7 @@ void ghostpad_status_log(const char *fmt, ...) {
     char buf[LOG_MAX]; va_list ap;
     va_start(ap, fmt); vsnprintf(buf, sizeof(buf)-1, fmt, ap); va_end(ap);
     buf[LOG_MAX-1] = '\0';
+    diagnostics_sanitize_raw_log(buf,sizeof(buf),buf);
     struct timespec log_now;
     uint64_t log_ms=clock_gettime(CLOCK_MONOTONIC,&log_now)==0 ?
         (uint64_t)log_now.tv_sec*1000u+(uint64_t)log_now.tv_nsec/1000000u:0;
@@ -465,7 +466,13 @@ static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
     if (out_bind_ok) *out_bind_ok = 0;
     int ret = scePadVirtualDeviceAddDevice(&vdp, VIRTUAL_DEVICE_TYPE_DUALSENSE);
     diagnostics_vda_result(1,ret);
+    vda_result_t outcome=vda_result_classify(ret,vdp.pad);
+    diagnostics_vda_observation(outcome);
     gp_log("slot[%d] VDA ret=0x%08x\n", slot, (uint32_t)ret);
+    gp_log("slot[%d] VDA outcome: %s; changed output-word mask=0x%02x (not ownership evidence)\n",
+           slot,vda_result_name(outcome.kind),outcome.changed_words);
+    if(outcome.kind==VDA_RESULT_ASSIGNMENT_PENDING)
+        connection_notice(2,"SteamController-PS5: input detected; virtual controller assignment pending without an owned handle. Do not repeatedly relaunch.");
 
     /* Only a positive handle returned by this exact AddDevice call can be
      * attributed to this session. Output tokens and asynchronous klog records
@@ -1754,14 +1761,16 @@ int main(void) {
     ret=scePadSetProcessPrivilege(1); gp_log("scePadSetProcessPrivilege: 0x%08x\n", ret);
     if (ret != 0) return fail_startup("scePadSetProcessPrivilege(1) failed");
 
-    /* Start klog capture thread first — must be running before any VDA call */
-    if (pthread_create(&g_klog_tid, NULL, klog_capture_thread, NULL)==0) {
-        g_klog_started = 1;
-        gp_log("klog thread started\n");
-    } else {
-        gp_log("klog: failed to start capture thread; VDA identity binding is degraded\n");
+    /* VDA ownership never uses system log events. Passive hand-off observation
+     * is unnecessary when that optional feature is disabled. */
+    if (g_runtime_policy.enable_ds_handoff) {
+        if (pthread_create(&g_klog_tid, NULL, klog_capture_thread, NULL)==0) {
+            g_klog_started = 1;
+            gp_log("optional hand-off observer started\n");
+        } else {
+            gp_log("optional hand-off observer unavailable\n");
+        }
     }
-    runtime_sleep_ms(300); /* let klog thread connect before first VDA */
 
     /* Remap portal + per-game profile switching */
     sc2_notify_fn = notify_str;

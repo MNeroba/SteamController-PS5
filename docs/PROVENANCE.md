@@ -87,3 +87,8 @@ FreeBSD 12b769ed36a115da3b5013c92cdf294a3a5de98d sys/dev/usb/usb_generic.c / usb
 ## Final runtime comparison — M1-242 (2026-10-14)
 
 Reviewed current LibrePadPS5 `28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc`, `src/ps5/virtual_controller.c`, `src/input/usb_device.c`, `src/app/main.c`, `tests/test_usb_transport.c`, root GPL3 and v1.1.3 release notes. Rechecked unchanged Puckbridge `78460113ef7c48502c765a1f83ba34d53c977134` gc_main and OmniPad `b7682efce18ee0a8d7c80bbc90afbce72151ef96` ps5_vpad/usb_hotplug/GPL3. SDK `d9c9519116944a7f1c22d262012c53b80b3520b7` crt/kernel.c is API/error/layout evidence only. No implementation copied. The local registry latch/reservation, live-fd USB identity check and bounded status arithmetic extend existing project modules independently. No MBus binding, klog ownership, storage migration, DS3/XInput code, kernel offset or new asset imported. Exact relevant lines/limits: PUBLIC_RUNTIME_REVIEW.md.
+
+
+## dev.5 review before changes — M1-245 (2026-10-15)
+
+Rechecked unchanged source pins: LibrePad28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc virtual_controller.c:519–590 and storage v1.1.3 warning, OmniPadb7682efce18ee0a8d7c80bbc90afbce72151ef96 ps5_vpad.c and FIRMWARE_1360_GUIDE, Puckbridge78460113ef7c48502c765a1f83ba34d53c977134 gc_main. General status/API reference only; no implementation copied. Their klog/MBus/Shell fallback does not prove exclusive ownership and is not enabled here. Independent extensions to existing private_file/webui_auth, diagnostics/raw logging and VDA result classification remain GPL-3.0-or-later. No upstream assets, new kernel offsets, storage migration or confidential SDK imported. Public OpenOrbis Pad.h marks VDA unreversed; export stubs alone do not establish a safe receipt ABI.

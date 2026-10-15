@@ -433,3 +433,10 @@ ACCEPTED: keep the existing exact-positive ownership contract until actual PS5 A
 ## ADR-059 — Pending VDA evidence and failure containment (2026-10-15)
 
 EXTERNAL_HARDWARE logs demonstrate the positive-only VDA receipt contract cannot finish the observed803b0006 path. Retain the no-repeat creation latch and existing exclusive ownership; an event near Add does not prove ownership. Block the next DEV publication until a justified pending receipt/assignment contract is implemented and tested. No blind klog/GetHandle adoption, unknown ABI side effects or native-device cleanup. Diagnose storage by secret-free stage/error metadata before any repair; preserve strict token protection and /data/ghostpad. Suppress/redact passive raw-klog identity samples. Published dev.4 and all historical evidence remain immutable. This is triage/host-policy work; no physical console operation or new release is authorized by a log link.
+
+
+## ADR-060 — dev.5 storage diagnostics and identity logging (2026-10-15)
+
+Use fixed typed storage stages plus errno and preserve first failure across cleanup. Skip permission mutations only after exact owned private mode is confirmed; re-stat before accepting. Never downgrade file ownership/type/mode/no-follow/randomness/format checks or overwrite an invalid existing token. Erase secret outputs/scratch on failure. Redact account-bearing application events before every raw sink; Safe Mode does not open klog and inactive handoff does not observe it. Optional text probe tables retain match booleans only. Do not claim arbitrary binary dumps or historical shared files are anonymized.
+
+ADR059 remains active for VDA: diagnostics classify pending/unresolved output without accepting speculative receipts or silently adding klog/MBus/Shell side effects. No new native ABI contract was proven. The candidate remains blocked and unpublished even if all software gates pass.

@@ -152,3 +152,10 @@ The existing USB worker owns `slot_recovery`: proven owned old VDA deletion, def
 ## Observed pending-creation limitation — M1-244 (2026-10-15)
 
 External dev.4 trace returns803b0006 and later emits a VDA event; the positive-only receipt contract leaves virtual_ready false even while Steam input is decoded. This does not establish event ownership, output-param semantics or safe deletion. The dev.4 latch limits further Add attempts but is not a working pending-registration implementation. A proven ABI/ownership transition is required before the next DEV release. Preserve generation/global reservation/pause/cleanup contracts and native-controller isolation; no klog-derived handle promotion or automatic user binding is authorized by this evidence. Storage diagnostics must identify operation/errno without secrets before changing filesystem policy.
+
+
+## dev.5 candidate — M1-245
+
+`storage_status.h` carries fixed stage/errno only. Existing private_file/webui_auth remain the sole storage policy, with exact-owned-private checks and redundant-chmod avoidance. Failed credentials/scratch are erased; first operation failure survives close/unlink. Diagnostics snapshots store this bounded status; raw log filtering runs before file/klog sinks, and Safe Mode omits optional system observation. Optional bridge text reports pass the same filter and expose user-match booleans rather than account IDs.
+
+`vda_result.h` is only a pure classifier, not another virtual-pad stack. Its pending/error/no-receipt distinction and changed-word bitmask do not create a handle or new device ownership. The existing slot registry remains authoritative; positive-only receipt and lifetime retry inhibition remain. The observed pending-registration functionality is still blocked pending an independently justified ABI.

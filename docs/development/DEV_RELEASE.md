@@ -66,3 +66,8 @@ Owner explicitly approved creation/publication. Tag dev/v0.1.0-dev.4 points to a
 ## Next publication blocked — M1-244 (2026-10-15)
 
 New external dev.4 logs demonstrate unresolved pending VDA ownership and token initialization failures. dev-release.json lists P0-VDA-PENDING-04 and packaging must reject future publication while it remains unresolved. Do not clear it based on compilation/host suites alone: justify the actual receipt/ownership contract and add meaningful regressions. Existing dev.4/tag/assets stay unchanged. See [external runtime report](EXTERNAL_RUNTIME_REPORT.md). No new release approval was given with the log link.
+
+
+## dev.5 preparation only — M1-245
+
+Owner explicitly withheld publication. Version/metadata/changelog and one-ELF SDK build are prepared for source review, with storage/logging regressions covered. P0-VDA-PENDING-04 remains open and real packaging rejects the candidate. Do not dispatch the manual DEV workflow or create dev/v0.1.0-dev.5. See [candidate status](DEV5_CANDIDATE.md); existing published assets/tags are unchanged.

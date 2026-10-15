@@ -31,7 +31,7 @@ static int read_exact(int fd, unsigned char *out, size_t length) {
     while (done < length) {
         ssize_t n = read(fd, out + done, length - done);
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) return -1;
+        if (n <= 0) { if (!n) errno=EIO; return -1; }
         done += (size_t)n;
     }
     return 0;
@@ -42,7 +42,7 @@ static int write_exact(int fd, const unsigned char *data, size_t length) {
     while (done < length) {
         ssize_t n = write(fd, data + done, length - done);
         if (n < 0 && errno == EINTR) continue;
-        if (n <= 0) return -1;
+        if (n <= 0) { if (!n) errno=EIO; return -1; }
         done += (size_t)n;
     }
     return 0;
@@ -53,12 +53,17 @@ static void erase_secret(void *data, size_t length) {
     while (length--) *p++ = 0;
 }
 
-static int secure_random(void *data, size_t length) {
+static int secure_random_report(void *data, size_t length, storage_status_t *status) {
     int fd = open("/dev/urandom", O_RDONLY);
-    if (fd < 0) return -1;
-    int result = read_exact(fd, data, length);
-    if (close(fd) != 0) result = -1;
-    return result;
+    if (fd < 0) return storage_failure(status,STORAGE_RANDOM_OPEN,errno);
+    int result=read_exact(fd,data,length), error=errno;
+    if (close(fd)!=0 && result==0)
+        return storage_failure(status,STORAGE_RANDOM_CLOSE,errno);
+    if (result!=0) return storage_failure(status,STORAGE_RANDOM_READ,error);
+    return 0;
+}
+static int secure_random(void *data, size_t length) {
+    return secure_random_report(data,length,NULL);
 }
 
 int webui_pairing_init(webui_pairing_t *p, uint64_t now_ms,
@@ -143,83 +148,102 @@ int webui_auth_path_allows(const char *path, const char *authorization,
     return webui_auth_matches(authorization, token);
 }
 
-static int read_token_file(int dir_fd, char token[WEBUI_TOKEN_HEX_LENGTH + 1]) {
-    unsigned char file_data[WEBUI_TOKEN_HEX_LENGTH + 2];
+static int read_token_file(int dir_fd, char token[WEBUI_TOKEN_HEX_LENGTH + 1],
+                            storage_status_t *status) {
+    unsigned char data[WEBUI_TOKEN_HEX_LENGTH+1]={0};
     struct stat st;
-    size_t i;
-    int fd = openat(dir_fd, TOKEN_FILE_NAME, O_RDONLY | O_NOFOLLOW | O_NONBLOCK);
-    if (fd < 0) return -1;
-    if (fstat(fd, &st) != 0 || !S_ISREG(st.st_mode) || st.st_uid != geteuid() ||
-        (st.st_mode & 077) != 0 || st.st_size != WEBUI_TOKEN_HEX_LENGTH + 1 ||
-        read_exact(fd, file_data, WEBUI_TOKEN_HEX_LENGTH + 1) != 0) {
-        close(fd);
-        return -1;
+    storage_stage_t stage=STORAGE_OK; int error=0;
+    int fd=openat(dir_fd,TOKEN_FILE_NAME,O_RDONLY|O_NOFOLLOW|O_NONBLOCK);
+    if (fd<0) return storage_failure(status,STORAGE_TOKEN_OPEN,errno);
+    if (fstat(fd,&st)!=0) { stage=STORAGE_TOKEN_STAT; error=errno; }
+    else if (!S_ISREG(st.st_mode)) { stage=STORAGE_TOKEN_TYPE; error=EINVAL; }
+    else if (st.st_uid!=geteuid()) { stage=STORAGE_TOKEN_OWNER; error=EACCES; }
+    else if (st.st_mode & 077) { stage=STORAGE_TOKEN_MODE; error=EACCES; }
+    else if (st.st_size!=WEBUI_TOKEN_HEX_LENGTH+1) { stage=STORAGE_TOKEN_SIZE; error=EINVAL; }
+    else if (read_exact(fd,data,sizeof(data))!=0) { stage=STORAGE_TOKEN_READ; error=errno; }
+    if (close(fd)!=0 && stage==STORAGE_OK) { stage=STORAGE_TOKEN_CLOSE; error=errno; }
+    if (stage==STORAGE_OK) {
+        if (data[WEBUI_TOKEN_HEX_LENGTH]!='\n') { stage=STORAGE_TOKEN_FORMAT; error=EINVAL; }
+        data[WEBUI_TOKEN_HEX_LENGTH]=0;
+        if (stage==STORAGE_OK && !webui_token_is_valid((const char *)data)) {
+            stage=STORAGE_TOKEN_FORMAT; error=EINVAL;
+        }
     }
-    close(fd);
-    if (file_data[WEBUI_TOKEN_HEX_LENGTH] != '\n') return -1;
-    file_data[WEBUI_TOKEN_HEX_LENGTH] = '\0';
-    if (!webui_token_is_valid((const char *)file_data)) return -1;
-    for (i = 0; i < WEBUI_TOKEN_HEX_LENGTH; i++) token[i] = (char)file_data[i];
-    token[WEBUI_TOKEN_HEX_LENGTH] = '\0';
-    return 0;
+    if (stage==STORAGE_OK) memcpy(token,data,sizeof(data));
+    erase_secret(data,sizeof(data));
+    return stage==STORAGE_OK ? 0 : storage_failure(status,stage,error);
 }
 
-static int create_token_file(int dir_fd, char token[WEBUI_TOKEN_HEX_LENGTH + 1]) {
-    static const char hex[] = "0123456789abcdef";
-    unsigned char random[WEBUI_TOKEN_HEX_LENGTH / 2];
-    unsigned char text[WEBUI_TOKEN_HEX_LENGTH + 1];
-    size_t i;
-    int token_fd;
-    if (secure_random(random, sizeof(random)) != 0) return -1;
-    for (i = 0; i < sizeof(random); i++) {
-        text[i * 2] = (unsigned char)hex[random[i] >> 4];
-        text[i * 2 + 1] = (unsigned char)hex[random[i] & 15];
+static int create_token_file(int dir_fd,char token[WEBUI_TOKEN_HEX_LENGTH+1],
+                              storage_status_t *status) {
+    static const char hex[]="0123456789abcdef";
+    unsigned char random[WEBUI_TOKEN_HEX_LENGTH/2]={0},text[WEBUI_TOKEN_HEX_LENGTH+1]={0};
+    if (secure_random_report(random,sizeof(random),status)!=0) {
+        erase_secret(random,sizeof(random)); return -1;
     }
-    text[WEBUI_TOKEN_HEX_LENGTH] = '\n';
-    token_fd = openat(dir_fd, TOKEN_FILE_NAME,
-                      O_WRONLY | O_CREAT | O_EXCL | O_NOFOLLOW, 0600);
-    if (token_fd < 0) {
-        if (errno == EEXIST) return read_token_file(dir_fd, token);
-        return -1;
+    for (size_t i=0;i<sizeof(random);i++) {
+        text[i*2]=(unsigned char)hex[random[i]>>4];
+        text[i*2+1]=(unsigned char)hex[random[i]&15];
     }
-    if (fchmod(token_fd, 0600) != 0 || write_exact(token_fd, text, sizeof(text)) != 0 ||
-        fsync(token_fd) != 0) {
-        close(token_fd);
-        unlinkat(dir_fd, TOKEN_FILE_NAME, 0);
-        return -1;
+    erase_secret(random,sizeof(random)); text[WEBUI_TOKEN_HEX_LENGTH]='\n';
+    int fd=openat(dir_fd,TOKEN_FILE_NAME,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
+    if (fd<0) {
+        int error=errno; erase_secret(text,sizeof(text));
+        if (error==EEXIST) return read_token_file(dir_fd,token,status);
+        return storage_failure(status,STORAGE_TOKEN_CREATE,error);
     }
-    if (close(token_fd) != 0) {
-        unlinkat(dir_fd, TOKEN_FILE_NAME, 0);
-        return -1;
+    storage_stage_t stage=STORAGE_OK; int error=0; struct stat st;
+    if (fstat(fd,&st)!=0) { stage=STORAGE_TOKEN_STAT; error=errno; }
+    else if (!S_ISREG(st.st_mode) || st.st_uid!=geteuid()) { stage=STORAGE_TOKEN_OWNER; error=EACCES; }
+    else if ((st.st_mode&07777)!=0600 && fchmod(fd,0600)!=0) {
+        stage=STORAGE_TOKEN_CHMOD; error=errno;
     }
-    for (i = 0; i < WEBUI_TOKEN_HEX_LENGTH; i++) token[i] = (char)text[i];
-    token[WEBUI_TOKEN_HEX_LENGTH] = '\0';
-    memset(random, 0, sizeof(random));
-    memset(text, 0, sizeof(text));
-    return 1;
+    else if (fstat(fd,&st)!=0) { stage=STORAGE_TOKEN_STAT; error=errno; }
+    else if (!S_ISREG(st.st_mode) || st.st_uid!=geteuid() || (st.st_mode&07777)!=0600) {
+        stage=STORAGE_TOKEN_MODE; error=EACCES;
+    }
+    else if (write_exact(fd,text,sizeof(text))!=0) { stage=STORAGE_TOKEN_WRITE; error=errno; }
+    else if (fsync(fd)!=0) { stage=STORAGE_TOKEN_SYNC; error=errno; }
+    if (close(fd)!=0 && stage==STORAGE_OK) { stage=STORAGE_TOKEN_CLOSE; error=errno; }
+    if (stage!=STORAGE_OK) unlinkat(dir_fd,TOKEN_FILE_NAME,0);
+    else { memcpy(token,text,WEBUI_TOKEN_HEX_LENGTH); token[WEBUI_TOKEN_HEX_LENGTH]=0; }
+    erase_secret(text,sizeof(text));
+    return stage==STORAGE_OK ? 1 : storage_failure(status,stage,error);
 }
 
+int webui_auth_load_or_create_report(const char *directory,
+                                     char token[WEBUI_TOKEN_HEX_LENGTH+1],
+                                     int *created,storage_status_t *status) {
+    struct stat st;
+    storage_status_t local; if (!status) status=&local;
+    storage_status_clear(status); if (created) *created=0;
+    if (token) erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
+    if (!directory || !directory[0] || !token)
+        return storage_failure(status,STORAGE_ARGUMENT,EINVAL);
+    int dir_fd=private_directory_open_report(directory,status);
+    if (dir_fd<0) return -1;
+    int result=read_token_file(dir_fd,token,status);
+    if (result!=0) {
+        if (fstatat(dir_fd,TOKEN_FILE_NAME,&st,AT_SYMLINK_NOFOLLOW)==0) {
+            /* Preserve the original security/format/read failure. Never replace
+             * an existing invalid, foreign or inaccessible credential. */
+            result=-1;
+        } else if (errno!=ENOENT) result=storage_failure(status,STORAGE_TOKEN_INSPECT,errno);
+        else result=create_token_file(dir_fd,token,status);
+    }
+    int close_error=close(dir_fd),error=errno;
+    if (result<0) {
+        erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
+        return storage_failure(status,status->stage,status->error);
+    }
+    if (close_error!=0) {
+        erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
+        return storage_failure(status,STORAGE_DIRECTORY_CLOSE,error);
+    }
+    if (created && result>0) *created=1;
+    storage_status_clear(status); return 0;
+}
 int webui_auth_load_or_create(const char *directory,
-                              char token[WEBUI_TOKEN_HEX_LENGTH + 1],
-                              int *created) {
-    struct stat st;
-    int dir_fd, result;
-    if (created) *created = 0;
-    if (!directory || !directory[0] || !token) return -1;
-    dir_fd = private_directory_open(directory);
-    if (dir_fd < 0) return -1;
-    if (read_token_file(dir_fd, token) == 0) {
-        close(dir_fd);
-        return 0;
-    }
-    if (fstatat(dir_fd, TOKEN_FILE_NAME, &st, AT_SYMLINK_NOFOLLOW) == 0 ||
-        errno != ENOENT) {
-        close(dir_fd);
-        return -1;
-    }
-    result = create_token_file(dir_fd, token);
-    close(dir_fd);
-    if (result < 0) return -1;
-    if (created && result > 0) *created = 1;
-    return 0;
+                              char token[WEBUI_TOKEN_HEX_LENGTH+1],int *created) {
+    return webui_auth_load_or_create_report(directory,token,created,NULL);
 }

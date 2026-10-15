@@ -18,10 +18,27 @@ int main(void) {
     assert(n > 0 && (size_t)n < sizeof(out));
     assert(strstr(out, "No Steam Controller detected") &&
            strstr(out, "Firmware (runtime): unavailable") && strstr(out, "log unavailable"));
+    char raw[256];
+    const char *identities[]={"userId=0x10203040(270544960)","[UserId:0x10203040]",
+        "USER_ID=270544960", "User ID: 270544960", "fgUser=0x10203040", "inject_uid=270544960",
+        "accountId=123456789", "USER-ID: private", "foreground_user=42", "initial_user=42",
+        "source user=0x10203040", "GH(uid=0x10203040)", "login_user=270544960", "native user 0x10203040"};
+    for(unsigned i=0;i<sizeof(identities)/sizeof(identities[0]);i++) {
+        snprintf(raw,sizeof(raw),"system event %s",identities[i]);
+        diagnostics_sanitize_raw_log(raw,sizeof(raw),raw);
+        assert(!strcmp(raw,"[GC] [redacted private event]\n"));
+    }
+    diagnostics_sanitize_raw_log(raw,sizeof(raw),"VDA ret=0x803b0006; storage errno=5");
+    assert(strstr(raw,"803b0006") && strstr(raw,"errno=5"));
+    char one[1]={'x'};diagnostics_sanitize_raw_log(one,sizeof(one),"UserId:123");assert(one[0]==0);
+    diagnostics_sanitize_raw_log(NULL,0,NULL);
+    diagnostics_sanitize_raw_log(raw,sizeof(raw),NULL);assert(!raw[0]);
+    storage_status_t failed_storage={STORAGE_TOKEN_SYNC,5};diagnostics_storage(&failed_storage);
     runtime_policy_t p = {.enable_webui = 1};
     diagnostics_runtime("initialize USB", -5, 0x13600000, &p);
     diagnostics_webui(1);
     diagnostics_vda_result(1, -5);
+    diagnostics_vda_observation(vda_result_classify((int32_t)UINT32_C(0x803b0006),NULL));
     diagnostics_vda_result(0, -6);
     slot_registry_token_t t = {0, 20};
     diagnostics_usb_begin(t, "/dev/ugen1.2", 0x28de, 0x1304);
@@ -54,6 +71,8 @@ int main(void) {
     s.gyro_imu = 1;
     n = diagnostics_report(out, sizeof(out), &s);
     assert(n > 0);
+    assert(strstr(out,"WebUI storage stage: file-sync; errno=5"));
+    assert(strstr(out,"assignment pending; ownership unresolved"));
     assert(strstr(out, "create-attempts=1 failures=1") &&
            strstr(out, "delete-attempts=1 failures=1"));
     assert(strstr(out, "13.60") && strstr(out, "FS_INIT failed") && strstr(out, "Valve Puck"));
