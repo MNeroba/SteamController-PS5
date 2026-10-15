@@ -6,6 +6,16 @@
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/socket.h>
+#include <unistd.h>
+#include <errno.h>
+static int storage_write_failure;
+static int injected_sync(int fd) {
+    if(storage_write_failure){errno=ENOSPC;return -1;}
+    return fsync(fd);
+}
+#define fsync injected_sync
+#include "../payload/webui_auth.c"
+#undef fsync
 static int bind_failure;
 static int injected_bind(int fd, const struct sockaddr *address, socklen_t length);
 static char auth_dir[128];
@@ -136,7 +146,23 @@ int main(void) {
     int f=open(path,O_WRONLY|O_TRUNC);assert(f>=0);assert(write(f,"bad",3)==3);close(f);
     int before=notifications;assert(webui_start(capture_notification)==-1);
     assert(notifications==before+1&&!strstr(notification,"ready"));
-    assert(unlink(path)==0);assert(rmdir(auth_dir)==0);
+    assert(unlink(path)==0);
+    storage_write_failure=1;
+    assert(webui_start(capture_notification)==0);
+    assert(g_auth_mode==WEBUI_AUTH_SESSION && strstr(notification,"Session only"));
+    assert(access(path,F_OK)==-1);assert(webui_token_is_valid(g_webui_token));
+    assert(request("GET /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==401);
+    text=strstr(notification,"Pairing code: ");assert(text);memcpy(code,text+14,8);code[8]=0;
+    snprintf(wire,sizeof(wire),"POST /pair HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 8\r\n\r\n%s",code);
+    assert(request(wire,out,sizeof(out))==200 && strstr(out,g_webui_token));
+    snprintf(wire,sizeof(wire),"GET /api/diagnostics HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",g_webui_token);
+    assert(request(wire,out,sizeof(out))==200 && strstr(out,"2=running with session-only authentication"));
+    memcpy(token,g_webui_token,sizeof(token));assert(webui_stop()==0);
+    assert(webui_start(capture_notification)==0 && strcmp(token,g_webui_token)!=0);
+    snprintf(wire,sizeof(wire),"GET /api/status HTTP/1.1\r\nHost: localhost\r\nAuthorization: Bearer %s\r\n\r\n",token);
+    assert(request(wire,out,sizeof(out))==401 && !strstr(out,g_webui_token));
+    assert(webui_stop()==0);assert(access(path,F_OK)==-1);
+    storage_write_failure=0;assert(rmdir(auth_dir)==0);
     puts("production WebUI first-launch, authentication, concurrency and lifecycle checks passed");
     return 0;
 }

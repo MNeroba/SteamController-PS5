@@ -232,3 +232,15 @@ Expected-red already0700/unsupported-fchmod test failed exit134; skip unnecessar
 ## F114 — dev.5 VDA limit is explicit (M1-245)
 
 Pinned analogs and public sources do not establish a safe new ownership receipt ABI. Result803b0006 is classified as pending with unchanged input bytes and changed-word mask only; status/output/klog do not become a handle.23 host checks include a replay with changed positive output words still yielding no owner and32 attempts causing one Add reservation. Real failing console behavior is NOT fixed by classification. Keep release block. No Shell patches/MBus/unknown syscall or native disconnect added.
+
+## F115 — Pending Add is an asynchronous lifecycle transition (M1-246)
+
+VERIFIED_CODE: LibrePad28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc virtual_controller.c:43/338/519–590/878–891; owner now authorizes its general correlation approach. Existing registry/lifecycle extended, no duplicate backend. Unique typed events may provide an explicitly correlated receipt after a full bounded window; malformed/native/ambiguous/backlog/error cases never do. Host tests cover byte-level parser, real nonblocking socket reader, async start/reservation/release/cleanup and conservative binding policy. Actual Add/VDI/MBus ABI remains HYPOTHESIS and physical coexistence NOT_RUN, not established by these tests. Provenance and tester checklist: docs/development/VDA_PENDING.md.
+
+## F116 — New-slot reconnect could bypass unresolved old VDA cleanup (M1-246)
+
+VERIFIED_HOST_TEST: a cancelled pending registration's failed deletion retained its handle, but another slot could reserve a new Add. Failing production-registry regression /tmp/sc-vda246-cleanup-red.log(exit134). Derived global barrier now blocks creation while any device is deleting, retiring or releasing with owned handle. Successful cleanup releases the barrier; ambiguous unknown outcomes still use the permanent latch. No guessed deletion. This is a software defect reproduced and fixed on the host, not a PS5 hotplug pass.
+
+## F117 — Storage failure need not remove authenticated diagnostics (M1-246)
+
+VERIFIED_HOST_TEST: production auth/fsync ENOSPC28 injection starts a protected RAM-only portal; actual HTTP pairing/authenticated report work, no token persists and restart rejects the previous token. Existing bad/foreign/insecure tokens and CSPRNG failure stay fatal. Raw-log filtering precedes every raw sink. The external console's actual storage stage/errno remains unknown until a dev.5 report; no ENOSPC/EOPNOTSUPP console diagnosis is inferred.

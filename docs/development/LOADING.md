@@ -73,3 +73,10 @@ See [SETTINGS_TILE.md](SETTINGS_TILE.md) for failure/retry behavior and required
 ## Download a diagnostic report
 
 After enrollment, open Settings & help → Diagnostics → Download Diagnostic Report. The fixed-name text export includes available startup, USB, user-recovery, virtual-controller, profile/motion/haptic and build/runtime information, plus a bounded filtered application log tail. It works with incomplete initialization or no connected Steam Controller. It does not read arbitrary system files. Review profile names, USB paths and other context before attaching it to an issue; never include credentials or console identifiers. Use SECURITY.md for vulnerabilities rather than posting exploits publicly.
+
+
+## dev.5 pending registration and storage fallback
+
+The experimental pending-registration path observes one typed virtual device after one Add and continues USB input during identification. Keep other virtual-controller payloads stopped; temporal correlation is not a proven ownership ABI. Press Steam/PS and use the console's profile picker. A connected or unknown native DualSense prevents automatic local binding; no native disconnect/unbind or Shell patch is performed. If identification is unresolved, avoid repeated reloads and collect diagnostics. Native coexistence is physically unverified.
+
+If operational credential-storage writes fail, dev.5 may start with a fresh RAM-only256-bit token. The console notification says **Session only**; normal pairing and bearer/Origin/LAN checks remain. Pair again after restart, and download diagnostics while running. There is no persistent recovery token in this mode. Profile saves may remain unavailable; a storage fallback is not a filesystem repair. Existing malformed/foreign/insecure credentials and entropy failure still disable access. [Contract and tester checklist](VDA_PENDING.md).

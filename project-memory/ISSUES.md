@@ -1,5 +1,14 @@
 # Issues and blockers — project register
 
+## Current checkpoint — M1-246 (2026-10-16)
+
+- P0-VDA-PENDING-04: IMPLEMENTED_HOST under explicitly owner-authorized temporal correlation; not a proven creation ABI. One pending transaction/cancellation/cleanup/native-policy tests added. Controlled physical Add/VDI/MBus and native coexistence remain BLOCKED_HARDWARE; keep other virtual-controller payloads stopped.
+- P0-VDA-CLEANUP-05: FIXED_HOST — new-slot reconnect previously bypassed a failed owned deletion; failing regression then registry-wide cleanup barrier. Actual PS5 cleanup remains unverified.
+- P1-STORAGE-DIAG-04: IMPLEMENTED_HOST — typed stage/errno, strict persistent auth plus operational-failure session-only fallback. The tester's actual errno and filesystem cause remain unknown; corrupt/foreign/unsafe credentials still refuse startup.
+- P2-KLOG-PRIVACY-04: FIXED_HOST — filtering remains before raw sinks. New registration observer exports counts/status only, not raw system lines or IDs.
+- Publication: owner explicitly approved dev.5 for controlled testing. Complete gates/exact-source acknowledgement required; earlier withheld-publication and blocker entries below are historical. Stable hardware gate unchanged.
+
+
 ## Current runtime blockers — M1-244 (2026-10-15)
 
 - P0-VDA-PENDING-04 — OPEN / BLOCKS FUTURE DEV: external dev.4 Add returns803b0006, asynchronous VDA event follows, but positive-only ownership cannot attach a handle. Actual input is decoded but not injected. Resolve proven ABI/ownership and cleanup; do not promote unowned klog IDs or retry Add. No physical cause/compatibility pass inferred.

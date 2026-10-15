@@ -20,6 +20,15 @@ int webui_auth_load_or_create_report(const char *directory,
                                      char token[WEBUI_TOKEN_HEX_LENGTH + 1],
                                      int *created, storage_status_t *status);
 
+/* Session credentials retain all bearer/pairing gates but never touch the
+ * failed storage again. Malformed/foreign/insecure existing tokens and entropy
+ * failures remain fatal. Operational failures preserve their stage/errno. */
+typedef enum { WEBUI_AUTH_FAILED=-1, WEBUI_AUTH_PERSISTENT=0,
+               WEBUI_AUTH_SESSION=1 } webui_auth_mode_t;
+webui_auth_mode_t webui_auth_begin(const char *directory,
+                                  char token[WEBUI_TOKEN_HEX_LENGTH+1],
+                                  storage_status_t *status);
+
 #define WEBUI_PAIR_CODE_LENGTH 8
 #define WEBUI_PAIR_TTL_MS 300000u
 #define WEBUI_PAIR_ATTEMPTS 5u

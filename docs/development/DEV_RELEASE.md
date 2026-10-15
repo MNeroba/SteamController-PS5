@@ -71,3 +71,8 @@ New external dev.4 logs demonstrate unresolved pending VDA ownership and token i
 ## dev.5 preparation only — M1-245
 
 Owner explicitly withheld publication. Version/metadata/changelog and one-ELF SDK build are prepared for source review, with storage/logging regressions covered. P0-VDA-PENDING-04 remains open and real packaging rejects the candidate. Do not dispatch the manual DEV workflow or create dev/v0.1.0-dev.5. See [candidate status](DEV5_CANDIDATE.md); existing published assets/tags are unchanged.
+
+
+## M1-246 — dev.5 owner approval (2026-10-16)
+
+Owner explicitly authorized the analogous event-correlation mechanism for this stage, then requested publishing dev.5 for the log author's test. This supersedes M1-245's publication hold. No actual Add/VDI/MBus ABI, firmware compatibility, native coexistence or storage cause is claimed. The missing pending software transition is implemented with regression coverage; correlation limitations are accepted for this experimental DEV channel and stated in release notes. Clear the critical code blocker only after final source review and complete local/exact-source CI gates; retain the stable hardware gate and owner-approved manual workflow, versiondev.5, SDKv0.43, one ELF/seven assets and downloaded-checksum verification. No old tag/release/asset is overwritten.

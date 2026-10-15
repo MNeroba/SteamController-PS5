@@ -18,7 +18,7 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 > **15 October runtime report:** external dev.4 logs show Puck input decoding, but virtual DualSense registration and WebUI token setup fail. The retry-storm protection is visible; working PS5 input is not established. Further DEV publication is blocked while these failures are investigated. Read the [log analysis](docs/development/EXTERNAL_RUNTIME_REPORT.md); avoid repeated launches of the failing build.
 
-> **dev.5 candidate:** protected-storage error diagnostics, redundant-chmod handling and account-log filtering are host-tested. VDA pending-assignment ownership remains blocked. [Candidate status](docs/development/DEV5_CANDIDATE.md) — no dev.5 release or download is published.
+> **dev.5 preparation:** owner-approved experimental pending-registration recovery, session-only protected WebUI fallback and account-log filtering are being validated for publication. Event correlation remains weaker than a proven creation receipt; physical PS5 behavior is unverified. [Implementation and tester checklist](docs/development/VDA_PENDING.md) · [Candidate status](docs/development/DEV5_CANDIDATE.md). No dev.5 download is claimed before release acknowledgement.
 
 ## Overview
 

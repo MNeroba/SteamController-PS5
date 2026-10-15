@@ -14,6 +14,7 @@
 #include <pthread.h>
 #include <fcntl.h>
 #include <signal.h>
+#include <dlfcn.h>
 #include <dirent.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
@@ -62,6 +63,8 @@
 #include "runtime_policy.h"
 #include "user_session.h"
 #include "diagnostics.h"
+#include "vda_pending.h"
+#include "vda_bind_policy.h"
 
 /* ── Logging ──────────────────────────────────────────────────────────── */
 #define LOG_DIR  "/data/ghostpad"
@@ -109,6 +112,8 @@ extern int32_t sceUserServiceGetInitialUser(int32_t *outUserId);
 extern int32_t sceUserServiceGetForegroundUser(int32_t *outUserId);
 extern int32_t sceUserServiceGetLoginUserIdList(int32_t users[4]);
 extern int32_t scePadInit(void);
+extern int32_t scePadGetHandle(int32_t user,int32_t type,int32_t index);
+extern int32_t scePadReadState(int32_t handle,ScePadData *data);
 extern int32_t scePadSetProcessPrivilege(int32_t privilege);
 extern int32_t scePadVirtualDeviceAddDevice(void *param, int32_t deviceType);
 extern int32_t scePadVirtualDeviceDeleteDevice(int32_t handle);
@@ -124,9 +129,20 @@ static slot_registry_t g_slots;
 static credential_kernel_scope_t g_runtime_credentials =
     CREDENTIAL_KERNEL_SCOPE_INITIALIZER;
 static gc_diag_once_t g_vdi_error_log = GC_DIAG_ONCE_INIT;
-/* Serialize AddDevice calls from concurrent controller sessions. A klog
- * DEVICE_ADDED event is not an ownership receipt. */
+/* One global Add transaction. Owner authorizes LibrePad-style event correlation
+ * for dev.5; this is explicitly weaker than a direct ABI receipt. */
 static pthread_mutex_t g_vda_create_lock = PTHREAD_MUTEX_INITIALIZER;
+static struct {
+    vda_pending_reader_t reader;
+    slot_registry_token_t token;
+    uint32_t logout_epoch;
+    int active, cancelled;
+} g_pending_vda;
+#define VDA_ASYNC_HANDLE (-2)
+static void *g_mbus_module;
+typedef int32_t (*local_mbus_bind_fn)(uint64_t,int32_t);
+static local_mbus_bind_fn g_mbus_bind;
+static int g_mbus_loaded;
 static int32_t         g_inject_uid = -1;
 static user_session_t g_users = USER_SESSION_INITIALIZER;
 static volatile sig_atomic_t g_signal_stop;
@@ -255,7 +271,10 @@ typedef struct {
     steam_legacy_input_state_t steam_input;
     sc2_input_state_t sc2_input;
     uint32_t inject_count;
-    int bind_ok;
+    int bind_ok, bind_attempted, previous_ps;
+    int32_t observed_handle;
+    uint64_t queued_ps_until, last_bind_check;
+    int queued_ps;
     int32_t last_vdi_ret;
     slot_recovery_t recovery;
     uint64_t last_vda_attempt_ms;
@@ -264,21 +283,89 @@ typedef struct {
 static int slot_virtual_ready(slot_registry_token_t token) {
     slot_registry_entry_t entry;
     return slot_registry_snapshot(&g_slots, token, &entry) == SLOT_REGISTRY_OK &&
-           entry.state == SLOT_REGISTRY_ACTIVE && entry.virtual_ready && !entry.virtual_deleting;
+           entry.state == SLOT_REGISTRY_ACTIVE && entry.virtual_ready && !entry.virtual_deleting && !entry.virtual_retiring;
+}
+
+static int monotonic_ms(uint64_t *ms);
+
+/* Explicit Steam/PS press only. GetHandle/ReadState are read-only native
+ * protection checks and NEVER establish virtual ownership. No pad is opened,
+ * disconnected or unbound. An unknown native state leaves the OS picker path. */
+static void bind_owned_vda(const slot_registry_entry_t *entry,usb_session_state_t *session) {
+    if(!entry->virtual_correlated || !entry->virtual_device_id || session->bind_attempted)return;
+    uint64_t check_ms;
+    if(monotonic_ms(&check_ms)!=0 || (session->last_bind_check && check_ms>=session->last_bind_check &&
+       check_ms-session->last_bind_check<5000))return;
+    session->last_bind_check=check_ms;
+    int32_t users[4]={-1,-1,-1,-1},foreground=-1;
+    int list=sceUserServiceGetLoginUserIdList(users);
+    int fg=sceUserServiceGetForegroundUser(&foreground);
+    int native_result=-1,native_connected=1;
+    if(!list && !fg && foreground>0) {
+        int32_t native=scePadGetHandle(foreground,0,0);
+        if(native>0 && native!=entry->virtual_handle) {
+            ScePadData data;memset(&data,0,sizeof(data));
+            native_result=scePadReadState(native,&data);native_connected=data.connected!=0;
+        }
+    }
+    int32_t target=vda_bind_target(list,users,fg,foreground,native_result,native_connected);
+    if(target<=0) {
+        gp_log("VDA local bind deferred: login=0x%08x foreground=0x%08x native-read=0x%08x native-connected=%d; using console picker\n",
+               (uint32_t)list,(uint32_t)fg,(uint32_t)native_result,native_connected);
+        return;
+    }
+    if(!g_mbus_loaded) {
+        g_mbus_loaded=1;
+        g_mbus_module=dlopen("/system/common/lib/libSceMbus.sprx",RTLD_NOW|RTLD_LOCAL);
+        if(!g_mbus_module)g_mbus_module=dlopen("libSceMbus.sprx",RTLD_NOW|RTLD_LOCAL);
+        if(g_mbus_module) {
+            void *symbol=dlsym(g_mbus_module,"sceMbusBindDeviceWithUserId");
+            _Static_assert(sizeof(symbol)==sizeof(g_mbus_bind),"MBus function pointer size");
+            memcpy(&g_mbus_bind,&symbol,sizeof(symbol));
+        }
+    }
+    if(!g_mbus_bind) {gp_log("VDA local MBus symbol unavailable; using console picker\n");return;}
+    /* Module resolution can take time: recheck selection and native state
+     * immediately before the only side effect. Unknown/changed state refuses. */
+    int32_t confirm[4]={-1,-1,-1,-1},selected=-1;
+    if(sceUserServiceGetLoginUserIdList(confirm)!=0 ||
+       sceUserServiceGetForegroundUser(&selected)!=0 || selected!=target ||
+       memcmp(confirm,users,sizeof(users)) || sc2_pause_is_active() || runtime_is_stopping())return;
+    int32_t native=scePadGetHandle(target,0,0);ScePadData native_data;memset(&native_data,0,sizeof(native_data));
+    if(native<=0 || native==entry->virtual_handle || scePadReadState(native,&native_data)!=0 || native_data.connected)return;
+    session->bind_attempted=1;
+    int result=g_mbus_bind(entry->virtual_device_id,target);
+    session->bind_ok=result==0;
+    gp_log("VDA local bind: ret=0x%08x; native controller operations=0\n",(uint32_t)result);
+    if(result)connection_notice(2,"SteamController-PS5: virtual controller ready; choose a profile on the console");
 }
 
 static void inject_pad(slot_registry_token_t token, int slot,
                        usb_session_state_t *session, const ScePadData *pad) {
     slot_registry_entry_t entry;
-    if (!session ||
-        slot_registry_snapshot(&g_slots, token, &entry) != SLOT_REGISTRY_OK ||
-        !entry.virtual_ready || entry.state != SLOT_REGISTRY_ACTIVE ||
-        session->recovery.pending || sc2_pause_is_active())
+    if(!session || !pad || slot_registry_snapshot(&g_slots,token,&entry)!=0)return;
+    user_session_snapshot_t users;user_session_snapshot(&g_users,&users);
+    if(entry.state!=SLOT_REGISTRY_ACTIVE || entry.virtual_retiring || entry.virtual_deleting ||
+       sc2_pause_is_active() || users.logged_out) {
+        session->queued_ps=0;session->queued_ps_until=0;return;
+    }
+    if(!entry.virtual_ready || session->recovery.pending) {
+        if(entry.virtual_creating && (pad->buttons&SCE_PAD_BUTTON_PS))session->queued_ps=1;
         return;
-    user_session_snapshot_t users;
-    user_session_snapshot(&g_users, &users);
-    if (users.logged_out) return;
+    }
+    ScePadData fresh=*pad;uint64_t now=0;
+    if(monotonic_ms(&now)!=0)return;
+    if(session->queued_ps) {session->queued_ps=0;session->queued_ps_until=now+150;}
+    if(session->queued_ps_until && now<session->queued_ps_until)fresh.buttons|=SCE_PAD_BUTTON_PS;
+    else session->queued_ps_until=0;
+    pad=&fresh;
     int32_t h = entry.virtual_handle;
+    if(session->observed_handle!=h) {
+        session->observed_handle=h;session->bind_ok=0;session->bind_attempted=0;session->previous_ps=0;
+    }
+    int ps=(pad->buttons&SCE_PAD_BUTTON_PS)!=0;
+    if(ps && !session->previous_ps)bind_owned_vda(&entry,session);
+    session->previous_ps=ps;
     int vr = scePadVirtualDeviceInsertData(h, pad);
     session->last_vdi_ret = vr;
     uint32_t n = ++session->inject_count;
@@ -458,32 +545,68 @@ static int probe_one_path(const char *path, uint16_t *out_vid, uint16_t *out_pid
 }
 
 /* ── Create VDA for a slot ────────────────────────────────────────────── */
+static int vda_log_open(void) {
+    int fd=g_klog_started ? -1 : open("/dev/klog",O_RDONLY|O_NONBLOCK);
+    if(fd>=0)return fd;
+    int sock=socket(AF_INET,SOCK_STREAM,0);
+    if(sock<0)return -1;
+    if(sock>=FD_SETSIZE) {close(sock);errno=EMFILE;return -1;}
+    if(fcntl(sock,F_SETFL,O_NONBLOCK)!=0) {int error=errno;close(sock);errno=error;return -1;}
+    struct sockaddr_in address;memset(&address,0,sizeof(address));
+    address.sin_family=AF_INET;address.sin_port=htons(3232);address.sin_addr.s_addr=htonl(INADDR_LOOPBACK);
+    int result=connect(sock,(struct sockaddr*)&address,sizeof(address));
+    if(result!=0 && errno==EINPROGRESS) {
+        fd_set writable;FD_ZERO(&writable);FD_SET(sock,&writable);
+        struct timeval timeout={0,50000};
+        result=select(sock+1,NULL,&writable,NULL,&timeout);
+        if(result>0) {
+            int error=0;socklen_t size=sizeof(error);
+            result=getsockopt(sock,SOL_SOCKET,SO_ERROR,&error,&size);
+            if(!result && error){errno=error;result=-1;}
+        } else {if(!result)errno=ETIMEDOUT;result=-1;}
+    }
+    if(result<0) {int error=errno;close(sock);errno=error;return -1;}
+    return sock;
+}
+static int monotonic_ms(uint64_t *ms) {
+    struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now)!=0)return -1;
+    *ms=(uint64_t)now.tv_sec*1000u+(uint64_t)now.tv_nsec/1000000u;return 0;
+}
 static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
     struct { int32_t size; int32_t creation_word; int32_t pad[6]; } vdp;
     pthread_mutex_lock(&g_vda_create_lock);
-    memset(&vdp,0,sizeof(vdp)); vdp.size=sizeof(vdp); vdp.creation_word=1; /* Preserve legacy ABI bytes; word meaning is physically unverified. */
-
-    if (out_bind_ok) *out_bind_ok = 0;
-    int ret = scePadVirtualDeviceAddDevice(&vdp, VIRTUAL_DEVICE_TYPE_DUALSENSE);
+    if(out_bind_ok)*out_bind_ok=0;
+    slot_registry_entry_t entry;uint64_t now=0;
+    if(g_pending_vda.active || slot<0 || slot_registry_snapshot_index(&g_slots,(uint32_t)slot,&entry) ||
+       !entry.virtual_creating || monotonic_ms(&now)!=0) {
+        pthread_mutex_unlock(&g_vda_create_lock);return -1;
+    }
+    /* A concurrent legacy reader requires an independent loopback stream. */
+    int fd=vda_log_open();
+    if(vda_pending_reader_begin(&g_pending_vda.reader,fd,now)!=0) {
+        diagnostics_vda_pending(g_pending_vda.reader.observation.summary);
+        gp_log("slot[%d] VDA not attempted: bounded fresh log unavailable errno=%d\n",slot,
+               g_pending_vda.reader.observation.summary.error);
+        pthread_mutex_unlock(&g_vda_create_lock);return -1;
+    }
+    _Static_assert(sizeof(vdp)==32,"inherited AddDevice input size");
+    memset(&vdp,0,sizeof(vdp));vdp.size=sizeof(vdp);vdp.creation_word=1;
+    int ret=scePadVirtualDeviceAddDevice(&vdp,VIRTUAL_DEVICE_TYPE_DUALSENSE);
     diagnostics_vda_result(1,ret);
-    vda_result_t outcome=vda_result_classify(ret,vdp.pad);
-    diagnostics_vda_observation(outcome);
-    gp_log("slot[%d] VDA ret=0x%08x\n", slot, (uint32_t)ret);
-    gp_log("slot[%d] VDA outcome: %s; changed output-word mask=0x%02x (not ownership evidence)\n",
-           slot,vda_result_name(outcome.kind),outcome.changed_words);
-    if(outcome.kind==VDA_RESULT_ASSIGNMENT_PENDING)
-        connection_notice(2,"SteamController-PS5: input detected; virtual controller assignment pending without an owned handle. Do not repeatedly relaunch.");
-
-    /* Only a positive handle returned by this exact AddDevice call can be
-     * attributed to this session. Output tokens and asynchronous klog records
-     * cannot identify a deletable handle safely. */
-    int32_t handle = (ret > 0) ? ret : -1;
-    if (handle>=0)
-        gp_log("slot[%d] VDI handle=0x%x ready\n", slot, (uint32_t)handle);
-    else
-        gp_log("slot[%d] ERROR: AddDevice did not return an attributable handle; further creation is inhibited, no guessed device will be deleted\n", slot);
-    pthread_mutex_unlock(&g_vda_create_lock);
-    return handle;
+    vda_result_t outcome=vda_result_classify(ret,vdp.pad);diagnostics_vda_observation(outcome);
+    gp_log("slot[%d] VDA ret=0x%08x; output-word change mask=0x%02x\n",slot,(uint32_t)ret,outcome.changed_words);
+    if(outcome.kind==VDA_RESULT_ASSIGNMENT_PENDING) {
+        g_pending_vda.token=entry.token;g_pending_vda.active=1;g_pending_vda.cancelled=0;
+        user_session_snapshot_t users;user_session_snapshot(&g_users,&users);
+        g_pending_vda.logout_epoch=users.logout_epoch;
+        diagnostics_vda_pending(g_pending_vda.reader.observation.summary);
+        connection_notice(2,"SteamController-PS5: virtual controller pending; identifying once. Keep other controller payloads stopped.");
+        pthread_mutex_unlock(&g_vda_create_lock);return VDA_ASYNC_HANDLE;
+    }
+    vda_pending_reader_close(&g_pending_vda.reader);
+    int32_t handle=(ret > 0) ? ret : -1;
+    gp_log("slot[%d] VDA direct receipt: %s\n",slot,handle>0 ? "ready" : "unresolved; retries inhibited");
+    pthread_mutex_unlock(&g_vda_create_lock);return handle;
 }
 
 /* Steam Controller actually being used (not just awake): a button, or a
@@ -518,8 +641,60 @@ static int delete_slot_vda(slot_registry_token_t token, int slot,
                                         &context);
 }
 
+/* Progress is nonblocking and bounded, under the same global Add lock.
+ * Cancellation still identifies the device before owned cleanup; it never
+ * abandons a reservation or creates a replacement during failed deletion. */
+static void pending_vda_poll(int eligible) {
+    pthread_mutex_lock(&g_vda_create_lock);
+    if(!g_pending_vda.active) {pthread_mutex_unlock(&g_vda_create_lock);return;}
+    slot_registry_entry_t entry;user_session_snapshot_t users;
+    user_session_snapshot(&g_users,&users);
+    if(!eligible || runtime_is_stopping() || sc2_pause_is_active() ||
+       !sc2_haptic_session_is_owner(g_pending_vda.token) || users.logged_out ||
+       users.logout_epoch!=g_pending_vda.logout_epoch ||
+       slot_registry_snapshot(&g_slots,g_pending_vda.token,&entry)!=0 ||
+       entry.state==SLOT_REGISTRY_RELEASING)g_pending_vda.cancelled=1;
+    uint64_t now=0;
+    if(monotonic_ms(&now)!=0) {
+        int error=errno;vda_pending_reader_close(&g_pending_vda.reader);
+        vda_pending_fail(&g_pending_vda.reader.observation,VDA_PENDING_CLOCK_ERROR,error);
+    }
+    if(!vda_pending_reader_poll(&g_pending_vda.reader,now)) {
+        pthread_mutex_unlock(&g_vda_create_lock);return;
+    }
+    uint64_t id=vda_pending_candidate(&g_pending_vda.reader.observation);
+    /* Protect every currently logged-in user's existing pad handle. These
+     * lookups can reject a candidate; they can never supply one. */
+    if(id) {
+        int32_t logged[4]={-1,-1,-1,-1};
+        int read_result=sceUserServiceGetLoginUserIdList(logged);
+        if(read_result || !vda_user_list_valid(logged)) {
+            gp_log("VDA candidate rejected: login-list result=0x%08x valid=%d\n",(uint32_t)read_result,vda_user_list_valid(logged));
+            id=0;vda_pending_fail(&g_pending_vda.reader.observation,VDA_PENDING_REJECTED,EIO);
+        } else for(unsigned i=0;i<4;i++)if(logged[i]>0 && scePadGetHandle(logged[i],0,0)==(int32_t)(uint32_t)id) {
+            id=0;vda_pending_fail(&g_pending_vda.reader.observation,VDA_PENDING_REJECTED,EBUSY);break;
+        }
+    }
+    vda_delete_context_t context={(int)g_pending_vda.token.index,"pending registration cancelled"};
+    slot_lifecycle_ops_t ops={.delete_virtual=delete_vda_handle};
+    int result=slot_lifecycle_finish_pending(&g_slots,g_pending_vda.token,id,g_pending_vda.cancelled,&ops,&context);
+    diagnostics_vda_pending(g_pending_vda.reader.observation.summary);
+    gp_log("slot[%u] VDA pending result: %s; events=%u distinct=%u malformed=%u truncated=%u errno=%d cancelled=%d registry=%d; event correlation is experimental\n",
+        g_pending_vda.token.index,vda_pending_name(g_pending_vda.reader.observation.summary.status),
+        g_pending_vda.reader.observation.summary.virtual_events,g_pending_vda.reader.observation.summary.distinct_virtuals,
+        g_pending_vda.reader.observation.summary.malformed,g_pending_vda.reader.observation.summary.truncated,
+        g_pending_vda.reader.observation.summary.error,g_pending_vda.cancelled,result);
+    if(!result && id && !g_pending_vda.cancelled)
+        connection_notice(1,"SteamController-PS5: virtual DualSense ready — press Steam/PS to select a profile");
+    else if(!id)connection_notice(2,"SteamController-PS5: virtual controller identification unresolved. Do not repeatedly reload; download diagnostics.");
+    memset(&g_pending_vda.reader.observation,0,sizeof(g_pending_vda.reader.observation));
+    g_pending_vda.active=0;
+    pthread_mutex_unlock(&g_vda_create_lock);
+}
+
 static int worker_create_virtual(uint32_t slot,int32_t *handle,int *bind_ok,void *context) {
     (void)context;*handle=create_vda_for_slot((int)slot,bind_ok);
+    if(*handle==VDA_ASYNC_HANDLE){*handle=-1;return SLOT_LIFECYCLE_CREATE_PENDING;}
     return *handle>0 ? 0 : -1;
 }
 
@@ -534,6 +709,7 @@ static int sc2_vda_attach(slot_registry_token_t token, int slot,
     if (slot_registry_snapshot(&g_slots, token, &entry) != SLOT_REGISTRY_OK ||
         entry.state != SLOT_REGISTRY_ACTIVE)
         return 0;
+    if(entry.virtual_retiring)return 0;
     if (entry.virtual_ready) return 1;
 
     user_session_snapshot_t users;
@@ -570,7 +746,8 @@ static void sc2_vda_detach(slot_registry_token_t token, int slot,
         return;
     }
     if (session) {
-        session->bind_ok = 0;
+        session->bind_ok = 0;session->bind_attempted=0;session->observed_handle=-1;
+        session->queued_ps=0;session->queued_ps_until=0;session->last_bind_check=0;
         session->last_vdi_ret = -1;
         session->inject_count = 0;
     }
@@ -595,9 +772,11 @@ static int slot_release(slot_registry_token_t token, const char *why) {
 static void retry_releasing_slots(void) {
     for (uint32_t i = 0; i < MAX_SLOTS; i++) {
         slot_registry_entry_t entry;
-        if (slot_registry_snapshot_index(&g_slots, i, &entry) == SLOT_REGISTRY_OK &&
-            entry.state == SLOT_REGISTRY_RELEASING)
+        if(slot_registry_snapshot_index(&g_slots,i,&entry)!=SLOT_REGISTRY_OK)continue;
+        if (entry.state == SLOT_REGISTRY_RELEASING)
             slot_release(entry.token, "deferred VDA cleanup retry");
+        else if(entry.state==SLOT_REGISTRY_ACTIVE && entry.virtual_retiring)
+            delete_slot_vda(entry.token,(int)i,"cancelled pending cleanup retry");
     }
 }
 
@@ -855,7 +1034,7 @@ static void *usb_hid_thread(void *arg) {
     struct usb_fs_open     fs_open;
     struct usb_fs_start    start;
     struct usb_fs_complete complete;
-    uint8_t  buf[64];
+    uint8_t  buf[64] = {0};
     void    *buffers[1]; uint32_t lengths[1];
     int fd = -1, out_opened = 0, sc2_iface = 0, owns_session = 0;
     int haptics_ready = 0;
@@ -1070,6 +1249,7 @@ main_loop: ;
     usb_input_watchdog_t input_watchdog;
     usb_input_watchdog_init(&input_watchdog, (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u);
     while (!runtime_is_stopping()) {
+        pending_vda_poll(sc2_link && !sc2_parked && !game_hooks_input_active());
         if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0 ||
             usb_input_watchdog_expired(&input_watchdog,
                 (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u, 500)) {
@@ -1173,10 +1353,10 @@ main_loop: ;
                     eligible,&recovery_ops,&recovery_context);
                 if(session.recovery.pending)session.last_vda_attempt_ms=recovery_ms;
                 if(session.recovery.recovered!=before) {
-                    session.bind_ok=0;session.last_vdi_ret=-1;session.inject_count=0;
+                    session.bind_ok=0;session.bind_attempted=0;session.observed_handle=-1;session.last_bind_check=0;session.last_vdi_ret=-1;session.inject_count=0;
                     connection_notice(3,"SteamController-PS5: user-session recovery ready — choose a user with Steam/PS");
                 }
-                if(recovery_result<0)gp_log("slot[%d] user recovery deferred result=%d; retaining owned device\n",slot,recovery_result);
+                if(recovery_result<0 && recovery_result!=SLOT_REGISTRY_BUSY)gp_log("slot[%d] user recovery deferred result=%d; retaining owned device\n",slot,recovery_result);
             }
             slot_registry_entry_t diagnostic_slot;
             if(slot_registry_snapshot(&g_slots,slot_token,&diagnostic_slot)==0)
@@ -1334,6 +1514,7 @@ static int manager_create_virtual(uint32_t slot, int32_t *out_handle,
     context->virtual_handle = handle;
     *out_handle = handle;
     *out_bind_ok = bind_ok;
+    if(handle==VDA_ASYNC_HANDLE){*out_handle=-1;return SLOT_LIFECYCLE_CREATE_PENDING;}
     return handle < 0 ? -1 : 0;
 }
 
@@ -1421,6 +1602,7 @@ static void *controller_manager_thread(void *arg) {
     gp_log("Manager thread started (MAX_SLOTS=%d)\n", MAX_SLOTS);
 
     while (!runtime_is_stopping()) {
+        pending_vda_poll(1);
         observe_users();
         reap_finished_usb_workers();
         if (runtime_is_stopping()) break;
@@ -1651,6 +1833,19 @@ static int runtime_shutdown(void) {
     if (!g_manager_started && join_all_usb_workers() != 0)
         safe_to_release = 0;
 
+    /* Finish the one already-issued Add before final registry cleanup. There
+     * is no second Add and no retry of an unknown device. All USB owners joined. */
+    if(safe_to_release) {
+        for(unsigned i=0;i<350;i++) {
+            pending_vda_poll(0);
+            pthread_mutex_lock(&g_vda_create_lock);int pending=g_pending_vda.active;
+            pthread_mutex_unlock(&g_vda_create_lock);
+            if(!pending)break;
+            usleep(10000);
+        }
+        if(g_mbus_module) {dlclose(g_mbus_module);g_mbus_module=NULL;g_mbus_bind=NULL;g_mbus_loaded=0;}
+    }
+
     /* Game hooks own remote import changes and must complete their rollback
      * before their status or shared state is allowed to go away. */
     int hooks_stop_result = game_hooks_stop();
@@ -1761,7 +1956,8 @@ int main(void) {
     ret=scePadSetProcessPrivilege(1); gp_log("scePadSetProcessPrivilege: 0x%08x\n", ret);
     if (ret != 0) return fail_startup("scePadSetProcessPrivilege(1) failed");
 
-    /* VDA ownership never uses system log events. Passive hand-off observation
+    /* The optional hand-off observer is separate from the bounded, dedicated
+     * pending-registration reader. Passive hand-off observation
      * is unnecessary when that optional feature is disabled. */
     if (g_runtime_policy.enable_ds_handoff) {
         if (pthread_create(&g_klog_tid, NULL, klog_capture_thread, NULL)==0) {

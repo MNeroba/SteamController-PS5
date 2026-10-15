@@ -36,6 +36,7 @@ typedef struct {
     unsigned usb_sessions, vda_creates, vda_deletes, vda_create_failures, vda_delete_failures;
     int vda_create_result, vda_delete_result;
     vda_result_t vda_observation;
+    vda_pending_summary_t pending;
     diagnostic_usb_t usb[SLOT_REGISTRY_MAX_SLOTS];
     char logs[LOG_LINES][LOG_LINE_MAX];
     unsigned log_head, log_count;
@@ -78,6 +79,9 @@ void diagnostics_storage(const storage_status_t *status) {
     pthread_mutex_lock(&lock);
     state.storage=status ? *status : (storage_status_t){STORAGE_OK,0};
     pthread_mutex_unlock(&lock);
+}
+void diagnostics_vda_pending(vda_pending_summary_t observation) {
+    pthread_mutex_lock(&lock);state.pending=observation;pthread_mutex_unlock(&lock);
 }
 void diagnostics_vda_observation(vda_result_t result) {
     pthread_mutex_lock(&lock);
@@ -172,7 +176,7 @@ void diagnostics_vda_result(int creation, int result) {
     if (creation) {
         state.vda_creates++;
         state.vda_create_result = result;
-        if (result <= 0)
+        if (result <= 0 && (uint32_t)result!=UINT32_C(0x803b0006))
             state.vda_create_failures++;
     } else {
         state.vda_deletes++;
@@ -336,7 +340,7 @@ int diagnostics_report(char *out, size_t cap, const diagnostics_steam_t *steam) 
             "credentials, serials or unrelated system files are included.\n\n--- Startup ---\n");
     field(&w, "Stage", snap.startup);
     add(&w,
-        "Startup result: %d (0x%08x)\nWebUI status: %d (1=running, 0=stopped/disabled, "
+        "Startup result: %d (0x%08x)\nWebUI status: %d (2=running with session-only authentication, 1=running, 0=stopped/disabled, "
         "-1=unavailable)\n",
         snap.startup_error, (unsigned)snap.startup_error, snap.webui);
     add(&w,"WebUI storage stage: %s; errno=%d\n",storage_stage_name(snap.storage.stage),snap.storage.error);
@@ -358,6 +362,9 @@ int diagnostics_report(char *out, size_t cap, const diagnostics_steam_t *steam) 
         "validation.\n",
         snap.vda_creates, snap.vda_create_failures, (unsigned)snap.vda_create_result,
         snap.vda_deletes, snap.vda_delete_failures, (unsigned)snap.vda_delete_result);
+    add(&w,"VDA pending observation: %s; events=%u distinct=%u malformed=%u truncated=%u elapsed_ms=%llu errno=%d\n",
+        vda_pending_name(snap.pending.status),snap.pending.virtual_events,snap.pending.distinct_virtuals,
+        snap.pending.malformed,snap.pending.truncated,(unsigned long long)snap.pending.elapsed_ms,snap.pending.error);
     if(snap.vda_creates) add(&w,"VDA outcome: %s; changed output-word mask=0x%02x "
         "(not handle evidence)\n",vda_result_name(snap.vda_observation.kind),snap.vda_observation.changed_words);
     add(&w, "\n--- USB and virtual controller ---\n");
@@ -391,13 +398,13 @@ int diagnostics_report(char *out, size_t cap, const diagnostics_steam_t *steam) 
             (unsigned long long)u->late, (unsigned long long)u->failures,
             (unsigned long long)u->timeouts, (unsigned long long)u->protocol, u->watchdog);
         add(&w,
-            "Owned virtual pad: ready=%d creating=%d deleting=%d ambiguous=%d "
+            "Owned virtual pad: ready=%d creating=%d deleting=%d ambiguous=%d retiring=%d event-correlated=%d "
             "slot-state=%d\nBinding: console profile picker; account binding NOT confirmed by "
             "button activity\nUser observation: valid=%d signed-in=%d foreground-member=%d "
             "errors=%u logout-epoch=%u logged-out=%d\nRecovery: pending=%d delete-attempts=%u "
             "delete-failures=%u registrations=%u\n",
             u->slot.virtual_ready, u->slot.virtual_creating, u->slot.virtual_deleting,
-            u->slot.virtual_blocked, u->slot.state, u->users.read_ok, u->users.logged_users,
+            u->slot.virtual_blocked, u->slot.virtual_retiring, u->slot.virtual_correlated, u->slot.state, u->users.read_ok, u->users.logged_users,
             u->users.foreground_valid, u->users.read_errors, u->users.logout_epoch,
             u->users.logged_out, u->recovery.pending, u->recovery.attempts,
             u->recovery.deletion_failures, u->recovery.recovered);

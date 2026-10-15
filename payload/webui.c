@@ -49,6 +49,7 @@ void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/gho
 #define WEBUI_RESPONSE_TIMEOUT_MS 5000u
 
 static char g_webui_token[WEBUI_TOKEN_HEX_LENGTH + 1];
+static webui_auth_mode_t g_auth_mode;
 static pthread_t g_webui_thread;
 static int g_webui_thread_started;
 static int g_listener = -1;
@@ -89,16 +90,17 @@ static void reply(int fd, int code, const char *type, const char *body, size_t n
 #define REPLY_TXT(fd, code, s) reply(fd, code, "text/plain", s, strlen(s))
 
 static int initialize_webui_auth(void) {
-    int created = 0;
     storage_status_t storage;
-    int result=webui_auth_load_or_create_report(WEBUI_AUTH_DIRECTORY,g_webui_token,&created,&storage);
+    g_auth_mode=webui_auth_begin(WEBUI_AUTH_DIRECTORY,g_webui_token,&storage);
     diagnostics_storage(&storage);
-    if (result!=0) {
-        LOG("webui: storage initialization failed stage=%s errno=%d\n",
+    if (g_auth_mode==WEBUI_AUTH_FAILED) {
+        LOG("webui: authentication initialization failed stage=%s errno=%d\n",
             storage_stage_name(storage.stage),storage.error);
         return -1;
     }
-    if (created) LOG("webui: generated a private portal token at %s\n", WEBUI_TOKEN_PATH);
+    if (g_auth_mode==WEBUI_AUTH_SESSION)
+        LOG("webui: session-only authentication; persistent storage stage=%s errno=%d; pair again after restart\n",
+            storage_stage_name(storage.stage),storage.error);
     return 0;
 }
 
@@ -641,9 +643,10 @@ int webui_start(webui_notify_fn notify) {
         notify("SteamController-PS5 — WebUI unavailable: server thread failed"); return -1;
     }
     g_webui_thread_started = 1;
-    diagnostics_webui(1);
-    char message[160];
-    snprintf(message, sizeof(message), "SteamController-PS5 — WebUI ready on port %d. Pairing code: %s (5 min)", WEBUI_PORT, code);
+    diagnostics_webui(g_auth_mode==WEBUI_AUTH_SESSION ? 2 : 1);
+    char message[240];
+    snprintf(message, sizeof(message), "SteamController-PS5 — WebUI ready on port %d. Pairing code: %s (5 min)%s", WEBUI_PORT, code,
+             g_auth_mode==WEBUI_AUTH_SESSION ? ". Session only: pair again after restart; profile saving may be unavailable." : "");
     notify(message); /* Local UI only: never pass this message to LOG. */
     memset(code, 0, sizeof(code)); memset(message, 0, sizeof(message));
     LOG("webui: listener ready on port %d; local pairing enabled\n", WEBUI_PORT);

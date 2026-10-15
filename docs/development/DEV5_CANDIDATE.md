@@ -1,3 +1,15 @@
+# dev.5 — M1-246 candidate update (2026-10-16)
+
+Owner explicitly authorized the analogous event-correlation approach for this stage and then dev.5 publication for the log author's test. This supersedes M1-245's withheld-publication instruction below. No published release is claimed until acknowledged.
+
+Implemented: one asynchronous pending Add/registry reservation; bounded fresh virtual-event identification, cancellation/release/failed-delete retention; Steam/PS-triggered local MBus with connected/unknown native protection and picker fallback; queued short PS action; typed secret-free diagnostics; operational-storage fallback to a new session-only CSPRNG credential. No Shell patches, native disconnect/unbind, storage migration, radio changes or second ELF. Actual Add/VDI/MBus contract and physical coexistence remain NOT_RUN; correlation across other payloads is an explicitly accepted experimental limitation. See [contract and tester checklist](VDA_PENDING.md).
+
+Final local and exact-source CI/release receipts are appended to project-memory/TEST_LOG.md and SESSION_LOG.md. Earlier counts/checksums below describe the M1-245 binary only, not this updated candidate.
+
+---
+
+## Historical M1-245 checkpoint
+
 # dev.5 candidate — preparation only
 
 2026-10-15 · M1-245 · SDK v0.43 · owner explicitly withheld publication

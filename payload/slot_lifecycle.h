@@ -15,6 +15,10 @@ typedef enum {
     SLOT_LIFECYCLE_WORKER_START_FAILED = -5
 } slot_lifecycle_result_t;
 
+/* A pending callback performed one Add and owns asynchronous completion.
+ * The registry reservation MUST remain until finish_pending, even on release. */
+#define SLOT_LIFECYCLE_CREATE_PENDING 1
+
 typedef struct {
     int (*create_virtual)(uint32_t slot, int32_t *out_handle,
                           int *out_bind_ok, void *context);
@@ -44,9 +48,16 @@ int slot_lifecycle_release(slot_registry_t *registry,
 
 int slot_lifecycle_attach(slot_registry_t *registry, slot_registry_token_t token,
                           const slot_lifecycle_ops_t *ops, void *context, int *bind_ok);
-typedef struct { uint32_t epoch, attempts, recovered, deletion_failures; int pending; } slot_recovery_t;
+typedef struct { uint32_t epoch, attempts, recovered, deletion_failures; int pending, awaiting_create; } slot_recovery_t;
 /* Called only by the existing USB worker at report boundaries. No USB I/O,
  * mapping reset or thread restart. eligibility excludes pause/release/sleep. */
 int slot_lifecycle_recover(slot_registry_t *registry, slot_registry_token_t token,
                            slot_recovery_t *recovery, const user_session_snapshot_t *users,
                            int eligible, const slot_lifecycle_ops_t *ops, void *context);
+
+/* Finalize owner-authorized event correlation without creating another device.
+ * Cancel/release finishes identification then deletes through registry ownership;
+ * failed deletion keeps the receipt and prevents another Add. */
+int slot_lifecycle_finish_pending(slot_registry_t *registry,slot_registry_token_t token,
+                                   uint64_t device_id,int cancelled,
+                                   const slot_lifecycle_ops_t *ops,void *context);

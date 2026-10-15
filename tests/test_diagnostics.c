@@ -79,6 +79,9 @@ int main(void) {
     assert(strstr(out, "0x803B0006") && strstr(out, "My\\x0aProfile\\x1b"));
     assert(!strstr(out, "supersecret") && !strstr(out, "12345678") && !strstr(out, "01:23:45") &&
            !strstr(out, "0123456789abcdef") && !strstr(out, "0x10000000") && !strchr(out, '\033'));
+    diagnostics_vda_result(1,(int32_t)UINT32_C(0x803b0006));
+    assert(diagnostics_report(out,sizeof(out),&s)>0);
+    assert(strstr(out,"create-attempts=2 failures=1"));
     char huge[8192];memset(huge,'x',sizeof(huge));huge[sizeof(huge)-1]=0;
     diagnostics_log(huge,1900);assert(diagnostics_report(out,sizeof(out),&s)>0);
     char small[32];

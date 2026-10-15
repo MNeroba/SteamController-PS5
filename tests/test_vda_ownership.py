@@ -49,6 +49,21 @@ class VdaOwnershipTests(unittest.TestCase):
         self.assertIn("(ret > 0) ? ret : -1", body,
                       "only the positive AddDevice return is accepted as owned")
 
+    def test_pending_path_keeps_one_reservation_and_has_no_shell_fallback(self):
+        body = function_body(self.gc_main, "static void pending_vda_poll(",
+                             "static int worker_create_virtual(")
+        self.assertIn("slot_lifecycle_finish_pending", body)
+        self.assertIn("vda_pending_candidate", body)
+        self.assertIn("scePadGetHandle", body)  # rejection only
+        self.assertNotIn("scePadVirtualDeviceAddDevice", body)
+        self.assertNotIn("shellui_pad_", body)
+        self.assertIn("g_pending_vda.cancelled=1", body)
+        bind = function_body(self.gc_main, "static void bind_owned_vda(", "static void inject_pad(")
+        self.assertIn("vda_bind_target", bind)
+        self.assertIn("sceMbusBindDeviceWithUserId", bind)
+        for forbidden in ("sceMbusDisconnectDevice", "sceMbusUnbindDevice", "ptrace", "kernel_set_"):
+            self.assertNotIn(forbidden, bind)
+
     def test_shellui_stubs_delete_only_the_handle_returned_by_their_vda_call(self) -> None:
         for signature, end_signature in (
             ("void shellui_stub(void *arg)\n{", "void shellui_stub_end(void)"),

@@ -1,4 +1,13 @@
-# Current status — 2026-10-14
+# Current status — 2026-10-16
+
+## M1-246 — current dev.5 execution, 2026-10-16
+
+Owner explicitly authorizes the analogous event-correlation approach temporarily and publishing dev.5 for the log author's controlled test. Baseline main6e1e82fefe3b9ae4408fb5d4540cc485a1ca4b03 has294 files; Host38805657403/SDK38805657360 succeeded, no open PR. Complete-tree source publication and manual DEV workflow must follow final validation, with no historical asset changes.
+
+Implemented: one asynchronous Add/reservation, bounded fresh typed virtual-event reader, receipt provenance, cancelled/retiring cleanup and global failed-cleanup barrier; native exclusion and Steam/PS-only guarded local MBus/picker fallback, queued150ms PS action; protected RAM-only auth after operational storage failure; expanded secret-free stage/errno/count diagnostics and first-IN zero initialization. Existing USB/Steam/profile/tile security and SDKv0.43 retained. See docs/development/VDA_PENDING.md and ADR061/062.
+
+Priority status: P0 actual Add/VDI/MBus contract and native coexistence BLOCKED_HARDWARE; operational correlation implemented under explicit owner acceptance, not proven exclusive ownership. P1 exact tester storage errno still unknown; reporting/session-only fallback host-verified. P1 USB shutdown/reconnect host fault suites pass, physical ioctl/cleanup timing NOT_RUN. No PS5/radio/firmware/tile operation performed. No release acknowledgement yet; local/exact-source final checks and release receipt follow in TEST_LOG/SESSION_LOG.
+
 
 
 

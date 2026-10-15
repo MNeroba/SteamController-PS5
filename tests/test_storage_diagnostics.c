@@ -9,15 +9,16 @@
 #include <assert.h>
 #include <string.h>
 #include <stdarg.h>
-static int chmod_calls, fault, stat_calls, checks;
+static int chmod_calls, fault, stat_calls, checks, random_opens;
 enum { NONE, SYNC_FAIL, WRITE_FAIL, RANDOM_OPEN_FAIL, READ_FAIL, FILE_CLOSE_FAIL,
-       DIR_CLOSE_FAIL, STAT_FAIL, FOREIGN_DIR, FOREIGN_FILE };
+       DIR_CLOSE_FAIL, STAT_FAIL, FOREIGN_DIR, FOREIGN_FILE, VOLATILE_RANDOM_FAIL };
 static int no_chmod(int fd, mode_t mode) {
     (void)fd; (void)mode; ++chmod_calls; errno=EOPNOTSUPP; return -1;
 }
 static int test_open(const char *path,int flags,...) {
     mode_t mode=0;
     if (flags&O_CREAT) { va_list ap;va_start(ap,flags);mode=(mode_t)va_arg(ap,int);va_end(ap); }
+    if (fault==VOLATILE_RANDOM_FAIL && !strcmp(path,"/dev/urandom") && random_opens++) {errno=ENXIO;return -1;}
     if (fault==RANDOM_OPEN_FAIL && !strcmp(path,"/dev/urandom")) { errno=ENXIO;return -1; }
     return open(path,flags,mode);
 }
@@ -34,7 +35,7 @@ static ssize_t test_read(int fd,void *data,size_t n) {
     return read(fd,data,n);
 }
 static ssize_t test_write(int fd,const void *data,size_t n) {
-    if (fault==WRITE_FAIL) { errno=ENOSPC;return -1; }
+    if (fault==WRITE_FAIL || fault==VOLATILE_RANDOM_FAIL) { errno=ENOSPC;return -1; }
     return write(fd,data,n);
 }
 static int test_sync(int fd) {
@@ -106,6 +107,34 @@ int main(void) {
     fd=open(path,O_CREAT|O_WRONLY,0600);CHECK(fd>=0);char bad[65];memset(bad,'z',64);bad[64]='\n';
     CHECK(write(fd,bad,sizeof(bad))==(ssize_t)sizeof(bad));CHECK(close(fd)==0);
     rejected(NONE,STORAGE_TOKEN_FORMAT,EINVAL);CHECK(unlink(path)==0);CHECK(rmdir(directory)==0);
+    /* Operational write failure may use a fresh RAM token; existing corrupt,
+     * foreign or insecure credentials must still fail closed. */
+    CHECK(mkdir(directory,0700)==0);
+    fault=WRITE_FAIL;
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_SESSION);
+    CHECK(webui_token_is_valid(out));CHECK(status.stage==STORAGE_TOKEN_WRITE && status.error==ENOSPC);
+    CHECK(access(path,F_OK)==-1);char session_token[65];memcpy(session_token,out,sizeof(out));
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_SESSION);
+    CHECK(strcmp(session_token,out)!=0);
+    fault=VOLATILE_RANDOM_FAIL;random_opens=0;
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_FAILED);
+    CHECK(status.stage==STORAGE_RANDOM_OPEN && status.error==ENXIO);
+    for(size_t i=0;i<sizeof(out);i++)CHECK(out[i]==0);
+    fault=RANDOM_OPEN_FAIL;memset(out,'x',sizeof(out));
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_FAILED);
+    CHECK(status.stage==STORAGE_RANDOM_OPEN);
+    for(size_t i=0;i<sizeof(out);i++)CHECK(out[i]==0);
+    fault=NONE;
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_PERSISTENT);
+    CHECK(webui_token_is_valid(out));
+    CHECK(chmod(path,0644)==0);
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_FAILED);
+    CHECK(status.stage==STORAGE_TOKEN_MODE);CHECK(out[0]==0);CHECK(chmod(path,0600)==0);
+    fault=FOREIGN_FILE;CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_FAILED);
+    CHECK(status.stage==STORAGE_TOKEN_OWNER);fault=NONE;
+    CHECK(unlink(path)==0);CHECK(symlink("missing",path)==0);
+    CHECK(webui_auth_begin(directory,out,&status)==WEBUI_AUTH_FAILED);
+    CHECK(unlink(path)==0);CHECK(rmdir(directory)==0);
     CHECK(!strcmp(storage_stage_name((storage_stage_t)-1),"unknown"));
     printf("storage diagnostics: %d checks passed\n",checks);return 0;
 }

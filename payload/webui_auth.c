@@ -247,3 +247,42 @@ int webui_auth_load_or_create(const char *directory,
                               char token[WEBUI_TOKEN_HEX_LENGTH+1],int *created) {
     return webui_auth_load_or_create_report(directory,token,created,NULL);
 }
+
+/* Deliberately narrow: never recover from a token read/format/owner/type/mode
+ * rejection, symlink, malformed path or failed entropy source. */
+static int session_storage_failure(const storage_status_t *s) {
+    if (s->error!=EROFS && s->error!=ENOSPC && s->error!=EDQUOT &&
+        s->error!=EOPNOTSUPP && s->error!=ENOSYS && s->error!=EIO &&
+        s->error!=EACCES && s->error!=EPERM) return 0;
+    switch(s->stage) {
+        case STORAGE_DIRECTORY_OPEN: case STORAGE_DIRECTORY_CREATE:
+        case STORAGE_DIRECTORY_CHMOD: case STORAGE_DIRECTORY_CLOSE:
+        case STORAGE_TOKEN_CREATE: case STORAGE_TOKEN_CHMOD:
+        case STORAGE_TOKEN_WRITE: case STORAGE_TOKEN_SYNC: case STORAGE_TOKEN_CLOSE:
+            return 1;
+        default:return 0;
+    }
+}
+webui_auth_mode_t webui_auth_begin(const char *directory,
+                                  char token[WEBUI_TOKEN_HEX_LENGTH+1],
+                                  storage_status_t *status) {
+    storage_status_t local;
+    if (!status)status=&local;
+    if(webui_auth_load_or_create_report(directory,token,NULL,status)==0)
+        return WEBUI_AUTH_PERSISTENT;
+    if (!token || !session_storage_failure(status))return WEBUI_AUTH_FAILED;
+    unsigned char random[WEBUI_TOKEN_HEX_LENGTH/2]={0};
+    storage_status_t entropy;
+    if(secure_random_report(random,sizeof(random),&entropy)!=0) {
+        erase_secret(random,sizeof(random));
+        erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
+        *status=entropy;return WEBUI_AUTH_FAILED;
+    }
+    static const char hex[]="0123456789abcdef";
+    for(size_t i=0;i<sizeof(random);i++) {
+        token[2*i]=hex[random[i]>>4];token[2*i+1]=hex[random[i]&15];
+    }
+    token[WEBUI_TOKEN_HEX_LENGTH]=0;
+    erase_secret(random,sizeof(random));
+    return WEBUI_AUTH_SESSION;
+}

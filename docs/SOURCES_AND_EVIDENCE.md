@@ -78,3 +78,8 @@ Puckbridge78460113 and OmniPadb7682ef remain their actual HEADs. Latest LibrePad
 ## dev.5 source review — 2026-10-15 (M1-245)
 
 Actual Puck78460113/Omnib7682ef/Libre28a3bfe HEADs remain unchanged. LibrePad core/storage.c blob1ba3260253800fdb324ad4cfd404f081f045ed4b preserves operation stages/errno; app/main.c:52–64 reports them. Reference only; no storage migration or implementation copied. Its virtual_controller:519–590 and OmniPad firmware guide use klog/MBus/Shell techniques which do not prove this payload's device ownership. Public OpenOrbis Pad.h declares VDA unreversed and PS5 export stubs only prove symbol availability. Keep the safe-receipt hardware/source blocker; no guessed fallback or compatibility claim.
+
+
+## M1-246 — 2026-10-16
+
+LibrePad main remains28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc (connected API checked); virtual_controller.c:43/338/519–590/878–891 provides event correlation, ID-low32 and local MBus/native-read API references. The owner now explicitly accepts the analogous approach temporarily. Implemented independently in the existing registry/lifecycle with a bounded observer and conservative native gating. This supersedes the earlier no-correlation policy, not the evidence limitation: true Add/VDI/MBus ABI and physical coexistence remain HYPOTHESIS/NOT_RUN. No source establishes zero risk or exclusive attribution across unrelated payloads. See development/VDA_PENDING.md; no implementation or new asset copied.

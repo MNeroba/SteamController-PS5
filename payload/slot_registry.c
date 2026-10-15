@@ -214,6 +214,7 @@ int slot_registry_take_virtual(slot_registry_t *registry,
         *out_handle = entry->virtual_ready ? entry->virtual_handle : -1;
         entry->virtual_ready = 0;
         entry->virtual_handle = -1;
+        entry->virtual_device_id = 0; entry->virtual_correlated = 0; entry->virtual_retiring=0;
         entry->confirmed = 0;
     }
     pthread_mutex_unlock(&registry->mutex);
@@ -257,6 +258,7 @@ int slot_registry_delete_virtual(slot_registry_t *registry,
             result = SLOT_REGISTRY_DELETE_FAILED;
         } else {
             entry->virtual_handle = -1;
+            entry->virtual_device_id = 0; entry->virtual_correlated = 0; entry->virtual_retiring=0;
         }
     }
     pthread_mutex_unlock(&registry->mutex);
@@ -314,15 +316,19 @@ int slot_registry_begin_virtual_create(slot_registry_t *r, slot_registry_token_t
     if(!r || !r->initialized)return SLOT_REGISTRY_ERROR;
     pthread_mutex_lock(&r->mutex);
     slot_registry_entry_t *e=find_token_locked(r,t);int rc=SLOT_REGISTRY_OK;
-    int creating=0;
-    for(unsigned i=0;i<SLOT_REGISTRY_MAX_SLOTS;i++)
-        creating |= r->entries[i].virtual_creating;
+    int creating=0,cleanup_pending=0;
+    for(unsigned i=0;i<SLOT_REGISTRY_MAX_SLOTS;i++) {
+        slot_registry_entry_t *other=&r->entries[i];
+        creating |= other->virtual_creating;
+        cleanup_pending |= other->virtual_deleting || other->virtual_retiring ||
+            (other->state==SLOT_REGISTRY_RELEASING && other->virtual_ready);
+    }
     if(!e)rc=SLOT_REGISTRY_STALE;
-    else if(r->creation_blocked || creating || (e->state!=SLOT_REGISTRY_ACTIVE && e->state!=SLOT_REGISTRY_RESERVED) || e->virtual_ready || e->virtual_deleting || e->virtual_blocked)rc=SLOT_REGISTRY_BUSY;
+    else if(r->creation_blocked || creating || cleanup_pending || (e->state!=SLOT_REGISTRY_ACTIVE && e->state!=SLOT_REGISTRY_RESERVED) || e->virtual_ready || e->virtual_deleting || e->virtual_blocked)rc=SLOT_REGISTRY_BUSY;
     else e->virtual_creating=1;
     pthread_mutex_unlock(&r->mutex);return rc;
 }
-int slot_registry_finish_virtual_create(slot_registry_t *r,slot_registry_token_t t,int32_t h) {
+static int finish_create(slot_registry_t *r,slot_registry_token_t t,int32_t h,uint64_t id,int retiring) {
     if(!r || !r->initialized)return SLOT_REGISTRY_ERROR;
     pthread_mutex_lock(&r->mutex);
     slot_registry_entry_t *e=find_token_locked(r,t);int rc=SLOT_REGISTRY_OK;
@@ -345,8 +351,17 @@ int slot_registry_finish_virtual_create(slot_registry_t *r,slot_registry_token_t
                     e->virtual_blocked=1;r->creation_blocked=1;rc=SLOT_REGISTRY_HANDLE_IN_USE;break;
                 }
             }
-            if(rc==SLOT_REGISTRY_OK) {e->virtual_handle=h;e->virtual_ready=1;e->confirmed=0;}
+            if(rc==SLOT_REGISTRY_OK) {e->virtual_handle=h;e->virtual_ready=1;e->confirmed=0;e->virtual_device_id=id;e->virtual_correlated=id!=0;e->virtual_retiring=retiring || e->state==SLOT_REGISTRY_RELEASING;}
         }
     }
     pthread_mutex_unlock(&r->mutex);return rc;
+}
+
+int slot_registry_finish_virtual_create(slot_registry_t *r,slot_registry_token_t t,int32_t h) {
+    return finish_create(r,t,h,0,0);
+}
+int slot_registry_finish_correlated_create(slot_registry_t *r,slot_registry_token_t t,uint64_t id,int retiring) {
+    uint32_t h=(uint32_t)id;
+    if(!id || !h || h>INT32_MAX)return finish_create(r,t,-1,0,0);
+    return finish_create(r,t,(int32_t)h,id,retiring);
 }

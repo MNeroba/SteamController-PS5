@@ -23,6 +23,9 @@ class UsbDetachContract(unittest.TestCase):
         self.assertLess(mapped, detached)
         self.assertIn("goto exit_slot;", worker[matched:mapped])
 
+    def test_first_input_buffer_starts_neutral_before_any_usb_start(self):
+        self.assertIn("uint8_t  buf[64] = {0};", MAIN)
+
     def test_probe_is_identity_only_and_never_initializes_usbfs(self):
         start = MAIN.index("static int probe_one_path(")
         end = MAIN.index("/* ── Create VDA", start)

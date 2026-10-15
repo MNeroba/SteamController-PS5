@@ -54,3 +54,8 @@ EXTERNAL_HARDWARE adverse report, not a gate pass. Supplied comment: Payload Man
 
 
 M1-245 dev.5: protected-storage/logging changes have host/build evidence only. The actual tester storage errno and pending VDA receipt ABI remain unknown. No H-row changes, no compatibility assertion; candidate/source prepared without publication. H09 must inspect precise storage stage/error and verify privacy in raw/diagnostic logs; H14 must establish owned pending receipt/assignment before any release.
+
+
+## M1-246 dev.5 controlled-test preparation — 2026-10-16
+
+Owner authorizes experimental dev.5 publication for the external log author's test; no hardware run occurred here. P0 Add return/event/low32 VDI/MBus contract, user picker/native coexistence, P1 actual storage-stage/errno and USB shutdown/reconnect on USB-C/Puck remain NOT_RUN. Owner console13.60 and tester's earlier5.50 are reports, not measured compatibility. Follow docs/development/VDA_PENDING.md with exact selected source/ELF digest and measured console/loader/transport; no account IDs/serials. Host-injected ENOSPC28 and synthetic events are not console results.

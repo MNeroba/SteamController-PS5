@@ -4,18 +4,20 @@ DEV entries describe software and build verification. They do not establish phys
 
 ## v0.1.0-dev.5
 
-Unpublished candidate. VDA ownership on the observed pending-assignment path remains blocked; physical PS5 operation is unverified.
+Owner-approved experimental candidate. Pending registration uses event correlation; the actual PS5 ABI and native-controller coexistence remain unverified.
 
 ### Bug Fixes
 
+- Handled pending virtual-controller registration without repeating device creation or restarting USB input; cancelled registration retains cleanup ownership (host-tested; PS5 verification pending).
+- Prevented reconnect from creating another virtual controller while earlier cleanup is unresolved (host-tested).
 - Avoided unnecessary permission changes when the settings directory and new credential file already have the required private permissions (host-tested).
-- Removed account identifiers from raw application logs and disabled the optional system-log observer in Safe Mode (host-tested).
+- Removed account identifiers from raw application logs and disabled the optional handoff log observer in Safe Mode (host-tested).
 - Preserved the original storage error through cleanup and cleared partial credentials after failed initialization (host-tested).
 
 ### New Features / Improvements
 
-- Added precise storage-stage and errno diagnostics without exposing credentials or account IDs.
-- Distinguished pending virtual-controller assignment from generic creation errors; kept ownership restrictions and the no-repeat safeguard. This does not establish working PS5 registration.
+- Added bounded registration diagnostics and precise storage-stage/errno reporting without exposing credentials or account IDs.
+- Added protected session-only WebUI access when persistent credential storage fails; pairing and authentication remain required.
 
 ## v0.1.0-dev.4
 

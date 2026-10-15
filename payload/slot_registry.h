@@ -38,6 +38,9 @@ typedef struct {
     uint16_t vendor_id;
     uint16_t product_id;
     int32_t virtual_handle;
+    uint64_t virtual_device_id; /* private MBus identity; never expose account IDs */
+    int virtual_retiring; /* cancellation cleanup unresolved: never inject */
+    int virtual_correlated; /* owner-authorized event correlation, NOT a direct ABI receipt */
     int virtual_ready;
     int virtual_deleting;
     int virtual_creating;
@@ -105,3 +108,9 @@ uint32_t slot_registry_count_claimed(slot_registry_t *registry);
  * lifetime: it does not prove AddDevice had no system-side effect. */
 int slot_registry_begin_virtual_create(slot_registry_t *registry, slot_registry_token_t token);
 int slot_registry_finish_virtual_create(slot_registry_t *registry, slot_registry_token_t token, int32_t handle);
+
+/* Owner-authorized experimental LibrePad-style correlation. Only a unique,
+ * complete, typed virtual event from the exact reserved creation window may
+ * reach this API. ID low32 is the upstream-derived VDI handle hypothesis. */
+int slot_registry_finish_correlated_create(slot_registry_t *registry,
+                                           slot_registry_token_t token,uint64_t device_id,int retiring);

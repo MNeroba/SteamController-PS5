@@ -78,7 +78,38 @@ static void test_global_creation_reservation(void) {
     assert(slot_lifecycle_release(&r,b,del,&f)==0 && f.deletes==0);
     slot_registry_destroy(&r);
 }
+static int deferred_create(uint32_t slot,int32_t *h,int *bind,void *ctx) {
+    fake_t *f=ctx;(void)slot;f->creates++;*h=-1;*bind=0;return 1;
+}
+static void test_async_pending(void) {
+    slot_registry_t r;slot_registry_token_t t;slot_registry_entry_t e;
+    assert(slot_registry_init(&r)==0);
+    assert(slot_registry_claim(&r,"pending",0x28de,0x1304,&t)==0);
+    assert(slot_registry_activate(&r,t)==0);
+    fake_t f={.r=&r,.t=t};slot_lifecycle_ops_t ops={.create_virtual=deferred_create,.delete_virtual=del};
+    assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    assert(slot_registry_snapshot(&r,t,&e)==0 && e.virtual_creating && !e.virtual_ready);
+    for(int n=0;n<32;n++)assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    assert(f.creates==1 && !r.creation_blocked);
+    assert(slot_registry_request_release(&r,t)==0);
+    assert(slot_registry_release(&r,t)==SLOT_REGISTRY_BUSY);
+    assert(slot_lifecycle_finish_pending(&r,t,0xd030d,0,&ops,&f)==0);
+    assert(f.deletes==1);
+    assert(slot_registry_snapshot(&r,t,&e)==0 && !e.virtual_ready && e.state==SLOT_REGISTRY_RELEASING);
+    assert(slot_lifecycle_release(&r,t,del,&f)==0);
+    assert(slot_registry_claim(&r,"pending-again",0x28de,0x1304,&t)==0);
+    assert(slot_registry_activate(&r,t)==0);f.t=t;
+    assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    f.fail_delete=1;
+    assert(slot_lifecycle_finish_pending(&r,t,0xd030e,1,&ops,&f)==SLOT_REGISTRY_DELETE_FAILED);
+    assert(slot_registry_snapshot(&r,t,&e)==0 && e.virtual_ready && e.virtual_correlated);
+    assert(e.virtual_device_id==0xd030e && e.virtual_handle==0xd030e);
+    assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    f.fail_delete=0;assert(slot_lifecycle_release(&r,t,del,&f)==0);
+    slot_registry_destroy(&r);
+}
 int main(void) {
+    test_async_pending();
     test_global_creation_reservation();
     test_unattributable_creation_never_retries();
     slot_registry_t r;

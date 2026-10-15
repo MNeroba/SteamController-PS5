@@ -245,6 +245,18 @@ int main(void) {
                                &cleanup) == SLOT_LIFECYCLE_INVALID);
     CHECK(slot_registry_count_claimed(&registry) == 0);
 
+    /* A worker-start failure during async Add cannot free its generation. */
+    slot_registry_destroy(&registry);CHECK(slot_registry_init(&registry)==0);
+    token=claim(&registry,&manager,"pending-worker-failure");
+    manager.create_result=SLOT_LIFECYCLE_CREATE_PENDING;manager.worker_result=-1;
+    manager.delete_result=0;manager.bind_ok=0;
+    CHECK(slot_lifecycle_start(&registry,token,1,&ops,&manager,&cleanup)==SLOT_LIFECYCLE_WORKER_START_FAILED);
+    CHECK(cleanup==SLOT_REGISTRY_BUSY);
+    CHECK(slot_registry_snapshot(&registry,token,&entry)==0 && entry.virtual_creating && entry.state==SLOT_REGISTRY_RELEASING);
+    CHECK(slot_lifecycle_finish_pending(&registry,token,0x70107,0,&ops,&manager)==0);
+    CHECK(slot_lifecycle_release(&registry,token,fake_delete_virtual,&manager)==0);
+    CHECK(slot_registry_count_claimed(&registry)==0);
+
     pthread_t workers[SLOT_REGISTRY_MAX_SLOTS];
     lifecycle_worker_args_t worker_args[SLOT_REGISTRY_MAX_SLOTS];
     for (unsigned i = 0; i < SLOT_REGISTRY_MAX_SLOTS; i++) {
