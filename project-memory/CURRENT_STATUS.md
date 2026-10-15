@@ -2,6 +2,9 @@
 
 
 
+
+M1-245 exact-source CI ACK: 05587f209d8171d0e9492ce87bb6224ece3c8b63 Host38805088725/job116663752470 and SDK38805088852 completed/success. All normal46 C/Python, sanitizer and Chromium220 steps pass remotely. Exact local export repeats normal/sanitizer/SDK build; selected SHA/version and exact tile PNG/param embedded. Local candidate2047056 bytes/SHA25672e8bc941809ece3f7a693e4a3ea2a39c5a82d47951b4122ce4e09e910dd9841, not a published Linux release. Exact host logbc16b88f536629ccef3439906016d62295fc29d14fc86e218f54bb3e0b5313c2; sanitizecb6f4c0edd51c05cf09ff5df46367cbeda4704ea553024355c57c49d470f8359; buildda9a848417ca12011b6b324ff9add71a16f30ddaa1128f2dec530303cddf5bae. GitHub releases remain dev.1–dev.4 and matching tag enumeration contains no dev.5. No manual dispatch/publication/physical action. Gate remains blocked for VDA ownership; actual PS5 storage cause unverified. Next: source-proven receipt/assignment ABI or separately approved controlled measured hardware capture, then repeat full gates before asking for release approval.
+
 ## dev.5 candidate — M1-245, 2026-10-15
 
 Owner requested fixes and preparation WITHOUT publication. Source baseline910f90371971fba08b2b1f375c7c61144617dfdf/tree d96fe30f296039025d4c82d16d8222dbc824bbde has288 files; all production bytes matched. Storage diagnostics and redundant chmod regression fixed; known account fields filtered before raw sinks, Safe Mode klog observer disabled, optional bridge text accounts redacted. Version/metadata/changelog/workflow defaultdev.5. Normal46 C/Python, full ASan/UBSan, Chromium220, SDKv0.43/45 C/dependency/determinism and targeted static analysis pass locally. Real DEV packager correctly rejects the unchanged P0 critical blocker before assets.

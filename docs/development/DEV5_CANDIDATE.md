@@ -29,3 +29,8 @@ AGENTS.md requires unambiguous ownership and prohibits unknown ABI calls with si
 - Physical PS5/storage/USB/VDA/user assignment/native DualSense/Settings tile: NOT_RUN. No known FW compatibility claimed.
 
 Exact commands, logs, candidate source identity and local ELF checksum are recorded in project-memory/TEST_LOG.md. Source changes may be pushed for review under the existing direct-main policy. No dev.5 release/tag/workflow dispatch is authorized. Historical dev.1–dev.4 assets/tags remain unchanged; the candidate metadata URL is a future location, not an available download.
+
+
+## Exact-source candidate receipt
+
+Source [`05587f209d8171d0e9492ce87bb6224ece3c8b63`](https://github.com/MNeroba/SteamController-PS5/commit/05587f209d8171d0e9492ce87bb6224ece3c8b63), complete294-file treecea4b15351d7d4435bdc86d508f09eb2486b4cf3. [Host38805088725](https://github.com/MNeroba/SteamController-PS5/actions/runs/38805088725) and [SDK38805088852](https://github.com/MNeroba/SteamController-PS5/actions/runs/38805088852) completed/success. Fresh Git-SHA-verified export repeats normal/sanitizer/SDK/dependency successfully. Local single ELF2047056 bytes; SHA256 `72e8bc941809ece3f7a693e4a3ea2a39c5a82d47951b4122ce4e09e910dd9841`; selected source/version and exact tile icon/metadata verified embedded. Local binary and checksum are in ignored output/dev5-candidate with BLOCKED status. This is not a released or hardware-validated binary; no dev.5 GitHub Release/tag exists. The actual packager remains blocked by P0-VDA-PENDING-04.
