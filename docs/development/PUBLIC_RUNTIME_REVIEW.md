@@ -1,5 +1,7 @@
 # Runtime safety review before public source access
 
+**Historical runtime audit and dev.4 publication.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+
 2026-10-14 · M1-242 · SDK v0.43 · intended FW13.60, hardware unverified
 
 **2026-10-15 update:** external dev.4 and complete previous-run logs now exist. Puck decoding is observed, but VDA ownership and token initialization fail. This supersedes the earlier comment-only evidence limitation and blocks future DEV publication. See [external runtime analysis](EXTERNAL_RUNTIME_REPORT.md). The source fixes below remain host-verified; they do not establish a working console backend.

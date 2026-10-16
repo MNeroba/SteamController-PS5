@@ -4,7 +4,7 @@ SteamController-PS5 is experimental software for a development console. Host tes
 
 ## Versions and updates
 
-The current experimental version is **v0.1.0-dev.4**. Report reproducible defects against current `main` or identify the exact release/source SHA. Earlier DEV builds remain available for historical evidence; there is no promise of separate maintenance branches or backported security fixes. Review the [changelog](CHANGELOG.md) and [release notes](https://github.com/MNeroba/SteamController-PS5/releases) before updating.
+The current experimental version is **v0.1.0-dev.5**. Report reproducible defects against current `main` or identify the exact release/source SHA. Earlier DEV builds remain available for historical evidence; there is no promise of separate maintenance branches or backported security fixes. Review the [changelog](CHANGELOG.md) and [release notes](https://github.com/MNeroba/SteamController-PS5/releases) before updating.
 
 ## Report a vulnerability privately
 
@@ -25,6 +25,8 @@ This is a solo-maintained project. No response deadline, bug bounty or coordinat
 - Keep the native DualSense available. Game hooks, bridge probing and DualSense handoff remain disabled by default; native Bluetooth LE is not enabled.
 - The optional Settings tile requires authenticated explicit confirmation. It is not automatically installed and does not start the payload after reboot.
 - Do not obtain reproduction evidence by taking over the stock radio, flashing firmware, invoking unknown side-effecting APIs or making unreviewed system changes.
+- RAM-only fallback uses a new session credential after eligible operational storage failures; unsafe existing credentials still fail closed. Profile persistence is independent of this fallback.
+- Pending VDA recovery uses temporal event correlation, which is not exclusive ownership proof. Keep other virtual-controller payloads stopped; native coexistence still needs PS5 testing.
 - Diagnostic reports are bounded and filtered, but review profile names, USB paths and contextual details before sharing them publicly.
 
 [Loading and recovery](docs/development/LOADING.md) · [Contribution rules](CONTRIBUTING.md) · [Hardware test plan](docs/TEST_PLAN.md)

@@ -2,7 +2,7 @@
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
-Current experimental download: [dev/v0.1.0-dev.4](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.4), one ELF built from `a5c20346392eac0eb9fa04cc201cd214e2957363`. Its SHA-256 is `34ae9fa0d55f8fdadbec4384d4171b029243e2fc6d0eb94a3d0120a6165f9ea4`. Download the matching checksum from the same release; do not substitute a local build digest. This version contains the host-verified [runtime safety fixes](https://github.com/MNeroba/SteamController-PS5/blob/a5c20346392eac0eb9fa04cc201cd214e2957363/docs/development/PUBLIC_RUNTIME_REVIEW.md); physical PS5 compatibility remains unverified.
+Current experimental download: [dev/v0.1.0-dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5), one ELF built from `382e4ecef4937356b72f9e1786917ae7147c0415`. Published ELF SHA-256: `01a73f3f676121061f58b52a833c642d8cd94b048fbbc524182b8756eb642bd0`. Download its matching checksum from the same release; do not substitute a local build digest. [Release validation](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) passed the repeated software/build gates. Pending VDA recovery is experimental event correlation; actual PS5 input/native coexistence remain unverified. Read the [contract and tester checklist](VDA_PENDING.md).
 
 ## Before loading
 
@@ -13,16 +13,16 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 
    ```sh
    # Linux
-   sha256sum --check SteamController-PS5-v0.1.0-dev.4.elf.sha256
+   sha256sum --check SteamController-PS5-v0.1.0-dev.5.elf.sha256
    # macOS
-   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.4.elf.sha256
+   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.5.elf.sha256
    ```
 
 3. Keep the native DualSense available. Use a recoverable development environment; retain local console access. Do not enable hooks or built-in-radio experiments for a first test.
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.4.elf
+   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.5.elf
    ```
 
    Port 9021 is an inherited convenience default, not a compatibility guarantee. This project has not tested the transfer or loading procedure on physical hardware. Do not repeatedly send the payload when a loader has failed or become unresponsive.
@@ -40,7 +40,7 @@ No FTP, manual INI file or persistent installation is required for this flow. A 
 
 Bridge probing, game hooks and DualSense handoff remain disabled. USB scanning uses only the Steam Controller allowlist and checked interfaces. Native BLE is not enabled. Keep the stock DualSense available and preserve its pairing state.
 
-Pairing codes expire after five minutes, allow five attempts and can be redeemed once; concurrent redemption has one winner. The permanent bearer token is never shown in a notification or logged. A browser retains its credential in session storage, including reloads. If the code expires or has already been used, advanced recovery accepts the owner-only `/data/ghostpad/webui.token` via the dialog. A new payload start supplies a new short-lived code. Do not put either secret in URLs, screenshots, issues or committed logs.
+Pairing codes expire after five minutes, allow five attempts and can be redeemed once; concurrent redemption has one winner. The bearer token is never shown in a notification or logged; persistent mode stores it privately, while Session only mode keeps it only in RAM. A browser retains its credential in session storage, including reloads. In persistent mode, if the code expires or has already been used, advanced recovery accepts the owner-only `/data/ghostpad/webui.token` via the dialog. In Session only mode no filesystem recovery token exists; retain the enrolled browser to collect diagnostics before stopping. One code enrolls one browser, including a separate PS5 tile browser. A new payload start supplies a new code, but do not repeatedly reload while registration or cleanup is unresolved. Do not put either secret in URLs, screenshots, issues or committed logs.
 
 All protected APIs require bearer authentication plus request validation. Only loopback, private RFC1918 and link-local IPv4 peers are permitted; public IPv4 and IPv6 peers are rejected. HTTP is plaintext: use a trusted isolated LAN and **never forward port 8090 to the internet**.
 
@@ -65,7 +65,7 @@ For a test report, record the exact payload SHA, ELF checksum, SDK, measured con
 
 ## Optional on-console settings tile (same ELF)
 
-After pairing, open **Settings & help → PS5 tile → Create tile on PS5**, read the experimental warning and confirm. The embedded icon and metadata register only `SCPS50001` in Media. No second ELF, FTP or separate image upload is needed. Keep the payload running; the tile opens `http://127.0.0.1:8090/`, not the payload itself. The PS5 browser has its own session, so pair there again using the current console code or recovery token. Remove the tile through the PS5 normal Delete action. This installer does not perform native uninstallation or database editing.
+After pairing, open **Settings & help → PS5 tile → Create tile on PS5**, read the experimental warning and confirm. The embedded icon and metadata register only `SCPS50001` in Media. No second ELF, FTP or separate image upload is needed. Keep the payload running; the tile opens `http://127.0.0.1:8090/`, not the payload itself. The PS5 browser has its own session and needs an unused notification code or, in persistent mode, the private recovery token. A code already redeemed by the LAN browser cannot enroll the tile browser. Session only mode has no filesystem recovery token; keep the enrolled LAN browser for diagnostics. Remove the tile through the PS5 normal Delete action. This installer does not perform native uninstallation or database editing.
 
 See [SETTINGS_TILE.md](SETTINGS_TILE.md) for failure/retry behavior and required FW 13.60 hardware checks. Do not treat an accepted registration request as a tested on-console launch.
 
@@ -79,4 +79,4 @@ After enrollment, open Settings & help → Diagnostics → Download Diagnostic R
 
 The experimental pending-registration path observes one typed virtual device after one Add and continues USB input during identification. Keep other virtual-controller payloads stopped; temporal correlation is not a proven ownership ABI. Press Steam/PS and use the console's profile picker. A connected or unknown native DualSense prevents automatic local binding; no native disconnect/unbind or Shell patch is performed. If identification is unresolved, avoid repeated reloads and collect diagnostics. Native coexistence is physically unverified.
 
-If operational credential-storage writes fail, dev.5 may start with a fresh RAM-only256-bit token. The console notification says **Session only**; normal pairing and bearer/Origin/LAN checks remain. Pair again after restart, and download diagnostics while running. There is no persistent recovery token in this mode. Profile saves may remain unavailable; a storage fallback is not a filesystem repair. Existing malformed/foreign/insecure credentials and entropy failure still disable access. [Contract and tester checklist](VDA_PENDING.md).
+If operational credential-storage writes fail, dev.5 may start with a fresh RAM-only 256-bit token. The console notification says **Session only**; normal pairing and bearer/Origin/LAN checks remain. Pair again after restart, and download diagnostics while running. There is no persistent recovery token in this mode. Profile saves may remain unavailable; a storage fallback is not a filesystem repair. Existing malformed/foreign/insecure credentials and entropy failure still disable access. [Contract and tester checklist](VDA_PENDING.md).

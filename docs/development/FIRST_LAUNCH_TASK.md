@@ -1,5 +1,7 @@
 # Codex Task — Simplify First Launch & Release v0.1.0-dev.2
 
+**Historical original dev.2 owner task.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+
 **Repository:** https://github.com/MNeroba/SteamController-PS5
 **Previous release:** `v0.1.0-dev.1`
 **Target release:** `v0.1.0-dev.2`

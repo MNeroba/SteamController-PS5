@@ -2,11 +2,11 @@
 
 The controller payload embeds a 512×512 version of the owner-supplied image and all launcher metadata. No companion ELF or external runtime asset is required.
 
-1. Load the normal dev.3 ELF through an independently confirmed compatible development loader.
+1. Load the current [dev.5 ELF](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5) through an independently confirmed compatible development loader.
 2. Pair with the existing WebUI on a trusted isolated LAN.
 3. Open **Settings & help → PS5 tile → Create tile on PS5** and confirm the app registration write.
 4. Check **Media → Steam Controller Settings** on the console. A successful HTTP response means registration was accepted, not that the tile has been seen/tested.
-5. The tile opens `http://127.0.0.1:8090/`. Keep the payload running. Pair again in the PS5 browser using the current notification code (if not already redeemed) or the advanced recovery token. If the code was redeemed in the LAN browser, obtain a new code by restarting the payload locally or use the recovery token. No automatic credential bypass is added.
+5. The tile opens `http://127.0.0.1:8090/`. Keep the payload running. The PS5 browser is a separate authentication session. A notification code enrolls only one browser. If the LAN browser already redeemed it, keep that browser for diagnostics. In persistent mode, the owner may use the existing private recovery token through the pairing dialog; never share it. In **Session only** mode there is no filesystem recovery token and no second-browser enrollment path after redemption. Do not repeatedly reload the payload to obtain another code, especially while VDA registration or cleanup is unresolved. There is no authentication bypass.
 
 The tile is persistent app metadata, not a boot service. After reboot the controller ELF still needs to be loaded normally. No PKG/FPKG is created. PS5 FW13.60 is owner-reported, not measured or verified compatible; registration, visibility, controller navigation and browser loopback remain **NOT_RUN**. A stock console cannot run arbitrary ELF files from this project.
 

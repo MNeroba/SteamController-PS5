@@ -1,5 +1,17 @@
 # Current status — 2026-10-16
 
+## M1-247 — published dev.5 and documentation reconciliation
+
+**Published experimental dev.5:** [dev/v0.1.0-dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5), source `382e4ecef4937356b72f9e1786917ae7147c0415`. [DEV workflow38810046681](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) completed successfully; release414294352 is a prerelease, not a draft, published **2026-10-15 21:30:53 UTC** (16 October in Riga). Seven assets contain exactly one ELF, **2,084,968 bytes**, SHA-256 `01a73f3f676121061f58b52a833c642d8cd94b048fbbc524182b8756eb642bd0`. Host48 C/Python, ASan/UBSan, Chromium220, deterministic assets and clean SDKv0.43/LLVM18 gates passed on that selected source. Physical Add/VDI/MBus, native DualSense coexistence, firmware compatibility and actual storage errno remain unverified. Event correlation is an owner-approved temporary experimental mechanism, not proof of exclusive ownership. Previous releases/tags/assets are unchanged.
+
+Current user/build/tile instructions now target dev.5. Persistent and session-only enrollment are distinguished; a redeemed code cannot enroll a second tile browser. Do not repeatedly reload an unresolved VDA to get another code. No code/assets/workflows/release bytes or repository visibility are changed by this documentation pass.
+
+Next: obtain the tester's sanitized dev.5 diagnostic report with exact ELF SHA-256, measured firmware/loader, VDA status, storage stage/errno, native DualSense behavior and USB-C/Puck result. Follow docs/development/VDA_PENDING.md; no physical test is claimed. Future version publication requires new approval.
+
+## Historical checkpoints — retained evidence
+
+Earlier candidate holds and queued CI statements below are superseded by the receipt above.
+
 ## M1-246 — current dev.5 execution, 2026-10-16
 
 Owner explicitly authorizes the analogous event-correlation approach temporarily and publishing dev.5 for the log author's controlled test. Baseline main6e1e82fefe3b9ae4408fb5d4540cc485a1ca4b03 has294 files; Host38805657403/SDK38805657360 succeeded, no open PR. Complete-tree source publication and manual DEV workflow must follow final validation, with no historical asset changes.

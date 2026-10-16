@@ -450,3 +450,8 @@ Pending completion is asynchronous; USB parsing/feedback/state continue. Cancel/
 ## ADR-062 — Protected session-only WebUI fallback (M1-246)
 
 Operational private-storage failures may fall back to a fresh256-bit CSPRNG credential in process memory, using the same local-code pairing, attempt/expiry limits, bearer, Origin/Host and LAN restrictions. No insecure/malformed/foreign credential is accepted or replaced; entropy failure remains fatal. Notification and diagnostic status2 distinguish nonpersistent mode. Restart invalidates the token; profiles keep their own checked persistent-save failure behavior. No storage migration, anonymous mutation endpoint, code/token log or automatic repair.
+
+
+## ADR-063 — 2026-10-16: current instructions versus historical evidence
+
+Use dev.5 in active user/setup/build/security instructions and actual acknowledged release identity/checksum. Keep dated audits, negative evidence, original tasks, tags and release assets unchanged; add explicit historical-context banners. Describe persistent-token and RAM-only single-redemption limits consistently; do not recommend repeated payload reloads for tile enrollment. Documentation-only updates use the full300-file source tree and expected-parent non-force main publication; runtime/source release tag remains382e4ecef4937356b72f9e1786917ae7147c0415.

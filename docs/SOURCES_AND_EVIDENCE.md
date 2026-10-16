@@ -1,5 +1,7 @@
 # Research source register and evidence status
 
+**Current context — dev.5 (2026-10-16):** the dated source snapshots below remain unchanged. Current reviewed VDA reference pin and the limited event-correlation contract are in [VDA_PENDING](development/VDA_PENDING.md) and [PROVENANCE](PROVENANCE.md). Source claims are not firmware compatibility or physical ownership evidence.
+
 **As of 2026-10-08.** These source URLs and the observed commit SHAs are **research snapshots**; Codex must re-check HEAD/repo ownership/LICENSE and pin its own reviewed SHAs before porting. Each `confirmed source fact` establishes content visible in source, **not** actual PS5 behavior unless separately marked as independent hardware test.
 
 ## Direct project sources

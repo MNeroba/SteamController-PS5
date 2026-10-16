@@ -1,6 +1,6 @@
 # Documentation
 
-Start with the [project overview](../README.md) and [current status](../project-memory/CURRENT_STATUS.md).
+Start with the [project overview](../README.md) and [current status](../project-memory/CURRENT_STATUS.md). Current published prerelease: [dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5). [Loading](development/LOADING.md), [build](BUILDING.md), [tile](development/SETTINGS_TILE.md) and [VDA/storage checklist](development/VDA_PENDING.md) describe the current version. Dated reviews and archived specifications retain the versions and results they actually reviewed.
 
 | Area | Read |
 | --- | --- |

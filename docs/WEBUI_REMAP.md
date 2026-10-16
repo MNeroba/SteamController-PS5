@@ -6,7 +6,7 @@
 
 ## Use
 
-1. Open **Remap → Buttons** in the authenticated portal and choose the profile to edit. WebUI starts automatically when the runtime policy is absent; enter the short-lived code from the console notification. Advanced token recovery is available in the pairing dialog. Use only a trusted isolated LAN.
+1. Open **Remap → Buttons** in the authenticated portal and choose the profile to edit. WebUI starts automatically when the runtime policy is absent; enter the short-lived code from the console notification. Persistent mode provides private token recovery in the pairing dialog. Session only mode has no filesystem recovery token; one notification code enrolls one browser. See [current enrollment and storage limits](development/LOADING.md). Use only a trusted isolated LAN.
 2. Click/tap a Steam Controller button, or focus it and press Enter/Space. Use **Back / top** for trigger pulls and the four rear buttons. The image is viewed from behind: physical L is on the right, R on the left.
 3. Choose one or more DualSense outputs in the editor's grouped picker or preview image. Green outlines and badges show the draft assignment for the active activator. On the main page, first select a Steam input, then click/tap a DualSense output: it is staged for the **Press** action, and **Done** applies it while **Cancel** discards it. Coarse-pointer hit areas extend around small output hotspots.
 4. **Done** updates the draft profile. **Cancel** or Escape preserves its previous assignment. **Save changes** writes through the authenticated `/api/profile` API, then rereads the canonical profile before reporting Saved. Server-normalized values replace the submitted draft; newer local edits remain unsaved. Failed or incomplete readback keeps a “Save not confirmed” state; changing a game profile uses the existing load/save flow.
@@ -88,8 +88,8 @@ The public interface initializes before authentication. Enter the eight-digit lo
 A corrupt stored Default offers confirmed, authenticated recovery with a backup of its exact previous bytes. The profile store serializes load/patch/save for both menu and portal. See [loading and advanced recovery](development/LOADING.md). These flows have host/Chromium coverage; console notification, browser and filesystem behavior require H-09 hardware validation.
 
 
-## Dev.3 diagnostics and current browser evidence
+## Diagnostics and current browser evidence
 
 Settings & help → Diagnostics → Download Diagnostic Report uses the existing authenticated API. It returns a bounded text attachment named for the embedded version, with startup/USB/virtual-controller/Steam state and a filtered application log tail. Errors, incomplete initialization and no connected controller remain reportable. Review names/paths before sharing; no arbitrary filesystem download is offered.
 
-Release workflow [38225113776](https://github.com/MNeroba/SteamController-PS5/actions/runs/38225113776) passed 220 Chromium assertions for source `9aab6dbae166b28416a9a00e6346f85bf12e524e`, including enrollment, profile persistence, tile confirmation and diagnostic-download failure/retry/bounds. Use `bash scripts/run_webui_browser.sh` for the current automated gate. Earlier counts/results and the machine-readable historical remap file above remain historical, not the current dev.3 run. All console/browser behavior requires H-09/H-13/H-15.
+Current dev.5 [release validation](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) passed 220 Chromium assertions for source `382e4ecef4937356b72f9e1786917ae7147c0415`, retaining enrollment, profile persistence, tile confirmation and diagnostic-download failure/retry/bounds coverage. Use `bash scripts/run_webui_browser.sh` for the automated gate. Earlier counts/results, dev.3 generated-page measurements and the machine-readable remap file above are historical. Physical PS5/browser behavior still requires H-09/H-13/H-15.

@@ -1,8 +1,12 @@
 # Architecture contracts — specialization without monolith
 
-## Current implementation checkpoint — dev.3
+## Current implementation checkpoint — dev.5
 
-The diagrams describe logical contracts, including research boundaries. USB-C/Puck are implemented; a native BLE adapter is not. The current single-SC2 runtime keeps some process-wide state and inherited adapter logic; the contracts do not assert a completed transport-independent PS5 backend. Later sections supersede earlier audit descriptions where fixes changed behavior. In dev.3 there is no guessed-endpoint fallback or klog/GetHandle ownership promotion, cancelled USB indices remain retired until FS teardown, and the WebUI has four bounded clients. Only a positive receipt from the exact creation call can establish VDA ownership; its PS5 ABI meaning is still unverified.
+USB-C/Puck are implemented; native BLE is research only. The single-SC2 runtime retains some process-wide inherited adapter state. Transport/core/backend diagrams express design contracts, not a claim that all portable separation or physical PS5 validation is complete.
+
+The registry serializes creation and preserves pending reservations, generation tokens and failed-cleanup ownership. Dev.5 adds owner-authorized bounded event correlation for `0x803b0006`; a correlated receipt is distinct from an inherited positive Add return. **Neither actual ABI nor exclusive event ownership is hardware-proven.** Connected/unknown native state prevents the new local MBus binding path; native disconnect/unbind and Shell patches are absent from that path. See [pending contract](development/VDA_PENDING.md). Earlier positive-only statements below describe dated checkpoints, not the current pending path.
+
+USB has no guessed-endpoint fallback; cancelled transfer indices remain retired until teardown. WebUI keeps four bounded clients, existing pairing/authentication/admission, and a fresh RAM-only credential after eligible operational storage failures. Unsafe existing credentials fail closed; profile storage remains separate.
 
 ## Target dependency direction
 
@@ -138,7 +142,7 @@ USB endpoint frame storage belongs to the session, and busy endpoint metadata is
 Hook import changes are transactional. Partial writes retain rollback ownership; unused remote pages are unmapped or tracked for retry. Any retained old hook page causes read-only refusal until the game restarts, rather than unverified capability reuse. Pages reached by import slots remain until process exit because callbacks may still be in flight. Optional hooks remain disabled by default.
 
 
-## Dev.3 session recovery and diagnostics (ADR-055)
+## Historical dev.3 session recovery and diagnostics (ADR-055)
 
 `user_session` is a portable mutex-protected value observer. The manager supplies read-only SDK user-list/foreground results at2s intervals; three consistent empties after prior presence establish one logout epoch, two same normalized lists establish relogin. Invalid/error/rapid observations reset consensus and suppress new registration. Startup at the login picker remains valid. The observer stores IDs only for comparisons; exported snapshots contain counts/flags, no account IDs. No user binding API or native pad operation is added.
 
@@ -149,12 +153,12 @@ The existing USB worker owns `slot_recovery`: proven owned old VDA deletion, def
 `diagnostics` copies bounded typed values under its own short mutex and formats outside the lock. It uses a48×192-byte filtered application memory ring; no filesystem reader, user-selected paths or raw kernel log export exists. The existing authenticated HTTP dispatcher produces a <=24KiB fixed-name text attachment; browser Blob URLs are revoked after download. Runtime firmware is measured, SDK/version fixed and source identity generated from selected SHA (dirty builds explicitly unknown). Configuration/profile/gyro/haptic data comes from existing services without UI driver mutation. The single-ELF tile remains opt-in and unchanged.
 
 
-## Observed pending-creation limitation — M1-244 (2026-10-15)
+## Historical pending-creation limitation — M1-244 (2026-10-15)
 
 External dev.4 trace returns803b0006 and later emits a VDA event; the positive-only receipt contract leaves virtual_ready false even while Steam input is decoded. This does not establish event ownership, output-param semantics or safe deletion. The dev.4 latch limits further Add attempts but is not a working pending-registration implementation. A proven ABI/ownership transition is required before the next DEV release. Preserve generation/global reservation/pause/cleanup contracts and native-controller isolation; no klog-derived handle promotion or automatic user binding is authorized by this evidence. Storage diagnostics must identify operation/errno without secrets before changing filesystem policy.
 
 
-## dev.5 candidate — M1-245
+## Historical dev.5 candidate — M1-245
 
 `storage_status.h` carries fixed stage/errno only. Existing private_file/webui_auth remain the sole storage policy, with exact-owned-private checks and redundant-chmod avoidance. Failed credentials/scratch are erased; first operation failure survives close/unlink. Diagnostics snapshots store this bounded status; raw log filtering runs before file/klog sinks, and Safe Mode omits optional system observation. Optional bridge text reports pass the same filter and expose user-match booleans rather than account IDs.
 

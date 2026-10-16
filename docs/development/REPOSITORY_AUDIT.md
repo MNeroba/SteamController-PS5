@@ -271,3 +271,8 @@ Reviewed authoritative mainaf183a2/tree703c039 with286 retained blobs; both bran
 ## Post-dev.3 runtime audit — M1-242, 2026-10-14
 
 Baseline1da839a6/tree9480e78c complete286 blobs. Added only PUBLIC_RUNTIME_REVIEW.md; no source relocation/deletion, generated header tracking, image/license removal or old-release mutation. Existing registry/USB helpers/adapter and focused regressions updated for three confirmed defects. Docs/memory/Unreleased/DEV review narrative reconciled. Review complete expected-parent tree before non-force main update; do not publish inherited desktop .git wholesale.
+
+
+## M1-247 — 2026-10-16: dev.5 documentation reconciliation
+
+Reviewed all active Markdown guidance for stale release/setup claims. Updated current README/build/loading/tile/security/feature/architecture/release/navigation/continuation guidance and marked dated audits/tasks as historical; original evidence, counts, hashes and archives preserved. Dev.5 release414294352/tag/source382e4ecef4937356b72f9e1786917ae7147c0415 acknowledged before changing download claims. No paths moved or removed; no runtime/asset/test/script/workflow bytes changed. Complete300-file base tree26757feb4be9c3419d20a5cbe3e7956d36ac6023 must be retained for docs publication. Old release assets deliberately remain immutable; read current main guides for corrected instructions.

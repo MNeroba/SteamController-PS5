@@ -4,7 +4,7 @@ DEV entries describe software and build verification. They do not establish phys
 
 ## v0.1.0-dev.5
 
-Owner-approved experimental candidate. Pending registration uses event correlation; the actual PS5 ABI and native-controller coexistence remain unverified.
+Published on 2026-10-15 (UTC) from `382e4ecef4937356b72f9e1786917ae7147c0415`. Pending registration uses event correlation; the actual PS5 ABI and native-controller coexistence remain unverified.
 
 ### Bug Fixes
 

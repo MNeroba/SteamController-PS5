@@ -1,6 +1,10 @@
-# dev.5 — M1-246 candidate update (2026-10-16)
+# dev.5 — published release and preparation history
 
-Owner explicitly authorized the analogous event-correlation approach for this stage and then dev.5 publication for the log author's test. This supersedes M1-245's withheld-publication instruction below. No published release is claimed until acknowledged.
+**Published experimental dev.5:** [dev/v0.1.0-dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5), source `382e4ecef4937356b72f9e1786917ae7147c0415`. [DEV workflow38810046681](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) completed successfully; release414294352 is a prerelease, not a draft, published **2026-10-15 21:30:53 UTC** (16 October in Riga). Seven assets contain exactly one ELF, **2,084,968 bytes**, SHA-256 `01a73f3f676121061f58b52a833c642d8cd94b048fbbc524182b8756eb642bd0`. Host48 C/Python, ASan/UBSan, Chromium220, deterministic assets and clean SDKv0.43/LLVM18 gates passed on that selected source. Physical Add/VDI/MBus, native DualSense coexistence, firmware compatibility and actual storage errno remain unverified. Event correlation is an owner-approved temporary experimental mechanism, not proof of exclusive ownership. Previous releases/tags/assets are unchanged.
+
+**Preparation history:** this stable document path retains candidate checkpoints below; their old publication holds and local binary hashes are historical, not the status or checksum of the released ELF.
+
+Owner explicitly authorized the analogous event-correlation approach for this stage and then dev.5 publication for the log author's test. This supersedes M1-245's withheld-publication instruction below. Publication acknowledgement is recorded above.
 
 Implemented: one asynchronous pending Add/registry reservation; bounded fresh virtual-event identification, cancellation/release/failed-delete retention; Steam/PS-triggered local MBus with connected/unknown native protection and picker fallback; queued short PS action; typed secret-free diagnostics; operational-storage fallback to a new session-only CSPRNG credential. No Shell patches, native disconnect/unbind, storage migration, radio changes or second ELF. Actual Add/VDI/MBus contract and physical coexistence remain NOT_RUN; correlation across other payloads is an explicitly accepted experimental limitation. See [contract and tester checklist](VDA_PENDING.md).
 

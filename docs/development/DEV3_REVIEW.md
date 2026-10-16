@@ -1,5 +1,7 @@
 # Dev.3 review and publication — 2026-10-12
 
+**Historical dev.3 review and publication.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+
 Owner approved publication on2026-10-12. [Experimental dev.3](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.3) is published from `9aab6dbae166b28416a9a00e6346f85bf12e524e`; workflow38225113776 passed all gates. Published dev.1/dev.2 remain unchanged. The local review acknowledgement below is historical; the publication acknowledgement identifies the actual download.
 
 ## Implemented scope

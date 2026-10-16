@@ -1,6 +1,6 @@
 # SteamController-PS5 — active execution specification
 
-Revision 1.4 · 2026-10-12 · Target: owner-reported **PS5 FW 13.60**, hardware-unverified · **SDK v0.43**
+Revision 1.5 · 2026-10-16 · Target: owner-reported **PS5 FW 13.60**, hardware-unverified · **SDK v0.43**
 
 The [full original specification](docs/archive/CODEX_TASK-1.1.md) is preserved verbatim and remains authoritative for detailed contracts, safety rules, evidence labels and acceptance criteria. Read it in full before substantial implementation. This file consolidates the current execution order; it does not revoke uncompleted requirements. Historical setup/PR instructions are superseded by the owner's direct-main solo-development policy and separate experimental DEV authorization.
 
@@ -21,7 +21,7 @@ Details: [current status](project-memory/CURRENT_STATUS.md), [feature table](STE
 
 ## Current execution order
 
-- **Current dev.5 — M1-246 (2026-10-16):** owner explicitly authorizes the analogous event-correlation approach temporarily, then publication for the log author's tests. Implement one pending Add transaction in the existing registry, bounded typed virtual-event identification, local MBus only on Steam/PS with native protection, no Shell patches. Preserve distinction from a proven Add ABI, native coexistence and actual storage errno remain hardware gates. Run all software/build gates on the exact source before the manual DEV workflow. See docs/development/VDA_PENDING.md; no release claim before acknowledgement.
+- **Current dev.5 — M1-246 (2026-10-16):** owner explicitly authorizes the analogous event-correlation approach temporarily, then publication for the log author's tests. Implement one pending Add transaction in the existing registry, bounded typed virtual-event identification, local MBus only on Steam/PS with native protection, no Shell patches. Preserve distinction from a proven Add ABI, native coexistence and actual storage errno remain hardware gates. All software/build gates passed on `382e4ecef4937356b72f9e1786917ae7147c0415`; dev/v0.1.0-dev.5 is published via successful workflow38810046681. See docs/development/VDA_PENDING.md and current status for the receipt. Next: controlled tester evidence and remaining hardware gates; future publication needs separate approval.
 
 - **Historical dev.5 preparation — M1-245:** owner requested VDA/storage/account-log fixes, explicitly WITHOUT publication. Storage diagnostics/private permission regression and log filtering are implemented/host-tested; observed pending VDA ownership is still blocked. Keep critical gate closed, prepare exact-source build for review, do not create a release/tag or dispatch DEV workflow. See docs/development/DEV5_CANDIDATE.md.
 - **Published dev.4 runtime safety update** — ambiguous Add creation latch/global serialization, live-fd USB identity check and bounded feedback status. Owner explicitly approved; sourcea5c20346392eac0eb9fa04cc201cd214e2957363, workflow38588689667, seven assets/one ELF. Host/sanitizer/Chromium220/SDKv0.43 gates pass; external dev.2/FW5.50 report and physical acceptance remain unresolved. No radio/storage migration or safety-policy relaxation.
@@ -49,7 +49,7 @@ At end: inspect diff, run diff-check/tests/sanitizers/build/browser as relevant,
 
 Owner reports upgrading from FW12.00 to13.60. Use13.60 for future measured hardware/launcher/BLE checks; no update was performed by this agent. Keep SDKv0.43 and safety gates. Published dev.2 metadata remains unchanged. Current packaging policy and warning now target13.60 unverified; preserve historical12.00 results and published dev.2 records. Never relabel old test results.
 
-### Current dev.3 task — M1-232
+### Historical dev.3 task — M1-232
 
 Owner requests supplied icon and on-console settings launcher in **one ELF**. Implemented optional authenticated confirmation, embedded icon/metadata and owned exact-title registration; local software/build evidence only. Fresh-source and remote gates passed; experimental dev/v0.1.0-dev.3 is published and recorded in M1-238. Current console target owner-reported FW13.60, unmeasured; SDKv0.43 and safety defaults retained. H-13 is hardware-gated. Historical12.00/dev.2 records remain unchanged. See ADR-054 and SETTINGS_TILE.md.
 
