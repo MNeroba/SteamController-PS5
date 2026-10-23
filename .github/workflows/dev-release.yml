@@ -30,7 +30,7 @@ jobs:
     steps:
       - name: Require explicitly selected mainline source and successful push checks
         id: select
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         env:
           SOURCE_SHA: ${{ inputs.source_sha }}
           DEV_VERSION: ${{ inputs.version }}
@@ -158,7 +158,7 @@ jobs:
           sha256sum --check "SteamController-PS5-${DEV_VERSION}.elf.sha256"
           for file in RELEASE_NOTES.md LOADING.md NOTICES.md LICENSE "SteamController-PS5-${DEV_VERSION}.elf.json"; do test -s "$file"; done
       - name: Reject a tag created while the build was running
-        uses: actions/github-script@v8
+        uses: actions/github-script@v9
         with:
           script: |
             const tag = 'dev/' + process.env.DEV_VERSION;
