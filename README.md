@@ -18,6 +18,8 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 > **Dev.5:** adds experimental recovery for pending virtual-controller registration, protected session-only WebUI access when credential storage fails, and clearer diagnostics with account IDs removed from application logs. These changes are host-tested; a fix on the tester's PS5 is **not yet confirmed**. Registration uses event correlation with known ownership limits: keep other virtual-controller payloads stopped. [Technical contract and tester checklist](docs/development/VDA_PENDING.md).
 
+> **External hardware evidence:** A tester's dev.4 logs demonstrate Valve Puck detection, decoded controller buttons/battery/gyro and a `0x803B0006` pending VDA result, **not working PS5 input**. Dev.5's event-correlation recovery has not yet been verified on real hardware. Please [report reproducible results](.github/ISSUE_TEMPLATE/bug_report.yml) without tokens, account identifiers or console serials.
+
 ## Overview
 
 One native ELF connects **one Steam Controller 2026** over USB-C or the official Valve Puck and translates its input into a virtual DualSense. The embedded WebUI lets you edit profiles and mappings without installing a separate web server or copying image assets.
