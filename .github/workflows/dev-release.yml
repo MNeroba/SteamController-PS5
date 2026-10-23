@@ -148,7 +148,7 @@ jobs:
       SOURCE_SHA: ${{ needs.select-source.outputs.source_sha }}
       DEV_VERSION: ${{ needs.select-source.outputs.version }}
     steps:
-      - uses: actions/download-artifact@v6
+      - uses: actions/download-artifact@v8
         with:
           name: experimental-dev-assets
           path: release-assets
