@@ -126,14 +126,14 @@ jobs:
           test -s NOTICES.md
           test -s LICENSE
           test -s "SteamController-PS5-${DEV_VERSION}.elf.json"
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: experimental-dev-assets
           path: release-assets/*
           if-no-files-found: error
       - name: Preserve browser evidence
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: experimental-dev-browser-evidence
           path: output/playwright/
