@@ -19,7 +19,7 @@ jobs:
         run: |
           make -C tests clean test
           make -C tests sanitize
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Install pinned Chromium browser tools
