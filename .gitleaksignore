@@ -1,0 +1,9 @@
+# Gitleaks v8.30.1: individually reviewed false positives in historical commits.
+# These fingerprints suppress only the exact historical findings, not future matches.
+# Historical docs entries below are prose about public source commit hashes and
+# the WebUI authentication design, not actual credentials.
+05587f209d8171d0e9492ce87bb6224ece3c8b63:docs/PROVENANCE.md:generic-api-key:94
+0f122c64eff0b196ba023c75af9a61ba1cc9514a:docs/ARCHITECTURE.md:generic-api-key:91
+0b0e85e3533210ced84cb60c3c4623978b3680ed:docs/ARCHITECTURE.md:generic-api-key:87
+# Deterministic synthetic sample token, tested to be removed from diagnostics.
+9aab6dbae166b28416a9a00e6346f85bf12e524e:tests/test_diagnostics.c:generic-api-key:46
