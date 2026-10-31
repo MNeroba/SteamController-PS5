@@ -1,6 +1,6 @@
 # Consolidation validation — 2026-10-10
 
-**Historical 2026-10-10 consolidation tests.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+**Historical 2026-10-10 consolidation tests.** For the current published **dev.6**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.6 includes host-tested token initialization and bounded VDA observer fixes; no physical PS5 result is established. Historical results and releases are unchanged.
 
 Baseline: main79f92cb. Source changes are limited to documentation/archive, build/CI/release tools, generated-header tracking, visible branding and matching browser expectations. No driver, transport or firmware code was redesigned. All 234 baseline Git blobs matched local files before consolidation; archive hashes, licenses and stable hardware-gate bytes were verified unchanged.
 

@@ -4,7 +4,7 @@ DEV entries describe software and build verification. They do not establish phys
 
 ## v0.1.0-dev.6
 
-Candidate prepared for review; not yet published.
+Published 31 October 2026 (UTC; 1 November in Riga) from `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. [Release and downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6).
 
 ### Bug Fixes
 

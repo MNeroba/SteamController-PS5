@@ -1,6 +1,6 @@
 # Runtime safety review before public source access
 
-**Historical runtime audit and dev.4 publication.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+**Historical runtime audit and dev.4 publication.** For the current published **dev.6**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.6 includes host-tested token initialization and bounded VDA observer fixes; no physical PS5 result is established. Historical results and releases are unchanged.
 
 2026-10-14 · M1-242 · SDK v0.43 · intended FW13.60, hardware unverified
 

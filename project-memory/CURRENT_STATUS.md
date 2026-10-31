@@ -1,6 +1,15 @@
-# Current status — 2026-10-31
+# Current status — 2026-11-01
 
-## M1-249 — v0.1.0-dev.6 candidate preparation (2026-10-31)
+## M1-249 — dev.6 published; repository Public (2026-11-01)
+
+Experimental prerelease [v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) was published by [DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948). Tag `dev/v0.1.0-dev.6` points to exact source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. The release has seven assets and exactly one ELF: **2,087,296 bytes**, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`. Repeated Host, ASan/UBSan, Chromium, deterministic asset and clean PS5 SDK v0.43 gates passed. This is VERIFIED_HOST_TEST and VERIFIED_PS5_BUILD only. Physical console, USB-C/Puck, VDA ownership/user binding, native DualSense coexistence and runtime storage remain NOT_RUN.
+
+The repository is now Public. GitHub private vulnerability reporting, dependency graph and Dependabot alerts are enabled. No historical test result was changed. The M1-248 fixes in dev.6 remain host/build evidence: the tester's earlier logs identify dev.5 and do not exercise them. Target filesystem behavior, VDA Add/receipt ABI and the EILSEQ workaround remain unconfirmed on Prospero.
+
+Next: provide the tester the published dev.6 ELF and checksum, request sanitized results with measured firmware/loader details, and update hardware evidence only from a real run. No stable release or PS5 compatibility claim.
+
+
+## Historical M1-249 — dev.6 candidate preparation (2026-10-31, before publication)
 
 The owner requested dev.6 preparation. Latest published release remains dev.5; no dev.6 tag, ELF or release exists. The tester's latest logs still came from published dev.5: USB-C/Puck input works, WebUI storage reports `file-inspect/EINVAL`, and VDA log setup reports `EILSEQ` before AddDevice. No exact tested ELF SHA or measured tester firmware was established. These logs do not exercise the source changes now on main.
 

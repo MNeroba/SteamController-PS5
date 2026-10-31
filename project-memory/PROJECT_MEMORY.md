@@ -1,8 +1,16 @@
 # Project memory — current continuation entry
 
+## Current — v0.1.0-dev.6 publication and public source (2026-11-01)
+
+The owner authorized publication followed by making the repository Public. [DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948) succeeded on main; published prerelease [dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) points to `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. It contains one ELF, 2,087,296 bytes, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`; all repeated Host, ASan/UBSan, Chromium, deterministic asset and SDK v0.43 build/checksum gates passed. The release is experimental; no physical PS5 test or firmware compatibility was established.
+
+Repository visibility is Public. Private vulnerability reporting, dependency graph and Dependabot alerts were enabled after conversion. This changes no hardware evidence. Next action: tester's exact dev.6 ELF/checksum and sanitized measured-console report; VDA ownership and native DualSense coexistence stay BLOCKED_HARDWARE.
+
+## Historical M1-249 — dev.6 preparation (2026-10-31, before publication)
+
 ## M1-249 — dev.6 preparation (2026-10-31)
 
-The owner requested preparation of v0.1.0-dev.6. Candidate scope is the M1-248 token-storage and bounded VDA observer fixes; the tester's logs identify the published dev.5 build and stop before AddDevice, so they do not test those fixes. The dev.5 release remains unchanged. Version, changelog, metadata, packaged loading instructions and workflow default are being aligned; corrected candidate `4c8b89bc789bf1dfd064264ff432d3919b5a1899` passed exact Host/ASan/UBSan/Chromium, SDK and secret-scan push runs [41245762239](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762239), [41245762158](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762158) and [41245762162](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762162). The first versioned draft commit `617fdbc4537cf3362439181c0d7d748941b79bdf` is not selected: review found it had replaced these historical memory files. This follow-up restores them in full before a release source is selected. No release/tag dispatch without separate approval; no hardware claim.
+The owner requested preparation of v0.1.0-dev.6. Candidate scope is the M1-248 token-storage and bounded VDA observer fixes; the tester's logs identify the published dev.5 build and stop before AddDevice, so they do not test those fixes. The dev.5 release remains unchanged. Version, changelog, metadata, packaged loading instructions and workflow default are being aligned; corrected candidate `4c8b89bc789bf1dfd064264ff432d3919b5a1899` passed exact Host/ASan/UBSan/Chromium, SDK and secret-scan push runs [41245762239](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762239), [41245762158](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762158) and [41245762162](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762162). The first versioned draft commit `617fdbc4537cf3362439181c0d7d748941b79bdf` is not selected: review found it had replaced these historical memory files. This follow-up restores them in full before a release source is selected. At that preparation checkpoint publication awaited separate approval; no hardware claim was made.
 
 ## M1-248 — dev.5 tester log findings (2026-10-31)
 

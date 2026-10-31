@@ -13,13 +13,13 @@ A PS5 cross-build verifies compilation/linking only. FW **13.60 is the intended,
 - Python 3, `make`, Clang, pthreads; no Sony SDK.
 - LLVM **18** and unzip/curl for the community SDK.
 - Node **24** and pinned Playwright CLI **0.1.22** only for browser checks.
-- Authorized access is needed if the repository is still private; no special repository permission is needed for cloning after it is public.
+- The repository is public; cloning and downloading releases do not require a GitHub account.
 
 ```sh
 git clone https://github.com/MNeroba/SteamController-PS5.git
 cd SteamController-PS5
 # Optional: rebuild the exact published version rather than current main.
-git checkout dev/v0.1.0-dev.5
+git checkout dev/v0.1.0-dev.6
 ```
 
 Ubuntu 24.04:
@@ -67,7 +67,7 @@ shasum -a 256 payload/ghost-control-ps5.elf
 
 `build_info.h` and `settings_tile_assets.h` are generated and untracked too. Build identity is derived from the checked-out source; modified/unknown trees must not be described as the published release. Release automation supplies the selected full `SOURCE_SHA` and `DEV_VERSION`; do not override them to mislabel local changes.
 
-The internal ELF/data paths retain upstream names for compatibility. Current published DEV assets use `SteamController-PS5-v0.1.0-dev.5.elf`. The internal build output remains `ghost-control-ps5.elf`. Separate toolchains/paths may produce different debug metadata; no claim of byte-identical ELF across platforms is made. Asset embedding is deterministic.
+The internal ELF/data paths retain upstream names for compatibility. Current published DEV assets use `SteamController-PS5-v0.1.0-dev.6.elf`. The internal build output remains `ghost-control-ps5.elf`. Separate toolchains/paths may produce different debug metadata; no claim of byte-identical ELF across platforms is made. Asset embedding is deterministic.
 
 ## Host and sanitizer checks
 

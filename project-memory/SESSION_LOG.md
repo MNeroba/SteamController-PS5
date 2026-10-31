@@ -1329,3 +1329,13 @@ The first versioned candidate commit `617fdbc4537cf3362439181c0d7d748941b79bdf` 
 ## 2026-10-31 — M1-249 corrected candidate and CI receipt
 
 Corrected dev.6 source candidate `4c8b89bc789bf1dfd064264ff432d3919b5a1899` is on main after preserving and restoring all historical project-memory records. Exact push Host run41245762239, PS5 SDK v0.43 run41245762158, and full-history secret-scan run41245762162 completed/success. Candidate version/changelog/metadata/workflow/loading guide align to v0.1.0-dev.6. The first draft617fdbc was superseded due to an unintended historical-memory deletion and is not selected. Published dev.5 remains unchanged. No release/tag/ELF or hardware test. Next: obtain explicit owner approval before dispatching the manual DEV workflow; after approval, inspect validate-build/package result, tag/source, seven assets and exact one-ELF checksum before asking the tester to use it.
+
+
+## M1-249 — dev.6 publication and Public transition (2026-11-01, UTC date 2026-10-31)
+
+- Owner explicitly requested that dev.6 be published first and repository visibility changed to Public after publication.
+- Candidate source `4c8b89bc789bf1dfd064264ff432d3919b5a1899` was an ancestor of main `846195ce58d321f8ae4a638555a3afd93b0469e7`; exact Host, PS5 SDK v0.43 and full-history secret scan push checks all passed before dispatch.
+- Dispatched Experimental DEV workflow run [41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948), selecting main, source SHA above and version `v0.1.0-dev.6`. All jobs passed: source gate, full host/sanitizer/Chromium and asset checks, clean SDK build/package/checksum, release publication.
+- GitHub release [dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) is a published prerelease, not a draft. Tag points to source SHA. Seven assets include exactly one ELF, `SteamController-PS5-v0.1.0-dev.6.elf`, size 2,087,296 bytes, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`.
+- After verifying the release and assets, changed repository visibility to Public. Enabled private vulnerability reporting, dependency graph and Dependabot alerts; automatic Dependabot security-update PRs remain disabled. GitHub settings showed Public and the private-report form enabled.
+- Source-fix evidence remains host/build only. Physical PS5 testing and all H-01–H-15 scenarios remain NOT_RUN unless separately recorded. Next: obtain exact dev.6 tester report/checksum/firmware/loader results; do not infer success from publication.

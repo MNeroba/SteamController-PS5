@@ -1,6 +1,15 @@
 # Issues and blockers — project register
 
-## Current follow-up — M1-249 dev.6 preparation (2026-10-31)
+## Current follow-up — M1-249 dev.6 published / hardware gates remain (2026-11-01)
+
+- P0-VDA-PENDING-04 remains BLOCKED_HARDWARE: registration ownership, user assignment and native DualSense coexistence have not been exercised on PS5. Dev.6 only adds the host-tested bounded log-reader retry for the observed setup error; it does not change AddDevice or prove a creation receipt.
+- P1-STORAGE-DIAG-04 is HOST_FIXED, TARGET_UNVERIFIED: missing-token detection uses protected `openat(O_NOFOLLOW)` ENOENT; strict creation and validation remain. Prospero filesystem behavior is unconfirmed.
+- Published experimental release [v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) uses source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`; [workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948) passed repeated host, sanitizer, Chromium, asset, SDK v0.43 and checksum gates. The tag points to the selected SHA and the release contains one ELF. Physical PS5 tests remain NOT_RUN.
+- Repository visibility is Public. Private vulnerability reporting, dependency graph and Dependabot alerts are enabled. Future release publication still requires separate owner approval.
+
+## Historical candidate-preparation checkpoint — M1-249 (before publication)
+
+## Historical candidate-preparation checkpoint — M1-249 (2026-10-31)
 
 - P0-VDA-PENDING-04 remains BLOCKED_HARDWARE: the bounded observer now retries one loopback stream only for `/dev/klog` EILSEQ; actual registration, ownership and native DualSense coexistence remain unverified. Tester logs stop before AddDevice and do not identify the failing source.
 - P1-STORAGE-DIAG-04 is HOST_FIXED, TARGET_UNVERIFIED: missing-token detection relies on protected `openat(O_NOFOLLOW)` ENOENT; strict create/validation remain. Prospero filesystem behavior is unconfirmed.

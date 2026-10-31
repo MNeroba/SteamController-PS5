@@ -2,7 +2,9 @@
 
 Reviewed: 2026-10-23. Repository: `MNeroba/SteamController-PS5`.
 
-Opening the source is independent from establishing a stable, working PS5 runtime. The current experimental build remains `v0.1.0-dev.5` (source `382e4ecef4937356b72f9e1786917ae7147c0415`); `main` has later documentation commits. Do not call VDA/game input, account binding, USB teardown, console browser or native-DualSense coexistence physically verified.
+> **Completion update — 2026-11-01:** dev.6 was published first, then the repository was changed to Public. Private vulnerability reporting, dependency graph and Dependabot alerts are enabled. The checklist below records the earlier pre-launch review; it does not imply that every old recommendation or signed-out check was repeated.
+
+Opening the source is independent from establishing a stable, working PS5 runtime. The current experimental build is v0.1.0-dev.6 from source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. Do not call VDA/game input, account binding, USB teardown, console browser or native-DualSense coexistence physically verified.
 
 ## Source and exposure review
 
@@ -13,17 +15,17 @@ Opening the source is independent from establishing a stable, working PS5 runtim
 - The tracked tree contains code, documentation, test assets and third-party notices, without an obvious committed ELF, private-key filename or token-file filename. Publication does not hide historical branches, tags, old commits or prior release assets.
 - Avoid adding actual console logs, screenshots containing account identifiers, pairing codes, browser bearer tokens, serial numbers, Bluetooth bonding data or user-specific paths. Existing public issue and SECURITY templates already direct users to sanitize evidence.
 
-## Owner-only GitHub administration — required manual operations
+## Post-public administration — residual checklist
 
-The connected GitHub app cannot change repository visibility, set branch protection/rulesets or enable private vulnerability reporting. These settings require the repository administrator in GitHub.
+The earlier review noted that the connected GitHub app could not change repository settings; the owner completed the visibility/security changes through the authenticated GitHub UI on 2026-11-01. Items below that were not performed remain follow-up checks.
 
-1. **Review retained Actions history and artifacts before Public**, especially older failing jobs and archives; delete any individual runs/artifacts that expose secrets through GitHub's supported controls, and revoke exposed credentials if found. Selected scans above are incomplete. The existence of confidential data cannot be disproved solely by regex screening.
+1. **Residual exposure review:** the repository is already Public, so retained Actions history, artifacts and reachable history are visible. The selected scans above are incomplete; review older failing jobs/archives and use GitHub's supported controls if a specific artifact exposes a secret. Revoke any exposed credential. Regex screening cannot prove that no confidential data exists.
 2. Verify the desired exposure of the complete reachable Git history, old PR discussions and `project-memory/` records, which include development decisions, local execution paths and build logs. Removing only today's file does not remove its history. Do not rewrite history without a separate plan, since published tags, source SHA evidence and release receipts depend on it.
-3. Navigate to **Settings → General → Danger Zone → Change repository visibility → Public**, and complete GitHub's impact confirmation. GitHub says all prior Actions history/logs become publicly visible and push rulesets may be disabled by this conversion.
-4. After the change, go to **Settings → Security and quality → Advanced Security**: enable and verify **Private vulnerability reporting**, plus available secret scanning/Dependabot security alerts and code scanning as applicable. Do not disclose vulnerabilities in public issues.
+3. **Completed 2026-11-01:** changed repository visibility to Public after dev.6 publication. GitHub warned that prior Actions history/logs would become public and push rulesets would be disabled; a signed-out verification was not performed here.
+4. **Partly completed 2026-11-01:** private vulnerability reporting, dependency graph and Dependabot alerts are enabled. Secret scanning and code scanning settings were not enabled during this task; review them separately as appropriate.
 5. Configure **Settings → Rules → Rulesets** or **Settings → Branches** for `main`: disallow force-pushes and deletion, require checks for `host-tests` and `build` (verify exact check names in the GitHub UI), use PR review/conversation resolution for community contributions. Avoid breaking the deliberately separate, manually approved DEV prerelease workflow. Check settings again after switching visibility.
 6. Review **Settings → Actions → General**: least-privileged default GITHUB_TOKEN, fork PR approval policy and permitted Actions; never allow write tokens or sensitive repository secrets in untrusted PR code. The Host test workflow now specifies `contents: read`.
-7. Verify the repository and release links from a **signed-out** session, confirm `main` branch checks, issue templates, SECURITY.md and experimental dev.5 warnings, then announce the source as experimental.
+7. **Remaining:** verify repository/release links from a signed-out session, review branch protections and Actions settings, and confirm issue templates, SECURITY.md and dev.6 experimental warnings.
 
 ## Runtime risks disclosed to contributors
 
@@ -32,4 +34,4 @@ The connected GitHub app cannot change repository visibility, set branch protect
 - WebUI uses pairing and bearer authorization but plain HTTP on trusted LAN; operational storage failure may use an authenticated RAM-only token. Real console storage error remains unknown.
 - Keep normal DualSense available, avoid simultaneous VDA payloads, do not repeatedly reload an unresolved registration and do not claim FW13.60 compatibility until tested.
 
-**Outcome:** Source visibility is technically reasonable as an experimental project after the administrator is comfortable with the remaining Actions/history exposure and configures the post-public security controls. A stable functional release is **not** authorized by this checklist.
+**Outcome:** Repository visibility is Public and the dev.6 experimental release is available. Historical Actions/archive and branch/action settings still need maintainer review. This does not establish PS5 runtime compatibility or authorize a stable hardware release.

@@ -1,6 +1,6 @@
 # Verification matrix and reproducible testing
 
-**Current release evidence — dev.5:** source `382e4ecef4937356b72f9e1786917ae7147c0415`, [DEV workflow38810046681](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681), normal48 C/Python, ASan/UBSan, Chromium220, deterministic assets and clean SDKv0.43/LLVM18 PASS. See T-P65 and the [pending registration/storage checklist](development/VDA_PENDING.md). Earlier test counts/firmware targets below are dated evidence. H-01–H-15 remain NOT_RUN where physical testing is required; external dev.4 failures are not a passed gate.
+**Current release evidence — dev.6:** source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`, [DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948), normal host, ASan/UBSan, 220+ Chromium assertions, nine image/embedding contracts, deterministic assets and clean SDK v0.43/LLVM 18 build/checksum PASS. The release contains one ELF and remains hardware-unverified. See T-P65 and the [pending registration/storage checklist](development/VDA_PENDING.md). Earlier test counts and firmware targets below are dated evidence. H-01–H-15 remain NOT_RUN where physical testing is required; external dev.4/dev.5 logs are not a passed gate.
 
 Tests are evidence, not intentions. `project-memory/TEST_LOG.md` records executed commands, exits, and environments. The matrix below distinguishes complete host verification from partial tests, unrun target work, and research blockers.
 

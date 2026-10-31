@@ -1,10 +1,10 @@
 # Architecture contracts — specialization without monolith
 
-## Current implementation checkpoint — dev.5
+## Current implementation checkpoint — dev.6
 
 USB-C/Puck are implemented; native BLE is research only. The single-SC2 runtime retains some process-wide inherited adapter state. Transport/core/backend diagrams express design contracts, not a claim that all portable separation or physical PS5 validation is complete.
 
-The registry serializes creation and preserves pending reservations, generation tokens and failed-cleanup ownership. Dev.5 adds owner-authorized bounded event correlation for `0x803b0006`; a correlated receipt is distinct from an inherited positive Add return. **Neither actual ABI nor exclusive event ownership is hardware-proven.** Connected/unknown native state prevents the new local MBus binding path; native disconnect/unbind and Shell patches are absent from that path. See [pending contract](development/VDA_PENDING.md). Earlier positive-only statements below describe dated checkpoints, not the current pending path.
+The registry serializes creation and preserves pending reservations, generation tokens and failed-cleanup ownership. Dev.5 introduced owner-authorized bounded event correlation for `0x803b0006`; dev.6 leaves that contract unchanged and only adds protected token-file initialization plus one bounded event-reader setup retry for the observed `/dev/klog/EILSEQ` case. **Neither actual ABI nor exclusive event ownership is hardware-proven.** Connected/unknown native state prevents the new local MBus binding path; native disconnect/unbind and Shell patches are absent from that path. See [pending contract](development/VDA_PENDING.md). Earlier positive-only statements below describe dated checkpoints, not the current pending path.
 
 USB has no guessed-endpoint fallback; cancelled transfer indices remain retired until teardown. WebUI keeps four bounded clients, existing pairing/authentication/admission, and a fresh RAM-only credential after eligible operational storage failures. Unsafe existing credentials fail closed; profile storage remains separate.
 

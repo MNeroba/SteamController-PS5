@@ -59,3 +59,8 @@ M1-245 dev.5: protected-storage/logging changes have host/build evidence only. T
 ## M1-246 dev.5 controlled-test preparation — 2026-10-16
 
 Owner authorizes experimental dev.5 publication for the external log author's test; no hardware run occurred here. P0 Add return/event/low32 VDI/MBus contract, user picker/native coexistence, P1 actual storage-stage/errno and USB shutdown/reconnect on USB-C/Puck remain NOT_RUN. Owner console13.60 and tester's earlier5.50 are reports, not measured compatibility. Follow docs/development/VDA_PENDING.md with exact selected source/ELF digest and measured console/loader/transport; no account IDs/serials. Host-injected ENOSPC28 and synthetic events are not console results.
+
+
+## M1-249 — dev.6 release checkpoint (2026-11-01)
+
+Published prerelease `dev/v0.1.0-dev.6`, source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`, [workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948). Repeated host/ASan/UBSan/Chromium/asset/SDK v0.43/checksum gates passed. Release contains one ELF (2,087,296 bytes; SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`). This does **not** change any H-row: measured console firmware, VDA ownership/assignment, native DualSense coexistence, USB-C/Puck, portal and physical feature behavior remain NOT_RUN / BLOCKED_HARDWARE. Repository visibility is Public; no hardware compatibility is asserted.

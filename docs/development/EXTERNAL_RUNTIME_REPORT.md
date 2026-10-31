@@ -1,6 +1,6 @@
 # External runtime failure analysis — 2026-10-15
 
-**Historical external dev.4 failure analysis.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+**Historical external dev.4 failure analysis.** For the current published **dev.6**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.6 includes host-tested token initialization and bounded VDA observer fixes; no physical PS5 result is established. Historical results and releases are unchanged.
 
 M1-244 · source comparison: main `aa9d4fa881b13c101edd1965baac7cbeb8b79655` / published dev.4 `a5c20346392eac0eb9fa04cc201cd214e2957363` · SDK v0.43
 

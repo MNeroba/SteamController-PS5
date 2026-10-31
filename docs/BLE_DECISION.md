@@ -1,6 +1,6 @@
 # Native PS5 Bluetooth LE evidence decision
 
-**dev.5 status — 2026-10-16:** native BLE remains unimplemented and B1–B6 remain unrun. Future hardware work targets measured owner-console FW13.60, not the historical12.00 assessment below; USB/Puck and the new VDA path provide no native-BLE evidence.
+**dev.6 status — 2026-11-01:** native BLE remains unimplemented and B1–B6 remain unrun. Future hardware work targets measured owner-console FW13.60, not the historical12.00 assessment below; USB/Puck and the new VDA path provide no native-BLE evidence.
 
 **Current target checkpoint — 2026-10-12:** intended FW13.60 is owner-reported and unverified. Native BLE B1–B6 remain NOT_RUN; no radio experiment was performed. The original12.00 assessment below is historical evidence, not the current hardware target. Follow [BLE_FEASIBILITY.md](BLE_FEASIBILITY.md) before any future passive study.
 

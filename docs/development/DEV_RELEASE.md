@@ -6,15 +6,21 @@ DEV builds are experimental software/build deliverables. They do not satisfy the
 
 Before publication, update CHANGELOG.md relative to the previous published version, with exactly **Bug Fixes** and **New Features / Improvements** (write `None.` when empty). Match payload/version.h, metadata and selected workflow version; never rewrite historical releases/tags. Both DEV packaging and stable tagged release workflows fail closed on a missing/mismatched entry. Notes include those two sections, actual source SHA and development/hardware status.
 
+## Published experimental dev.6 — M1-249 (2026-11-01 Riga / 2026-10-31 UTC)
+
+[dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6), source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`, published as release 430212834 by [manual DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948). The workflow completed successfully in all three jobs and reran the normal host suite, ASan/UBSan, Chromium regression, nine image/embedding contracts, deterministic asset generation, clean SDK v0.43/LLVM 18 cross-build, packaging/notice checks and checksum verification. The release contains seven assets and exactly one ELF: `SteamController-PS5-v0.1.0-dev.6.elf`, 2,087,296 bytes, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`. The annotated tag points to the selected source SHA above.
+
+The repository is Public. GitHub private vulnerability reporting, dependency graph and Dependabot alerts are enabled. This release remains experimental: no physical PS5/USB/Puck/VDA/native DualSense/storage test or firmware-compatibility claim is established.
+
 **Published experimental dev.5:** [dev/v0.1.0-dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5), source `382e4ecef4937356b72f9e1786917ae7147c0415`. [DEV workflow38810046681](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) completed successfully; release414294352 is a prerelease, not a draft, published **2026-10-15 21:30:53 UTC** (16 October in Riga). Seven assets contain exactly one ELF, **2,084,968 bytes**, SHA-256 `01a73f3f676121061f58b52a833c642d8cd94b048fbbc524182b8756eb642bd0`. Host48 C/Python, ASan/UBSan, Chromium220, deterministic assets and clean SDKv0.43/LLVM18 gates passed on that selected source. Physical Add/VDI/MBus, native DualSense coexistence, firmware compatibility and actual storage errno remain unverified. Event correlation is an owner-approved temporary experimental mechanism, not proof of exclusive ownership. Previous releases/tags/assets are unchanged.
 
 Future versions still require explicit owner approval. A green push does not authorize publication; never reuse an existing release tag.
 
-## dev.6 candidate — M1-249 (2026-10-31)
+## dev.6 preparation record — M1-249 (pre-publication checkpoint, 2026-10-31)
 
 The owner requested preparation of v0.1.0-dev.6. Its scope is the M1-248 tester follow-up: protected token initialization without the redundant no-follow metadata probe, plus one bounded VDA log-reader retry for `/dev/klog/EILSEQ`. No VDA Add result, firmware compatibility or physical fix is claimed. The tester's shown logs came from the published dev.5 ELF and do not exercise the new source.
 
-The version header, changelog, Payload Manager metadata, release workflow default and bundled loading guide are aligned to dev.6. Corrected candidate source `4c8b89bc789bf1dfd064264ff432d3919b5a1899` passed exact push gates: Host [41245762239](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762239), SDK [41245762158](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762158), and secret scan [41245762162](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762162), all success. It is ready for owner review, but no tag, release or ELF download exists. The manual DEV workflow must wait for separate explicit publication approval.
+The version header, changelog, Payload Manager metadata, release workflow default and bundled loading guide are aligned to dev.6. Corrected candidate source `4c8b89bc789bf1dfd064264ff432d3919b5a1899` passed exact push gates: Host [41245762239](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762239), SDK [41245762158](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762158), and secret scan [41245762162](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762162), all success. At this checkpoint the release had not yet been published; the subsequent owner-approved publication is recorded above.
 
 ## Manual publication
 

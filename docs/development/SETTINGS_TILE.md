@@ -2,7 +2,7 @@
 
 The controller payload embeds a 512×512 version of the owner-supplied image and all launcher metadata. No companion ELF or external runtime asset is required.
 
-1. Load the current [dev.5 ELF](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5) through an independently confirmed compatible development loader.
+1. Load the current [dev.6 ELF](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) through an independently confirmed compatible development loader.
 2. Pair with the existing WebUI on a trusted isolated LAN.
 3. Open **Settings & help → PS5 tile → Create tile on PS5** and confirm the app registration write.
 4. Check **Media → Steam Controller Settings** on the console. A successful HTTP response means registration was accepted, not that the tile has been seen/tested.

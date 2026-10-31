@@ -1,6 +1,6 @@
 # Static audit remediation register
 
-**Historical original static findings and remediation.** For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+**Historical original static findings and remediation.** For the current published **dev.6**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.6 includes host-tested token initialization and bounded VDA observer fixes; no physical PS5 result is established. Historical results and releases are unchanged.
 
 Audit source: `ffff5e08905d394b67a7da070fcf4657a250f070`, 251 blobs, all 41 production C units present. Findings are CONFIRMED_STATIC; target consequences remain unverified. No P0 was confirmed. Owner authorized remediation on 2026-10-11. Preserve original historical results.
 
