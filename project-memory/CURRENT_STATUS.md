@@ -1,10 +1,10 @@
 # Current status — 2026-10-31
 
-## M1-248 — external dev.5 failure follow-up; local candidate only
+## M1-248 — external dev.5 failure follow-up; source committed, release unpublished
 
 The tester updated the shared Gist with logs from dev.5. Sanitized facts: Steam Controller via USB-C/Puck is detected and reports input; WebUI authentication setup fails at `file-inspect / EINVAL`; VDA event-log setup fails with `EILSEQ` before AddDevice, so this run says nothing about the VDA Add result. No user IDs, tokens, pairing codes or raw system log text are retained here. The run's measured firmware and exact ELF SHA are not established by the inspected excerpt.
 
-The reviewed source follow-up is being added to current `main`; it is not included in published dev.5 and does not modify its tag or assets:
+The reviewed source follow-up was pushed directly to current `main` as `e03f2c428e98c8e76334539f33e1f336d3b6ae49`. It is not included in published dev.5 and does not modify its tag or assets:
 
 - `payload/webui_auth.c` now recognizes an absent token from `openat(..., O_NOFOLLOW) == ENOENT`, avoiding the subsequent `fstatat(..., AT_SYMLINK_NOFOLLOW)` that plausibly produced `EINVAL` on the tester's filesystem. Create remains exclusive/no-follow; a file that appears/disappears in the race fails safely. The filesystem hypothesis is not hardware-confirmed.
 - `payload/vda_pending.c`/`payload/gc_main.c` allow one loopback-reader retry only when `/dev/klog` is the selected source and its bounded initial read returns `EILSEQ`. The loopback stream must independently drain to `EAGAIN`; otherwise Add is not called. Other failures remain fail-closed, and source/error logs are more specific. The tester's old log did not identify its reader source.
@@ -14,7 +14,7 @@ Validation: normal host C/Python tests pass except `test_webui_server`, whose lo
 
 Checkout constraint: local Git is `fix/p0-safety` based on `7846011` with a large inherited mixed/dirty tree, not an authoritative current-main snapshot. Do not commit or publish the whole checkout. Before any replacement release, transplant only reviewed files onto a freshly verified complete `main` tree, run green exact-source CI/SDK/browser gates, and get separate owner approval.
 
-GitHub main was rechecked at `e5662cfa63b871b3c6d0d5f1cb34774023c2bb88`; the four newer security/workflow commits touch no runtime/test files in this change. The source update is based on that complete current tree. Next: verify exact-source Host/SDK/security Actions; address failures before preparing a replacement experimental DEV build. A replacement release still requires separate approval and exact ELF SHA-256 for the tester. Never describe this workaround as PS5-proven.
+The source commit is now `main` HEAD. GitHub Actions run [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077) completed successfully for the full-history secret scan; no Host or PS5 SDK workflow was triggered by this source-only push. The published dev.5 ELF/tag/assets remain unchanged. Next, obtain SDK v0.43 and unrestricted local-browser/loopback testing before considering a replacement build; any release still requires separate approval and an exact ELF SHA-256 for the tester. Never describe this workaround as PS5-proven.
 
 ---
 

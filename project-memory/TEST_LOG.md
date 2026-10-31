@@ -1270,3 +1270,8 @@ Documentation-only commit `5f91c44f87d6615dba625d28d063ba342ce37bc1` on main pas
 Final targeted ASan/UBSan rerun after the create-race and fallback-open tests: `test_storage_diagnostics`1387, `test_vda_pending`92 and `test_vda_registration`276 all PASS. `python3 tests/test_changelog.py`5 PASS; `python3 scripts/check_changelog.py --version v0.1.0-dev.5` PASS; `git diff --check` and explicit trailing-whitespace scan across16 touched files PASS. Auth source contains no `fstatat` call (only an explanatory comment).
 
 Published dev.5 source/tag/assets remain unchanged. Local source changes have no reviewed source SHA or ELF and were not committed, pushed, or released. Do not instruct the tester to retry until a separately approved replacement build and exact ELF SHA-256 exist.
+
+
+## 2026-10-31 — M1-248 GitHub receipt
+
+Source under test: `e03f2c428e98c8e76334539f33e1f336d3b6ae49` (pushed to `main`). GitHub full-history secret scan run [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077): **success**. This workflow did not run Host or PS5 SDK tests. Local host/sanitizer, browser, SDK and physical-test outcomes are recorded in the preceding M1-248 entry. Published dev.5 artifacts are unchanged.

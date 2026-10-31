@@ -1309,3 +1309,8 @@ Validation: full normal binary/Python sweep and full ASan/UBSan binary sweep pas
 Final targeted ASan/UBSan pass after fallback-open regression: storage1387, pending observer92, registration276. Changelog checks and `git diff --check` pass; explicit trailing-whitespace scan passed for16 touched files. `make -C payload clean` and `make -C payload` both stop at `PS5_PAYLOAD_SDK is not set` before recipe execution. Browser preview remains blocked by sandbox bind EPERM.
 
 The desktop checkout is inherited `fix/p0-safety` at base `7846011` with a very large mixed/dirty overlay. No source SHA/build identity; no commit/push/release made. Existing dev.5 release/tag/assets unchanged. Next exact action: compare current live GitHub main and transplant this reviewed patch plus the M1-248 docs onto a fresh complete tree; run green normal/sanitizer/browser/SDK/CI gates. Only after the owner explicitly approves a replacement release should it be published and assigned to tester with SHA-256. Preserve firmware and native DualSense gates.
+
+
+## 2026-10-31 — M1-248 source push receipt
+
+The reviewed 16-file M1-248 source/documentation patch was committed directly to current `main` as `e03f2c428e98c8e76334539f33e1f336d3b6ae49` after confirming its parent was the live main head `e5662cfa63b871b3c6d0d5f1cb34774023c2bb88`. GitHub confirmed the ref update and the new main head. Actions run [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077) (full-history secret scan, push event) completed with success. No release/tag/ELF was created or modified. Host tests are recorded above; the local listener/browser bind and PS5 SDK gates remain unavailable in this environment. Physical PS5 validation is NOT_RUN.
