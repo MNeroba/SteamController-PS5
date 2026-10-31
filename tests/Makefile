@@ -244,7 +244,7 @@ $(BUILD)/test_vda_result: test_vda_result.c ../payload/slot_registry.c ../payloa
 $(BUILD)/test_diagnostics $(BUILD)/test_webui_http $(BUILD)/test_webui_server: ../payload/storage_status.h ../payload/vda_result.h
 
 $(BUILD)/test_vda_pending: test_vda_pending.c ../payload/vda_pending.c | $(BUILD)
-	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -o $@
+	$(CC) $(CFLAGS) -DVDA_PENDING_TEST -I../payload $(filter %.c,$^) -o $@
 
 $(BUILD)/test_vda_registration: test_vda_registration.c ../payload/vda_pending.c ../payload/slot_lifecycle.c ../payload/slot_registry.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -pthread -o $@

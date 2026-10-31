@@ -545,9 +545,8 @@ static int probe_one_path(const char *path, uint16_t *out_vid, uint16_t *out_pid
 }
 
 /* ── Create VDA for a slot ────────────────────────────────────────────── */
-static int vda_log_open(void) {
-    int fd=g_klog_started ? -1 : open("/dev/klog",O_RDONLY|O_NONBLOCK);
-    if(fd>=0)return fd;
+enum { VDA_LOG_SOURCE_NONE, VDA_LOG_SOURCE_DEVICE, VDA_LOG_SOURCE_LOOPBACK };
+static int vda_loopback_log_open(void) {
     int sock=socket(AF_INET,SOCK_STREAM,0);
     if(sock<0)return -1;
     if(sock>=FD_SETSIZE) {close(sock);errno=EMFILE;return -1;}
@@ -568,6 +567,22 @@ static int vda_log_open(void) {
     if(result<0) {int error=errno;close(sock);errno=error;return -1;}
     return sock;
 }
+static int vda_log_open(int *source) {
+    if(source)*source=VDA_LOG_SOURCE_NONE;
+    int fd=g_klog_started ? -1 : open("/dev/klog",O_RDONLY|O_NONBLOCK);
+    if(fd>=0) {if(source)*source=VDA_LOG_SOURCE_DEVICE;return fd;}
+    fd=vda_loopback_log_open();
+    if(fd>=0 && source)*source=VDA_LOG_SOURCE_LOOPBACK;
+    return fd;
+}
+static int vda_loopback_log_open_callback(void *context) {
+    (void)context;
+    return vda_loopback_log_open();
+}
+static const char *vda_log_source_name(int source) {
+    return source==VDA_LOG_SOURCE_DEVICE ? "/dev/klog" :
+           source==VDA_LOG_SOURCE_LOOPBACK ? "loopback" : "unavailable";
+}
 static int monotonic_ms(uint64_t *ms) {
     struct timespec now;if(clock_gettime(CLOCK_MONOTONIC,&now)!=0)return -1;
     *ms=(uint64_t)now.tv_sec*1000u+(uint64_t)now.tv_nsec/1000000u;return 0;
@@ -581,14 +596,34 @@ static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
        !entry.virtual_creating || monotonic_ms(&now)!=0) {
         pthread_mutex_unlock(&g_vda_create_lock);return -1;
     }
-    /* A concurrent legacy reader requires an independent loopback stream. */
-    int fd=vda_log_open();
-    if(vda_pending_reader_begin(&g_pending_vda.reader,fd,now)!=0) {
+    /* A concurrent legacy reader requires an independent loopback stream.
+     * Some firmware klog readers reject the stream with EILSEQ; retry once on
+     * the already-supported loopback source, still draining its backlog before
+     * AddDevice. Every other read error remains fail-closed. */
+    int log_source=VDA_LOG_SOURCE_NONE;
+    int fd=vda_log_open(&log_source);
+    int fallback_attempted=0,primary_error=0;
+    vda_pending_fallback_open_fn fallback_open=
+        log_source==VDA_LOG_SOURCE_DEVICE ? vda_loopback_log_open_callback : NULL;
+    int reader_result=vda_pending_reader_begin_recover(&g_pending_vda.reader,fd,
+        fallback_open,NULL,now,&fallback_attempted,&primary_error);
+    if(fallback_attempted) {
+        log_source=VDA_LOG_SOURCE_LOOPBACK;
+        if(reader_result==0)
+            gp_log("slot[%d] VDA log reader recovered: /dev/klog errno=%d; using fresh loopback stream\n",
+                   slot,primary_error);
+        else
+            gp_log("slot[%d] VDA log fallback failed: /dev/klog errno=%d loopback errno=%d\n",
+                   slot,primary_error,g_pending_vda.reader.observation.summary.error);
+    }
+    if(reader_result!=0) {
         diagnostics_vda_pending(g_pending_vda.reader.observation.summary);
-        gp_log("slot[%d] VDA not attempted: bounded fresh log unavailable errno=%d\n",slot,
+        gp_log("slot[%d] VDA not attempted: bounded fresh log unavailable source=%s errno=%d\n",slot,
+               vda_log_source_name(log_source),
                g_pending_vda.reader.observation.summary.error);
         pthread_mutex_unlock(&g_vda_create_lock);return -1;
     }
+    gp_log("slot[%d] VDA bounded fresh log ready source=%s\n",slot,vda_log_source_name(log_source));
     _Static_assert(sizeof(vdp)==32,"inherited AddDevice input size");
     memset(&vdp,0,sizeof(vdp));vdp.size=sizeof(vdp);vdp.creation_word=1;
     int ret=scePadVirtualDeviceAddDevice(&vdp,VIRTUAL_DEVICE_TYPE_DUALSENSE);

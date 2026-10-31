@@ -1,5 +1,11 @@
 # Issues and blockers — project register
 
+## Current follow-up — M1-248 (2026-10-31)
+
+- P0-VDA-PENDING-04: still BLOCKED_HARDWARE for actual registration, ownership and native DualSense coexistence. External dev.5 logs show `EILSEQ` before AddDevice. A local, host-tested single fallback from `/dev/klog` to the existing bounded loopback source now runs only for that exact reader error; it does not turn the external run into a VDA test or prove source-specific behavior on PS5.
+- P1-STORAGE-DIAG-04: external dev.5 report now gives stage `file-inspect`, errno `EINVAL` (22). Code evidence shows this follows missing-token `openat` and `fstatat(AT_SYMLINK_NOFOLLOW)`. Unsupported flag/filesystem behavior is a plausible, unconfirmed cause. Local host fix removes the second path inspection while retaining `O_NOFOLLOW`, `O_EXCL` and fail-closed handling; hardware filesystem behavior remains unverified.
+- Published dev.5 is unchanged. The source fix is being submitted to current `main` for exact-source CI; no replacement ELF or release is published. Browser/server bind and local SDK build are blocked in the current environment; see M1-248 in CURRENT_STATUS and TEST_LOG.
+
 ## Current checkpoint — M1-246 (2026-10-16)
 
 - P0-VDA-PENDING-04: IMPLEMENTED_HOST under explicitly owner-authorized temporal correlation; not a proven creation ABI. One pending transaction/cancellation/cleanup/native-policy tests added. Controlled physical Add/VDI/MBus and native coexistence remain BLOCKED_HARDWARE; keep other virtual-controller payloads stopped.

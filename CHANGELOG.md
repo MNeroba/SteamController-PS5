@@ -2,6 +2,16 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. Historical releases and tags remain unchanged.
 
+## Unreleased — dev.5 tester follow-up (not published)
+
+### Bug Fixes
+
+- Fixed token initialization when the target filesystem rejects `fstatat`'s no-follow flag; missing tokens are now identified by the existing protected no-follow open (host-tested).
+
+### New Features / Improvements
+
+- Added one bounded retry through the existing loopback log stream when `/dev/klog` returns `EILSEQ`; registration still stops if a fresh stream cannot be established (host-tested; PS5 behavior unverified).
+
 ## v0.1.0-dev.5
 
 Published on 2026-10-15 (UTC) from `382e4ecef4937356b72f9e1786917ae7147c0415`. Pending registration uses event correlation; the actual PS5 ABI and native-controller coexistence remain unverified.

@@ -455,3 +455,11 @@ Operational private-storage failures may fall back to a fresh256-bit CSPRNG cred
 ## ADR-063 — 2026-10-16: current instructions versus historical evidence
 
 Use dev.5 in active user/setup/build/security instructions and actual acknowledged release identity/checksum. Keep dated audits, negative evidence, original tasks, tags and release assets unchanged; add explicit historical-context banners. Describe persistent-token and RAM-only single-redemption limits consistently; do not recommend repeated payload reloads for tile enrollment. Documentation-only updates use the full300-file source tree and expected-parent non-force main publication; runtime/source release tag remains382e4ecef4937356b72f9e1786917ae7147c0415.
+
+## ADR-064 — No-follow token absence detection on Prospero-like filesystems (2026-10-31)
+
+External dev.5 logs report `file-inspect/EINVAL`. Replace the redundant `fstatat(AT_SYMLINK_NOFOLLOW)` existence probe with the result of the already-protected `openat(O_NOFOLLOW)`: only `ENOENT` means absent. Create with `O_EXCL|O_NOFOLLOW`; on `EEXIST`, reopen and validate the competing file, and fail if it disappears. Existing symlink, type, ownership, permissions, format, read and entropy checks remain strict. This is the smallest host-verified compatibility change; unsupported-flag behavior on the actual PS5 filesystem remains a hypothesis until a new hardware run.
+
+## ADR-065 — Bounded log-source recovery for pending VDA setup (2026-10-31)
+
+The external dev.5 log reports `EILSEQ` while establishing the bounded event reader, before AddDevice. Permit exactly one alternate open only when `/dev/klog` was selected and the initial reader reports `VDA_PENDING_UNAVAILABLE/EILSEQ`. The existing loopback source is independently drained to `EAGAIN`; Add remains blocked on all other errors, failed opens, read errors, overflow and incomplete drains. Log source and both errors without recording raw log lines or device/account identifiers. Host injection verifies policy and descriptor lifetime; actual target source and VDA behavior remain unverified. Published dev.5 remains immutable and unchanged.

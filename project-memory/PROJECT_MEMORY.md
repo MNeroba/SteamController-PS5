@@ -1,5 +1,11 @@
 # Project memory — current continuation entry
 
+## M1-248 — dev.5 tester log findings (2026-10-31)
+
+External tester's updated logs identify WebUI storage stage `file-inspect`, errno `EINVAL` and VDA reader error `EILSEQ` before AddDevice; USB-C/Puck Steam input was active. No raw log bytes or user IDs retained. In code, `file-inspect` was reached after `openat(O_NOFOLLOW)` found no token and the caller redundantly invoked `fstatat(AT_SYMLINK_NOFOLLOW)`. Local replacement uses that open's `ENOENT`, then `O_EXCL|O_NOFOLLOW`, preserving strict file handling. The fstatat/Prospero incompatibility is plausible, not measured.
+
+VDA's old log did not disclose source. Recovery retries via existing loopback only if source is `/dev/klog` and initial read returns EILSEQ; fresh bounded drain remains mandatory before Add. All other errors still block registration. The source fix is being submitted against current main; the inherited local branch is not used as a publication tree. Published dev.5 remains unchanged. See ADR-064/065 and TEST_LOG M1-248.
+
 ## M1-247 — published dev.5 and documentation reconciliation
 
 **Published experimental dev.5:** [dev/v0.1.0-dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5), source `382e4ecef4937356b72f9e1786917ae7147c0415`. [DEV workflow38810046681](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) completed successfully; release414294352 is a prerelease, not a draft, published **2026-10-15 21:30:53 UTC** (16 October in Riga). Seven assets contain exactly one ELF, **2,084,968 bytes**, SHA-256 `01a73f3f676121061f58b52a833c642d8cd94b048fbbc524182b8756eb642bd0`. Host48 C/Python, ASan/UBSan, Chromium220, deterministic assets and clean SDKv0.43/LLVM18 gates passed on that selected source. Physical Add/VDI/MBus, native DualSense coexistence, firmware compatibility and actual storage errno remain unverified. Event correlation is an owner-approved temporary experimental mechanism, not proof of exclusive ownership. Previous releases/tags/assets are unchanged.

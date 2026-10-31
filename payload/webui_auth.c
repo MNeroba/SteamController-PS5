@@ -154,7 +154,13 @@ static int read_token_file(int dir_fd, char token[WEBUI_TOKEN_HEX_LENGTH + 1],
     struct stat st;
     storage_stage_t stage=STORAGE_OK; int error=0;
     int fd=openat(dir_fd,TOKEN_FILE_NAME,O_RDONLY|O_NOFOLLOW|O_NONBLOCK);
-    if (fd<0) return storage_failure(status,STORAGE_TOKEN_OPEN,errno);
+    if (fd<0) {
+        /* ENOENT from the no-follow open is sufficient to identify absence.
+         * Avoid fstatat(AT_SYMLINK_NOFOLLOW): Prospero filesystems may reject
+         * that flag, and a second path lookup would also introduce a race. */
+        if (errno==ENOENT) return 1;
+        return storage_failure(status,STORAGE_TOKEN_OPEN,errno);
+    }
     if (fstat(fd,&st)!=0) { stage=STORAGE_TOKEN_STAT; error=errno; }
     else if (!S_ISREG(st.st_mode)) { stage=STORAGE_TOKEN_TYPE; error=EINVAL; }
     else if (st.st_uid!=geteuid()) { stage=STORAGE_TOKEN_OWNER; error=EACCES; }
@@ -189,7 +195,13 @@ static int create_token_file(int dir_fd,char token[WEBUI_TOKEN_HEX_LENGTH+1],
     int fd=openat(dir_fd,TOKEN_FILE_NAME,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
     if (fd<0) {
         int error=errno; erase_secret(text,sizeof(text));
-        if (error==EEXIST) return read_token_file(dir_fd,token,status);
+        if (error==EEXIST) {
+            int existing=read_token_file(dir_fd,token,status);
+            /* The competing path disappeared between EEXIST and open. Do not
+             * report a missing credential as a successfully created token. */
+            if (existing==1) return storage_failure(status,STORAGE_TOKEN_OPEN,ENOENT);
+            return existing;
+        }
         return storage_failure(status,STORAGE_TOKEN_CREATE,error);
     }
     storage_stage_t stage=STORAGE_OK; int error=0; struct stat st;
@@ -214,7 +226,6 @@ static int create_token_file(int dir_fd,char token[WEBUI_TOKEN_HEX_LENGTH+1],
 int webui_auth_load_or_create_report(const char *directory,
                                      char token[WEBUI_TOKEN_HEX_LENGTH+1],
                                      int *created,storage_status_t *status) {
-    struct stat st;
     storage_status_t local; if (!status) status=&local;
     storage_status_clear(status); if (created) *created=0;
     if (token) erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
@@ -223,14 +234,7 @@ int webui_auth_load_or_create_report(const char *directory,
     int dir_fd=private_directory_open_report(directory,status);
     if (dir_fd<0) return -1;
     int result=read_token_file(dir_fd,token,status);
-    if (result!=0) {
-        if (fstatat(dir_fd,TOKEN_FILE_NAME,&st,AT_SYMLINK_NOFOLLOW)==0) {
-            /* Preserve the original security/format/read failure. Never replace
-             * an existing invalid, foreign or inaccessible credential. */
-            result=-1;
-        } else if (errno!=ENOENT) result=storage_failure(status,STORAGE_TOKEN_INSPECT,errno);
-        else result=create_token_file(dir_fd,token,status);
-    }
+    if (result==1) result=create_token_file(dir_fd,token,status);
     int close_error=close(dir_fd),error=errno;
     if (result<0) {
         erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);

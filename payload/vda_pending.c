@@ -6,6 +6,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+#ifdef VDA_PENDING_TEST
+extern ssize_t vda_pending_test_read(int fd, void *buffer, size_t size);
+#define vda_reader_read vda_pending_test_read
+#else
+#define vda_reader_read read
+#endif
+
 static void increment(uint32_t *n) {
     if (*n < UINT32_MAX)
         ++*n;
@@ -211,7 +218,7 @@ int vda_pending_reader_begin(vda_pending_reader_t *r, int fd, uint64_t now_ms) {
     char buffer[1024];
     int partial = 0;
     for (unsigned i = 0; i < 64; i++) {
-        ssize_t n = read(fd, buffer, sizeof(buffer));
+        ssize_t n = vda_reader_read(fd, buffer, sizeof(buffer));
         if (n > 0) {
             partial = buffer[n - 1] != '\n';
             continue;
@@ -231,6 +238,35 @@ int vda_pending_reader_begin(vda_pending_reader_t *r, int fd, uint64_t now_ms) {
     vda_pending_fail(&r->observation, VDA_PENDING_UNAVAILABLE, EOVERFLOW);
     return -1;
 }
+int vda_pending_reader_fallback_eligible(const vda_pending_reader_t *r) {
+    return r && r->observation.summary.status == VDA_PENDING_UNAVAILABLE &&
+           r->observation.summary.error == EILSEQ;
+}
+int vda_pending_reader_begin_recover(vda_pending_reader_t *r, int fd,
+                                     vda_pending_fallback_open_fn fallback_open,
+                                     void *context, uint64_t now_ms,
+                                     int *fallback_attempted, int *primary_error) {
+    if (fallback_attempted)
+        *fallback_attempted = 0;
+    if (primary_error)
+        *primary_error = 0;
+    int result = vda_pending_reader_begin(r, fd, now_ms);
+    if (!result || !fallback_open || !vda_pending_reader_fallback_eligible(r))
+        return result;
+    int error = r->observation.summary.error;
+    if (primary_error)
+        *primary_error = error;
+    if (fallback_attempted)
+        *fallback_attempted = 1;
+    errno = 0;
+    int fallback_fd = fallback_open(context);
+    if (fallback_fd < 0) {
+        error = errno ? errno : EIO;
+        vda_pending_fail(&r->observation, VDA_PENDING_UNAVAILABLE, error);
+        return -1;
+    }
+    return vda_pending_reader_begin(r, fallback_fd, now_ms);
+}
 int vda_pending_reader_poll(vda_pending_reader_t *r, uint64_t now_ms) {
     if (!r)
         return 1;
@@ -243,7 +279,7 @@ int vda_pending_reader_poll(vda_pending_reader_t *r, uint64_t now_ms) {
     char buffer[512];
     int quiet = 0;
     for (unsigned i = 0; i < 8; i++) {
-        ssize_t n = read(r->fd, buffer, sizeof(buffer));
+        ssize_t n = vda_reader_read(r->fd, buffer, sizeof(buffer));
         if (n > 0) {
             vda_pending_feed(&r->observation, buffer, (size_t)n);
             continue;

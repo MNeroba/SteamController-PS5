@@ -50,8 +50,14 @@ typedef struct {
     vda_pending_t observation;
     int fd;
 } vda_pending_reader_t;
+typedef int (*vda_pending_fallback_open_fn)(void *context);
 /* Takes ownership of fd even on failure. Requires a freshly opened nonblocking
  * stream. Bounded drain must reach EAGAIN before the caller may perform Add. */
 int vda_pending_reader_begin(vda_pending_reader_t *reader, int fd, uint64_t now_ms);
+int vda_pending_reader_fallback_eligible(const vda_pending_reader_t *reader);
+int vda_pending_reader_begin_recover(vda_pending_reader_t *reader, int fd,
+                                     vda_pending_fallback_open_fn fallback_open,
+                                     void *context, uint64_t now_ms,
+                                     int *fallback_attempted, int *primary_error);
 int vda_pending_reader_poll(vda_pending_reader_t *reader, uint64_t now_ms);
 void vda_pending_reader_close(vda_pending_reader_t *reader);

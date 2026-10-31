@@ -1,4 +1,24 @@
-# Current status — 2026-10-16
+# Current status — 2026-10-31
+
+## M1-248 — external dev.5 failure follow-up; local candidate only
+
+The tester updated the shared Gist with logs from dev.5. Sanitized facts: Steam Controller via USB-C/Puck is detected and reports input; WebUI authentication setup fails at `file-inspect / EINVAL`; VDA event-log setup fails with `EILSEQ` before AddDevice, so this run says nothing about the VDA Add result. No user IDs, tokens, pairing codes or raw system log text are retained here. The run's measured firmware and exact ELF SHA are not established by the inspected excerpt.
+
+The reviewed source follow-up is being added to current `main`; it is not included in published dev.5 and does not modify its tag or assets:
+
+- `payload/webui_auth.c` now recognizes an absent token from `openat(..., O_NOFOLLOW) == ENOENT`, avoiding the subsequent `fstatat(..., AT_SYMLINK_NOFOLLOW)` that plausibly produced `EINVAL` on the tester's filesystem. Create remains exclusive/no-follow; a file that appears/disappears in the race fails safely. The filesystem hypothesis is not hardware-confirmed.
+- `payload/vda_pending.c`/`payload/gc_main.c` allow one loopback-reader retry only when `/dev/klog` is the selected source and its bounded initial read returns `EILSEQ`. The loopback stream must independently drain to `EAGAIN`; otherwise Add is not called. Other failures remain fail-closed, and source/error logs are more specific. The tester's old log did not identify its reader source.
+- Regression-first storage test failed on injected `fstatat` `EINVAL`; after the fix, storage tests pass. VDA test injects `EILSEQ`, verifies the reader is discarded and the bounded alternate stream is used; unrelated errors do not retry, and a fallback-open failure without errno is normalized to `EIO`.
+
+Validation: normal host C/Python tests pass except `test_webui_server`, whose loopback `bind()` is denied with `EPERM` in this sandbox. All other host binaries passed in the targeted sweep. ASan/UBSan sweep also passed for every runnable binary except the same listener test. Browser preview cannot bind localhost (`EPERM`); PS5 SDK v0.43 is not configured/found, so cross-build is NOT_RUN. Physical PS5 validation is NOT_RUN. The published dev.5 source/tag/assets remain unchanged.
+
+Checkout constraint: local Git is `fix/p0-safety` based on `7846011` with a large inherited mixed/dirty tree, not an authoritative current-main snapshot. Do not commit or publish the whole checkout. Before any replacement release, transplant only reviewed files onto a freshly verified complete `main` tree, run green exact-source CI/SDK/browser gates, and get separate owner approval.
+
+GitHub main was rechecked at `e5662cfa63b871b3c6d0d5f1cb34774023c2bb88`; the four newer security/workflow commits touch no runtime/test files in this change. The source update is based on that complete current tree. Next: verify exact-source Host/SDK/security Actions; address failures before preparing a replacement experimental DEV build. A replacement release still requires separate approval and exact ELF SHA-256 for the tester. Never describe this workaround as PS5-proven.
+
+---
+
+# Historical current status — 2026-10-16
 
 ## M1-247 — published dev.5 and documentation reconciliation
 

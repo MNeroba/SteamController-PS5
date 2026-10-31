@@ -7,6 +7,24 @@
 #include <fcntl.h>
 #include <unistd.h>
 #include <errno.h>
+static int fail_read_fd = -1;
+ssize_t vda_pending_test_read(int fd, void *buffer, size_t size) {
+    if (fd == fail_read_fd) { errno = EILSEQ; return -1; }
+    return read(fd, buffer, size);
+}
+typedef struct { int fd, calls; } fallback_context_t;
+static int fallback_open(void *opaque) {
+    fallback_context_t *context = opaque;
+    ++context->calls;
+    int fd = context->fd;
+    context->fd = -1;
+    return fd;
+}
+static int fallback_open_without_errno(void *opaque) {
+    (void)opaque;
+    errno = 0;
+    return -1;
+}
 static unsigned checks;
 #define CHECK(x)                                                                                   \
     do {                                                                                           \
@@ -23,8 +41,38 @@ static void begin(vda_pending_t *s) {
     vda_pending_begin(s, 100, 0);
 }
 static void readers(void) {
-    int pair[2];
+    int pair[2], fallback_pair[2];
     vda_pending_reader_t r;
+    CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+    CHECK(fcntl(pair[0], F_SETFL, O_NONBLOCK) == 0);
+    CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, fallback_pair) == 0);
+    CHECK(fcntl(fallback_pair[0], F_SETFL, O_NONBLOCK) == 0);
+    fallback_context_t fallback = { fallback_pair[0], 0 };
+    int fallback_attempted = 0, primary_error = 0;
+    fail_read_fd = pair[0];
+    CHECK(vda_pending_reader_begin_recover(&r, pair[0], fallback_open, &fallback, 100,
+                                           &fallback_attempted, &primary_error) == 0);
+    fail_read_fd = -1;
+    CHECK(fallback_attempted && primary_error == EILSEQ && fallback.calls == 1);
+    CHECK(r.fd == fallback_pair[0] && r.observation.summary.status == VDA_PENDING_OBSERVING);
+    CHECK(!vda_pending_candidate(&r.observation));
+    errno = 0; CHECK(fcntl(pair[0], F_GETFD) == -1 && errno == EBADF);
+    CHECK(close(pair[1]) == 0);
+    CHECK(write(fallback_pair[1], EVENT, strlen(EVENT)) == (ssize_t)strlen(EVENT));
+    CHECK(vda_pending_reader_poll(&r, 200) == 0 && r.observation.summary.virtual_events == 1);
+    vda_pending_reader_close(&r); CHECK(close(fallback_pair[1]) == 0);
+
+    CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
+    CHECK(fcntl(pair[0], F_SETFL, O_NONBLOCK) == 0);
+    fail_read_fd = pair[0]; fallback_attempted = 0; primary_error = 0;
+    CHECK(vda_pending_reader_begin_recover(&r, pair[0], fallback_open_without_errno, NULL, 100,
+                                           &fallback_attempted, &primary_error) == -1);
+    fail_read_fd = -1;
+    CHECK(fallback_attempted && primary_error == EILSEQ && r.fd == -1);
+    CHECK(r.observation.summary.status == VDA_PENDING_UNAVAILABLE &&
+          r.observation.summary.error == EIO && !vda_pending_candidate(&r.observation));
+    CHECK(close(pair[1]) == 0);
+
     CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair) == 0);
     CHECK(fcntl(pair[0], F_SETFL, O_NONBLOCK) == 0);
     CHECK(write(pair[1], EVENT, strlen(EVENT)) == (ssize_t)strlen(EVENT));
@@ -60,8 +108,12 @@ static void readers(void) {
           !vda_pending_candidate(&r.observation));
     CHECK(close(pair[1]) == 0);
     errno = EACCES;
-    CHECK(vda_pending_reader_begin(&r, -1, 100) == -1);
+    fallback_attempted = 1; primary_error = 1;
+    CHECK(vda_pending_reader_begin_recover(&r, -1, fallback_open, &fallback, 100,
+                                           &fallback_attempted, &primary_error) == -1);
+    CHECK(!fallback_attempted && primary_error == 0 && fallback.calls == 1);
     CHECK(r.observation.summary.error == EACCES);
+    CHECK(!vda_pending_reader_fallback_eligible(&r));
     vda_pending_reader_close(&r);
 }
 int main(void) {
