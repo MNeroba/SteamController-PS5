@@ -1280,3 +1280,8 @@ Source under test: `e03f2c428e98c8e76334539f33e1f336d3b6ae49` (pushed to `main`)
 ## M1-249 — dev.6 candidate preparation baseline (2026-10-31)
 
 Published dev.5 remains the only downloadable version. Before the dev.6 version bump, current main `4bd783c1b8dc1082942b85a7fcee72a0e0c45632` had exact push checks Host [41245148448](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148448) and PS5 SDK [41245148430](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148430), both success; full-history secret scan [41245148379](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148379) success. Source-fix ancestor `e03f2c4` also had Host41245027045, SDK41245027061 and secret scan41245027077 success. These checks do not transfer to the versioned dev.6 source SHA. Candidate exact-SHA checks pending; DEV workflow not dispatched; no ELF/release or PS5 hardware test.
+
+
+## M1-249 review correction — candidate draft superseded (2026-10-31)
+
+Diff review of first versioned draft `617fdbc4537cf3362439181c0d7d748941b79bdf` found that its project-memory update replaced the historical contents of `PROJECT_MEMORY.md` and `ISSUES.md`. Do not select this SHA for release. The follow-up restores those files from parent `4bd783c1b8dc1082942b85a7fcee72a0e0c45632`, preserving the complete earlier record and appending the dev.6 checkpoint. The first draft's Actions runs are not candidate-release evidence. No runtime files or release artifacts were deleted or modified by this correction.

@@ -1319,3 +1319,8 @@ The reviewed 16-file M1-248 source/documentation patch was committed directly to
 ## 2026-10-31 — M1-249 start: prepare dev.6
 
 Owner requested dev.6 preparation after tester reported no success on the published dev.5 build. Reconciled remote main at `4bd783c1b8dc1082942b85a7fcee72a0e0c45632`; the inherited desktop checkout is a dirty overlay at `7846011`, so no local wholesale commit. M1-248 source fixes are on main at `e03f2c428e98c8e76334539f33e1f336d3b6ae49`. Exact push Host/SDK checks passed on e03f2c4 and current docs head 4bd783c; see TEST_LOG. Dev.6 changes only versioned release metadata/changelog/loading docs and test history; source fixes are already present. Exact candidate CI must pass before final review. DEV workflow is a publish action and remains unrun pending separate explicit approval.
+
+
+## M1-249 source review correction (2026-10-31)
+
+The first versioned candidate commit `617fdbc4537cf3362439181c0d7d748941b79bdf` was pushed to main, then full-tree diff review caught that two summary files had been replaced instead of preserved. Do not select it as the dev.6 release source even if its workflows pass. The next commit restores their full content from the previous main tree and records this negative result. It also makes the versioned ELF variable explicit in the packaged transfer example. Re-run exact-source Host/SDK checks on the corrected commit.

@@ -24,6 +24,7 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
+   ELF=SteamController-PS5-v0.1.0-dev.N.elf # replace with the exact downloaded filename
    nc -w 8 <PS5-IP> <loader-port> < "$ELF"
    ```
 
