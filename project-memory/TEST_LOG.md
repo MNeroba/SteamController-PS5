@@ -1285,3 +1285,12 @@ Published dev.5 remains the only downloadable version. Before the dev.6 version 
 ## M1-249 review correction — candidate draft superseded (2026-10-31)
 
 Diff review of first versioned draft `617fdbc4537cf3362439181c0d7d748941b79bdf` found that its project-memory update replaced the historical contents of `PROJECT_MEMORY.md` and `ISSUES.md`. Do not select this SHA for release. The follow-up restores those files from parent `4bd783c1b8dc1082942b85a7fcee72a0e0c45632`, preserving the complete earlier record and appending the dev.6 checkpoint. The first draft's Actions runs are not candidate-release evidence. No runtime files or release artifacts were deleted or modified by this correction.
+
+
+## M1-249 — corrected dev.6 source gates (2026-10-31)
+
+Candidate/source SHA: `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. GitHub push Actions on this exact SHA:
+- Host run [41245762239](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762239): **success**, including `make -C tests clean test`, ASan/UBSan and `bash scripts/run_webui_browser.sh`.
+- PS5 SDK v0.43 cross-build [41245762158](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762158): **success**.
+- Full-history secret scan [41245762162](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762162): **success**.
+This establishes host/build gates only. Physical PS5, USB/Puck, VDA ownership/assignment, native DualSense coexistence, runtime storage and firmware compatibility remain NOT_RUN. DEV workflow_dispatch was not run; no dev.6 tag, release or public ELF exists. First draft SHA `617fdbc4537cf3362439181c0d7d748941b79bdf` is excluded because its project-memory files were corrected in the candidate; only 4c8b89b is eligible for review.

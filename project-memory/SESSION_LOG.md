@@ -1324,3 +1324,8 @@ Owner requested dev.6 preparation after tester reported no success on the publis
 ## M1-249 source review correction (2026-10-31)
 
 The first versioned candidate commit `617fdbc4537cf3362439181c0d7d748941b79bdf` was pushed to main, then full-tree diff review caught that two summary files had been replaced instead of preserved. Do not select it as the dev.6 release source even if its workflows pass. The next commit restores their full content from the previous main tree and records this negative result. It also makes the versioned ELF variable explicit in the packaged transfer example. Re-run exact-source Host/SDK checks on the corrected commit.
+
+
+## 2026-10-31 — M1-249 corrected candidate and CI receipt
+
+Corrected dev.6 source candidate `4c8b89bc789bf1dfd064264ff432d3919b5a1899` is on main after preserving and restoring all historical project-memory records. Exact push Host run41245762239, PS5 SDK v0.43 run41245762158, and full-history secret-scan run41245762162 completed/success. Candidate version/changelog/metadata/workflow/loading guide align to v0.1.0-dev.6. The first draft617fdbc was superseded due to an unintended historical-memory deletion and is not selected. Published dev.5 remains unchanged. No release/tag/ELF or hardware test. Next: obtain explicit owner approval before dispatching the manual DEV workflow; after approval, inspect validate-build/package result, tag/source, seven assets and exact one-ELF checksum before asking the tester to use it.

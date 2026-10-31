@@ -4,7 +4,7 @@
 
 - P0-VDA-PENDING-04 remains BLOCKED_HARDWARE: the bounded observer now retries one loopback stream only for `/dev/klog` EILSEQ; actual registration, ownership and native DualSense coexistence remain unverified. Tester logs stop before AddDevice and do not identify the failing source.
 - P1-STORAGE-DIAG-04 is HOST_FIXED, TARGET_UNVERIFIED: missing-token detection relies on protected `openat(O_NOFOLLOW)` ENOENT; strict create/validation remain. Prospero filesystem behavior is unconfirmed.
-- Dev.6 version/changelog/metadata and package guide are aligned on main, but the corrected exact-SHA Host/SDK runs are pending. First draft `617fdbc4537cf3362439181c0d7d748941b79bdf` is not a release source because it temporarily replaced historical project-memory summaries; this commit restores the original records.
+- Dev.6 version/changelog/metadata and package guide are aligned. Corrected candidate `4c8b89bc789bf1dfd064264ff432d3919b5a1899` passed exact Host/ASan/UBSan/Chromium [41245762239](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762239), PS5 SDK [41245762158](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762158) and secret scan [41245762162](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245762162). First draft `617fdbc4537cf3362439181c0d7d748941b79bdf` is not a release source because it temporarily replaced historical project-memory summaries; this commit restores the original records.
 - No new release/tag or ELF is published; dev.5 remains unchanged. Separate owner approval is required before the manual release workflow.
 
 ## Historical M1-248 tester follow-up (2026-10-31)
