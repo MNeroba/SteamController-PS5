@@ -17,7 +17,7 @@ class Changelog(unittest.TestCase):
     def test_current_and_history(self):
         text=(ROOT/'CHANGELOG.md').read_text()
         self.assertIn('### Bug Fixes',validate(VERSION))
-        for v in ['v0.1.0-dev.1','v0.1.0-dev.2','v0.1.0-dev.3','v0.1.0-dev.4']:
+        for v in ['v0.1.0-dev.1','v0.1.0-dev.2','v0.1.0-dev.3','v0.1.0-dev.4','v0.1.0-dev.5']:
             self.assertEqual(entry(text,v).count('### '),2)
     def test_bad_format(self):
         good='## v0.1.0-dev.3\n\n### Bug Fixes\n\nNone.\n\n### New Features / Improvements\n\n- Reports.\n'

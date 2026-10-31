@@ -244,3 +244,8 @@ VERIFIED_HOST_TEST: a cancelled pending registration's failed deletion retained 
 ## F117 — Storage failure need not remove authenticated diagnostics (M1-246)
 
 VERIFIED_HOST_TEST: production auth/fsync ENOSPC28 injection starts a protected RAM-only portal; actual HTTP pairing/authenticated report work, no token persists and restart rejects the previous token. Existing bad/foreign/insecure tokens and CSPRNG failure stay fatal. Raw-log filtering precedes every raw sink. The external console's actual storage stage/errno remains unknown until a dev.5 report; no ENOSPC/EOPNOTSUPP console diagnosis is inferred.
+
+
+## F118 — dev.5 tester log does not evaluate the M1-248 source fixes (2026-10-31)
+
+EXTERNAL_HARDWARE: the supplied follow-up still identifies itself as a dev.5 run. It shows Steam USB-C/Puck input, a protected WebUI `file-inspect/EINVAL` failure, and VDA observer initialization `EILSEQ` before AddDevice. It does not reveal the tested ELF SHA, measured firmware or selected log-reader source. Therefore it does not establish behavior of source commit `e03f2c4` or any PS5 ownership/assignment result. Keep prior logs outside Git and retain NOT_RUN hardware rows until a version-identified run occurs.

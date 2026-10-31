@@ -463,3 +463,8 @@ External dev.5 logs report `file-inspect/EINVAL`. Replace the redundant `fstatat
 ## ADR-065 — Bounded log-source recovery for pending VDA setup (2026-10-31)
 
 The external dev.5 log reports `EILSEQ` while establishing the bounded event reader, before AddDevice. Permit exactly one alternate open only when `/dev/klog` was selected and the initial reader reports `VDA_PENDING_UNAVAILABLE/EILSEQ`. The existing loopback source is independently drained to `EAGAIN`; Add remains blocked on all other errors, failed opens, read errors, overflow and incomplete drains. Log source and both errors without recording raw log lines or device/account identifiers. Host injection verifies policy and descriptor lifetime; actual target source and VDA behavior remain unverified. Published dev.5 remains immutable and unchanged.
+
+
+## ADR-066 — dev.6 source scope and publication boundary (2026-10-31)
+
+ACCEPTED: prepare v0.1.0-dev.6 as the next experimental version containing the already-reviewed M1-248 protected-token initialization and bounded VDA log-source recovery. Do not expand the AddDevice ABI, event ownership, account binding, native DualSense behavior, firmware claims or security defaults for this version. Use one exact mainline source SHA with successful Host and SDK push gates, aligned changelog/version/metadata/workflow and a single SDK-built ELF. This request authorizes preparation; manual DEV workflow dispatch/release remains a separate approval because it publishes an artifact. Physical behavior stays NOT_RUN; published dev.5 is immutable.

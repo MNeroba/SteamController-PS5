@@ -2,7 +2,7 @@
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
-Current experimental download: [dev/v0.1.0-dev.5](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.5), one ELF built from `382e4ecef4937356b72f9e1786917ae7147c0415`. Published ELF SHA-256: `01a73f3f676121061f58b52a833c642d8cd94b048fbbc524182b8756eb642bd0`. Download its matching checksum from the same release; do not substitute a local build digest. [Release validation](https://github.com/MNeroba/SteamController-PS5/actions/runs/38810046681) passed the repeated software/build gates. Pending VDA recovery is experimental event correlation; actual PS5 input/native coexistence remain unverified. Read the [contract and tester checklist](VDA_PENDING.md).
+Published experimental downloads are listed on the [GitHub Releases page](https://github.com/MNeroba/SteamController-PS5/releases). Select the exact prerelease you intend to test, then download its ELF and matching checksum from that same release. Confirm the version and source SHA in its release notes; never substitute an older or locally built ELF. Every DEV build remains experimental. Pending VDA recovery uses event correlation; actual PS5 input and native DualSense coexistence are unverified. Read the [contract and tester checklist](VDA_PENDING.md).
 
 ## Before loading
 
@@ -13,16 +13,18 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 
    ```sh
    # Linux
-   sha256sum --check SteamController-PS5-v0.1.0-dev.5.elf.sha256
+   ELF=SteamController-PS5-v0.1.0-dev.N.elf # replace dev.N with the downloaded release version
+   sha256sum --check "$ELF.sha256"
    # macOS
-   shasum -a 256 -c SteamController-PS5-v0.1.0-dev.5.elf.sha256
+   ELF=SteamController-PS5-v0.1.0-dev.N.elf # replace dev.N with the downloaded release version
+   shasum -a 256 -c "$ELF.sha256"
    ```
 
 3. Keep the native DualSense available. Use a recoverable development environment; retain local console access. Do not enable hooks or built-in-radio experiments for a first test.
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   nc -w 8 <PS5-IP> <loader-port> < SteamController-PS5-v0.1.0-dev.5.elf
+   nc -w 8 <PS5-IP> <loader-port> < "$ELF"
    ```
 
    Port 9021 is an inherited convenience default, not a compatibility guarantee. This project has not tested the transfer or loading procedure on physical hardware. Do not repeatedly send the payload when a loader has failed or become unresponsive.
@@ -75,8 +77,8 @@ See [SETTINGS_TILE.md](SETTINGS_TILE.md) for failure/retry behavior and required
 After enrollment, open Settings & help → Diagnostics → Download Diagnostic Report. The fixed-name text export includes available startup, USB, user-recovery, virtual-controller, profile/motion/haptic and build/runtime information, plus a bounded filtered application log tail. It works with incomplete initialization or no connected Steam Controller. It does not read arbitrary system files. Review profile names, USB paths and other context before attaching it to an issue; never include credentials or console identifiers. Use SECURITY.md for vulnerabilities rather than posting exploits publicly.
 
 
-## dev.5 pending registration and storage fallback
+## Pending registration and storage fallback
 
 The experimental pending-registration path observes one typed virtual device after one Add and continues USB input during identification. Keep other virtual-controller payloads stopped; temporal correlation is not a proven ownership ABI. Press Steam/PS and use the console's profile picker. A connected or unknown native DualSense prevents automatic local binding; no native disconnect/unbind or Shell patch is performed. If identification is unresolved, avoid repeated reloads and collect diagnostics. Native coexistence is physically unverified.
 
-If operational credential-storage writes fail, dev.5 may start with a fresh RAM-only 256-bit token. The console notification says **Session only**; normal pairing and bearer/Origin/LAN checks remain. Pair again after restart, and download diagnostics while running. There is no persistent recovery token in this mode. Profile saves may remain unavailable; a storage fallback is not a filesystem repair. Existing malformed/foreign/insecure credentials and entropy failure still disable access. [Contract and tester checklist](VDA_PENDING.md).
+If operational credential-storage writes fail, an experimental build may start with a fresh RAM-only 256-bit token. The console notification says **Session only**; normal pairing and bearer/Origin/LAN checks remain. Pair again after restart, and download diagnostics while running. There is no persistent recovery token in this mode. Profile saves may remain unavailable; a storage fallback is not a filesystem repair. Existing malformed/foreign/insecure credentials and entropy failure still disable access. [Contract and tester checklist](VDA_PENDING.md).

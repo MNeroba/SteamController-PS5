@@ -1275,3 +1275,8 @@ Published dev.5 source/tag/assets remain unchanged. Local source changes have no
 ## 2026-10-31 — M1-248 GitHub receipt
 
 Source under test: `e03f2c428e98c8e76334539f33e1f336d3b6ae49` (pushed to `main`). GitHub full-history secret scan run [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077): **success**. This workflow did not run Host or PS5 SDK tests. Local host/sanitizer, browser, SDK and physical-test outcomes are recorded in the preceding M1-248 entry. Published dev.5 artifacts are unchanged.
+
+
+## M1-249 — dev.6 candidate preparation baseline (2026-10-31)
+
+Published dev.5 remains the only downloadable version. Before the dev.6 version bump, current main `4bd783c1b8dc1082942b85a7fcee72a0e0c45632` had exact push checks Host [41245148448](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148448) and PS5 SDK [41245148430](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148430), both success; full-history secret scan [41245148379](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148379) success. Source-fix ancestor `e03f2c4` also had Host41245027045, SDK41245027061 and secret scan41245027077 success. These checks do not transfer to the versioned dev.6 source SHA. Candidate exact-SHA checks pending; DEV workflow not dispatched; no ELF/release or PS5 hardware test.

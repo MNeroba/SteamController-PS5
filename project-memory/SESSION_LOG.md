@@ -1314,3 +1314,8 @@ The desktop checkout is inherited `fix/p0-safety` at base `7846011` with a very 
 ## 2026-10-31 — M1-248 source push receipt
 
 The reviewed 16-file M1-248 source/documentation patch was committed directly to current `main` as `e03f2c428e98c8e76334539f33e1f336d3b6ae49` after confirming its parent was the live main head `e5662cfa63b871b3c6d0d5f1cb34774023c2bb88`. GitHub confirmed the ref update and the new main head. Actions run [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077) (full-history secret scan, push event) completed with success. No release/tag/ELF was created or modified. Host tests are recorded above; the local listener/browser bind and PS5 SDK gates remain unavailable in this environment. Physical PS5 validation is NOT_RUN.
+
+
+## 2026-10-31 — M1-249 start: prepare dev.6
+
+Owner requested dev.6 preparation after tester reported no success on the published dev.5 build. Reconciled remote main at `4bd783c1b8dc1082942b85a7fcee72a0e0c45632`; the inherited desktop checkout is a dirty overlay at `7846011`, so no local wholesale commit. M1-248 source fixes are on main at `e03f2c428e98c8e76334539f33e1f336d3b6ae49`. Exact push Host/SDK checks passed on e03f2c4 and current docs head 4bd783c; see TEST_LOG. Dev.6 changes only versioned release metadata/changelog/loading docs and test history; source fixes are already present. Exact candidate CI must pass before final review. DEV workflow is a publish action and remains unrun pending separate explicit approval.

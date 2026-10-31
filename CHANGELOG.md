@@ -2,15 +2,18 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. Historical releases and tags remain unchanged.
 
-## Unreleased — dev.5 tester follow-up (not published)
+## v0.1.0-dev.6
+
+Candidate prepared for review; not yet published.
 
 ### Bug Fixes
 
-- Fixed token initialization when the target filesystem rejects `fstatat`'s no-follow flag; missing tokens are now identified by the existing protected no-follow open (host-tested).
+- Fixed protected WebUI token initialization so a missing token is detected by the existing no-follow open, without a second metadata lookup; exclusive creation and validation remain in place (host-tested; target filesystem unverified).
+- Improved pending VDA log setup with one fresh loopback retry when the selected `/dev/klog` reader returns `EILSEQ`; registration remains blocked if the fallback cannot drain safely (host-tested; PS5 behavior unverified).
 
 ### New Features / Improvements
 
-- Added one bounded retry through the existing loopback log stream when `/dev/klog` returns `EILSEQ`; registration still stops if a fresh stream cannot be established (host-tested; PS5 behavior unverified).
+None.
 
 ## v0.1.0-dev.5
 

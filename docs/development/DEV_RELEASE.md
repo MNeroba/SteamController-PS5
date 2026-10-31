@@ -10,6 +10,12 @@ Before publication, update CHANGELOG.md relative to the previous published versi
 
 Future versions still require explicit owner approval. A green push does not authorize publication; never reuse an existing release tag.
 
+## dev.6 candidate — M1-249 (2026-10-31)
+
+The owner requested preparation of v0.1.0-dev.6. Its scope is the M1-248 tester follow-up: protected token initialization without the redundant no-follow metadata probe, plus one bounded VDA log-reader retry for `/dev/klog/EILSEQ`. No VDA Add result, firmware compatibility or physical fix is claimed. The tester's shown logs came from the published dev.5 ELF and do not exercise the new source.
+
+The version header, changelog, Payload Manager metadata, release workflow default and bundled loading guide are aligned to dev.6. The immediately preceding main source has green Host and PS5 cross-build checks; the versioned dev.6 candidate still needs its own exact-source push workflows. No tag, ELF or release has been created. The manual DEV workflow must wait for separate explicit publication approval.
+
 ## Manual publication
 
 1. Review `ISSUES.md`, this task's full file audit, safety defaults and `dev-release.json`. A known unresolved critical **code** defect must be added to `critical_code_blockers`; the workflow then fails closed. Hardware-dependent risks stay explicit in the notes and matrix.

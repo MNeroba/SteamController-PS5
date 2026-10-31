@@ -1,5 +1,13 @@
 # Current status — 2026-10-31
 
+## M1-249 — v0.1.0-dev.6 candidate preparation (2026-10-31)
+
+The owner requested dev.6 preparation. Latest published release remains dev.5; no dev.6 tag, ELF or release exists. The tester's latest logs still came from published dev.5: USB-C/Puck input works, WebUI storage reports `file-inspect/EINVAL`, and VDA log setup reports `EILSEQ` before AddDevice. No exact tested ELF SHA or measured tester firmware was established. These logs do not exercise the source changes now on main.
+
+The candidate contains the M1-248 fixes: determine an absent protected token from `openat(O_NOFOLLOW) == ENOENT`, with exclusive/no-follow creation and existing validation preserved; retry the bounded VDA observer once through a fresh loopback stream only when the selected `/dev/klog` reader returns `EILSEQ`. Add remains blocked unless the new stream drains to `EAGAIN`. No Add ABI, event ownership, account binding, firmware or native DualSense policy is changed.
+
+Dev.6 release metadata is being aligned: version header, two-section changelog, Payload Manager sidecar, manual workflow default and packaged loading guide. Source/Host/SDK CI on the dev.6 commit is pending. The immediately preceding main source `e03f2c4` passed Host/SDK/secret scan; its docs descendant `4bd783c` passed Host/SDK. Local sandbox could not bind loopback, and the inherited desktop checkout is not a safe publication tree. No PS5 hardware claim. Do not dispatch the DEV workflow until the exact dev.6 source gates pass and separate publication approval is given.
+
 ## M1-248 — external dev.5 failure follow-up; source committed, release unpublished
 
 The tester updated the shared Gist with logs from dev.5. Sanitized facts: Steam Controller via USB-C/Puck is detected and reports input; WebUI authentication setup fails at `file-inspect / EINVAL`; VDA event-log setup fails with `EILSEQ` before AddDevice, so this run says nothing about the VDA Add result. No user IDs, tokens, pairing codes or raw system log text are retained here. The run's measured firmware and exact ELF SHA are not established by the inspected excerpt.
@@ -14,7 +22,7 @@ Validation: normal host C/Python tests pass except `test_webui_server`, whose lo
 
 Checkout constraint: local Git is `fix/p0-safety` based on `7846011` with a large inherited mixed/dirty tree, not an authoritative current-main snapshot. Do not commit or publish the whole checkout. Before any replacement release, transplant only reviewed files onto a freshly verified complete `main` tree, run green exact-source CI/SDK/browser gates, and get separate owner approval.
 
-The source commit is now `main` HEAD. GitHub Actions run [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077) completed successfully for the full-history secret scan; no Host or PS5 SDK workflow was triggered by this source-only push. The published dev.5 ELF/tag/assets remain unchanged. Next, obtain SDK v0.43 and unrestricted local-browser/loopback testing before considering a replacement build; any release still requires separate approval and an exact ELF SHA-256 for the tester. Never describe this workaround as PS5-proven.
+Source fix `e03f2c428e98c8e76334539f33e1f336d3b6ae49` is an ancestor of current main `4bd783c1b8dc1082942b85a7fcee72a0e0c45632`. Exact-source Host [41245027045](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027045), PS5 SDK [41245027061](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027061), and secret scan [41245027077](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245027077) passed; the docs descendant also passed Host [41245148448](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148448) and SDK [41245148430](https://github.com/MNeroba/SteamController-PS5/actions/runs/41245148430). The versioned dev.6 commit still needs its own exact-SHA Host/SDK checks. The published dev.5 ELF/tag/assets remain unchanged. Next: complete the versioned dev.6 source commit, wait for its exact-SHA Host/SDK runs, then request separate publication approval. A tester must receive the actual release ELF and SHA-256 only after publication. Never describe this workaround as PS5-proven. Never describe this workaround as PS5-proven.
 
 ---
 
