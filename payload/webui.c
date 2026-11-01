@@ -584,7 +584,16 @@ static void *server_thread(void *arg) {
         if (slot == WEBUI_CLIENT_MAX) { close(c); continue; }
         webui_client_t *client = &g_clients[slot];
         client->fd = c; client->done = 0;
-        int r = pthread_create(&client->thread, NULL, client_thread, client);
+        /* Local patch: dispatch() alone needs ~105 KiB of stack (plus ~38 KiB
+         * in handle); the PS5 default thread stack is too small and the first
+         * HTTP request crashed the payload. Use an explicit 1 MiB stack. */
+        pthread_attr_t attr;
+        int r = pthread_attr_init(&attr);
+        if (r == 0) {
+            r = pthread_attr_setstacksize(&attr, 1024u * 1024u);
+            if (r == 0) r = pthread_create(&client->thread, &attr, client_thread, client);
+            pthread_attr_destroy(&attr);
+        }
         if (r != 0) { close(c); client->fd = -1; LOG("webui: client thread failed (%d)\n", r); }
         else client->started = 1;
     }
