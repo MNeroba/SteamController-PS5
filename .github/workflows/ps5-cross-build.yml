@@ -46,6 +46,7 @@ jobs:
       - name: Upload cross-build artifact
         uses: actions/upload-artifact@v7
         with:
+          archive: true
           name: SteamController-PS5-cross-build
           path: |
             payload/ghost-control-ps5.elf

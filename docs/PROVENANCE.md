@@ -106,3 +106,8 @@ M1-246 owner clarification authorizes the analogous event-correlation approach f
 |---|---|---|
 | payload/webui.c worker stack, payload/vda_pending.c backlog bound, initial payload/ps5_at_compat.h and payload/Makefile | TheBrokenG0d/SteamController-PS5 PR8 head c3a7ddb4f721b512e294dea23ed67e4d5cd1ef1a (three contributor commits) | Contributor's GPL-3.0-or-later changes; preserve author commits and SPDX. Retain 1 MiB client stacks and 4096-read nonblocking drain; replace ambiguous fd/inode inference after reproducing two P1 defects. Contributor-reported FW13.20/Puck results are EXTERNAL_HARDWARE only. |
 | payload/ps5_at_compat.c, tests/test_ps5_at_compat.c and ABI tests | ps5-payload-dev/sdk d9c9519116944a7f1c22d262012c53b80b3520b7 libc/syscalls.c:1841–1950 and include/freebsd/sys/errno.h:163–165; freebsd/freebsd-src d106002967eff712894ab8b5337bbbff106ce5e0 lib/libc/amd64/SYS.h | SDK GPL-3.0-or-later (John Törnblom), FreeBSD file BSD-4-Clause notices retained upstream. Public ABI/numeric definitions and carry-flag error convention used as reference only; independently authored typed wrappers and tests, no implementation copied. No new kernel offsets, memory patches, filesystem migration or native-controller operations. |
+
+
+## M1-251 — CI Actions updates (2026-11-01)
+
+Dependabot PR3–7 update references to existing official actions/upload-artifact, checkout, setup-node, download-artifact and github-script dependencies. Exact reviewed upstream revisions and compatibility decisions are in development/CI_ACTIONS.md. No upstream implementation is copied into the payload; the small non-publishing artifact/API smoke workflow is authored here. Existing licenses and release notices remain unchanged.

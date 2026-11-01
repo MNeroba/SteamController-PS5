@@ -63,6 +63,7 @@ jobs:
       - name: Upload build artifact
         uses: actions/upload-artifact@v7
         with:
+          archive: true
           name: ghost-control-ps5
           path: |
             payload/ghost-control-ps5.elf
@@ -92,6 +93,7 @@ jobs:
       - name: Download tested payload artifact
         uses: actions/download-artifact@v8
         with:
+          digest-mismatch: error
           name: ghost-control-ps5
           path: release-assets
       - name: Verify downloaded ELF checksum

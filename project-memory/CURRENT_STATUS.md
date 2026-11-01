@@ -177,3 +177,8 @@ Owner requests integration in existing unpublished dev.3 and explicitly withhold
 ## M1-250 — PR8 corrective follow-up / dev.7 (2026-11-01)
 
 Owner authorizes fixes, validated PR8 merge and a new experimental release. Both P1 defects reproduced against c3a7ddb, then resolved using explicit syscall error status rather than fd/inode inference. Contributor's 1 MiB WebUI stack and bounded 4 MiB klog drain retained; 51 host targets, ASan/UBSan, Chromium220, amd64 CF/register trap and clean SDKv0.43/LLVM18 build pass locally. Exact-head GitHub CI/merge/publication pending. External contributor FW13.20/Puck results are not a test of the revised adapter or FW13.60. See [PR8 review and correction](PR8_REVIEW.md).
+
+
+## M1-251 — PR3–7 Actions maintenance preparation (2026-11-01)
+
+Owner requests necessary follow-up for PR1–7. PR1 stays closed/superseded. Issue2 updated to exact dev.7 source f4ec9ae9e7e287c957a5602493a5b7d46449aed3, ELF digest9bc6e1672bc8d20c8e9fcff85359c976523bdf6296a64e1e92dae34e6d7edb73 and hardware/native coexistence/storage checklist; dev.5 body preserved. Five original Dependabot heads merged locally onto complete main f44da276c6672bb283d2b715f3a8729c2e598df8; one adjacent checkout/setup-node conflict resolved to both v7. Added read-only CI Actions smoke for real multi-file transfer/checksums and github-script APIs, explicit archive:true/digest-mismatch:error. Actual candidate/main runs pending; no CI success or merge into main claimed yet. No payload/SDK/version/release change. Next: publish codex/actions-maintenance, require smoke plus Host/sanitizer/Chromium/SDK/secret checks, then non-force main integration preserving all PR ancestry and verify GitHub closure. See docs/development/CI_ACTIONS.md.
