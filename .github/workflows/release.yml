@@ -90,7 +90,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Download tested payload artifact
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@v8
         with:
           name: ghost-control-ps5
           path: release-assets
