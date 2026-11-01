@@ -2,6 +2,20 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. Historical releases and tags remain unchanged.
 
+## v0.1.0-dev.7
+
+Experimental release candidate. Contributor-reported results on a single FW 13.20/Puck console apply to the original PR #8 build; this revised release has no physical PS5 acceptance result.
+
+### Bug Fixes
+
+- Prevented WebUI request handling from overflowing the default worker stack by allocating an explicit bounded stack (host-tested; contributor reported the original fix on FW 13.20).
+- Allowed virtual-controller startup to drain larger existing kernel-log backlogs safely and retain a full observation window before accepting a pending registration (host-tested; ownership and user assignment remain experimental).
+- Corrected PS5 filesystem error handling for credentials, profiles and optional tile files, preserving exclusive creation and descriptor ownership during failures and file replacement (host-tested; revised adapter awaits console testing).
+
+### New Features / Improvements
+
+- Added regressions for target syscall arguments and error flags, descriptor exhaustion, concurrent file replacement and credential cleanup after failed initialization.
+
 ## v0.1.0-dev.6
 
 Published 31 October 2026 (UTC; 1 November in Riga) from `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. [Release and downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6).

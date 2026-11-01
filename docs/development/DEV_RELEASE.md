@@ -6,6 +6,12 @@ DEV builds are experimental software/build deliverables. They do not satisfy the
 
 Before publication, update CHANGELOG.md relative to the previous published version, with exactly **Bug Fixes** and **New Features / Improvements** (write `None.` when empty). Match payload/version.h, metadata and selected workflow version; never rewrite historical releases/tags. Both DEV packaging and stable tagged release workflows fail closed on a missing/mismatched entry. Notes include those two sections, actual source SHA and development/hardware status.
 
+## dev.7 preparation — M1-250 (2026-11-01)
+
+The owner explicitly authorized correction of PR8, merge after successful checks and a new release. Select **v0.1.0-dev.7**, preserving dev.6 and all historical tags/assets. Contributor commits retain their authorship; the maintainer replaces the fd/inode error heuristic with explicit amd64 syscall error status and adds host/ABI/storage/backlog regressions. See [PR8 review and correction](../../project-memory/PR8_REVIEW.md). A standalone dev.N fits the existing version gate; do not relax it for a fix.1 suffix.
+
+Local normal/sanitizer/Chromium220 and SDKv0.43/LLVM18 checks passed before versioning. The new selected exact source still needs green remote checks and the manual DEV workflow's repeated checks before publication. Contributor-reported FW13.20/Puck results apply only to original c3a7ddb; revised adapter, FW13.60, native DualSense coexistence, games and cleanup remain hardware-unverified. No new kernel/Shell/radio behavior or storage migration.
+
 ## Published experimental dev.6 — M1-249 (2026-11-01 Riga / 2026-10-31 UTC)
 
 [dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6), source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`, published as release 430212834 by [manual DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948). The workflow completed successfully in all three jobs and reran the normal host suite, ASan/UBSan, Chromium regression, nine image/embedding contracts, deterministic asset generation, clean SDK v0.43/LLVM 18 cross-build, packaging/notice checks and checksum verification. The release contains seven assets and exactly one ELF: `SteamController-PS5-v0.1.0-dev.6.elf`, 2,087,296 bytes, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`. The annotated tag points to the selected source SHA above.

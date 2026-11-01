@@ -1,6 +1,12 @@
-# Pending virtual-controller registration — dev.6
+# Pending virtual-controller registration — dev.7
 
 2026-10-16 · M1-246 · experimental, physical PS5 verification NOT_RUN
+
+## dev.7 correction (2026-11-01)
+
+PR8 author TheBrokenG0d reports WebUI and sustained Puck/system-menu input on one fat PS5/FW13.20 at source c3a7ddb. This is EXTERNAL_HARDWARE, not a hardware test of the revised dev.7 adapter; native DualSense coexistence and games were not systematically tested. SDKv0.43 defines **EOVERFLOW=84 and EILSEQ=86**. The older diagnosis of tester errno84 as EILSEQ was incorrect; historical records below are preserved. The prior drain itself synthesized EOVERFLOW after64 reads. The corrected drain remains nonblocking and refuses Add when its larger bound cannot reach EAGAIN.
+
+The SDK's filesystem stubs omit POSIX error translation. The revised target adapter captures the syscall error flag separately from the returned value, preserving the existing credential/profile/tile security checks and actual fd ownership. Its host and SDK evidence does not establish console behavior. [Detailed review, regressions and limits](../../project-memory/PR8_REVIEW.md).
 
 ## Contract and evidence
 
@@ -12,8 +18,8 @@ The owner explicitly requested the analogous approach for this stage, deferring 
 
 ## Implemented flow
 
-1. Reserve creation in the existing generation-tagged slot registry before any Add. Open a dedicated nonblocking `/dev/klog` or bounded loopback3232 stream. Drain at most64KiB to EAGAIN; an incomplete/unavailable backlog refuses Add. When the optional handoff observer is active, only an independent loopback stream is permitted.
-2. Perform Add once. A positive direct return retains the existing path. `0x803b0006` leaves the reservation pending; the USB owner continues input, motion and feedback without a3-second blocking wait or reader restart.
+1. Reserve creation in the existing generation-tagged slot registry before any Add. Open a dedicated nonblocking `/dev/klog` or bounded loopback3232 stream. Drain at most4096 nonblocking 1 KiB reads (4 MiB bound) to EAGAIN; an incomplete/unavailable backlog refuses Add. When the optional handoff observer is active, only an independent loopback stream is permitted.
+2. Refresh the monotonic observation timestamp after the drain, preserving the partial-line guard, then perform Add once. Clock/arming failure refuses Add. A positive direct return retains the existing path. `0x803b0006` leaves the reservation pending; the USB owner continues input, motion and feedback without a3-second blocking wait or reader restart.
 3. Observe a full3-second minimum window, bounded to4KiB per poll and1024 bytes per line. Require exact LoginMgr DEVICE_ADDED fields: type1, subtype22, battery capability0, a valid uint64 ID and positive signed low32. Duplicate observations of the same ID count as one candidate; different IDs, malformed/truncated data, clock/read/close failure or unread backlog at completion refuse correlation. Known physical DualSense events (battery1) are excluded; contradictory native/virtual IDs refuse correlation.
 4. Fresh user-list validation and existing native-handle comparisons can reject a candidate, never supply one. Store an accepted event receipt in the existing registry with `virtual_correlated`, distinct from a direct Add receipt. The assumed ID-to-handle relationship remains HYPOTHESIS pending console validation.
 5. Cancel/pause/confirmed logout/release/disconnect finishes identification for cleanup. A cancelled receipt is marked retiring before it can receive input. Failed deletion retains ownership and blocks a replacement; manager retries cleanup. Unresolved identification keeps the lifetime no-repeat latch and never deletes a guessed device. An unidentified orphan cannot be safely cleaned automatically.

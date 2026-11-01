@@ -217,7 +217,10 @@ int vda_pending_reader_begin(vda_pending_reader_t *r, int fd, uint64_t now_ms) {
     }
     char buffer[1024];
     int partial = 0;
-    for (unsigned i = 0; i < 64; i++) {
+    /* Local patch: 64 x 1 KiB was too small for the existing /dev/klog
+     * backlog on real consoles and failed with EOVERFLOW (errno 84 on
+     * FreeBSD/PS5, misread as Linux EILSEQ). Drain up to 4 MiB. */
+    for (unsigned i = 0; i < 4096; i++) {
         ssize_t n = vda_reader_read(fd, buffer, sizeof(buffer));
         if (n > 0) {
             partial = buffer[n - 1] != '\n';
@@ -241,6 +244,24 @@ int vda_pending_reader_begin(vda_pending_reader_t *r, int fd, uint64_t now_ms) {
 int vda_pending_reader_fallback_eligible(const vda_pending_reader_t *r) {
     return r && r->observation.summary.status == VDA_PENDING_UNAVAILABLE &&
            r->observation.summary.error == EILSEQ;
+}
+int vda_pending_reader_start_window(vda_pending_reader_t *r, uint64_t now_ms) {
+    if (!r) return -1;
+    if (r->fd < 0 || r->window_armed ||
+        r->observation.summary.status != VDA_PENDING_OBSERVING ||
+        r->observation.summary.virtual_events || r->observation.used) {
+        vda_pending_reader_close(r);
+        vda_pending_fail(&r->observation, VDA_PENDING_REJECTED, EINVAL);
+        return -1;
+    }
+    if (now_ms < r->observation.started_ms) {
+        vda_pending_reader_close(r);
+        vda_pending_fail(&r->observation, VDA_PENDING_CLOCK_ERROR, EIO);
+        return -1;
+    }
+    r->observation.started_ms = now_ms;
+    r->window_armed = 1;
+    return 0;
 }
 int vda_pending_reader_begin_recover(vda_pending_reader_t *r, int fd,
                                      vda_pending_fallback_open_fn fallback_open,

@@ -8,8 +8,10 @@
 #include <unistd.h>
 #include <errno.h>
 static int fail_read_fd = -1;
+static unsigned backlog_reads;
 ssize_t vda_pending_test_read(int fd, void *buffer, size_t size) {
     if (fd == fail_read_fd) { errno = EILSEQ; return -1; }
+    if (backlog_reads) { --backlog_reads; memset(buffer, '\n', size); return (ssize_t)size; }
     return read(fd, buffer, size);
 }
 typedef struct { int fd, calls; } fallback_context_t;
@@ -116,8 +118,53 @@ static void readers(void) {
     CHECK(!vda_pending_reader_fallback_eligible(&r));
     vda_pending_reader_close(&r);
 }
+static void backlog_limits(void) {
+    const unsigned sizes[] = {128, 4095, 4096};
+    for (unsigned i=0; i<sizeof(sizes)/sizeof(*sizes); ++i) {
+        int pair[2]; vda_pending_reader_t r;
+        CHECK(socketpair(AF_UNIX, SOCK_STREAM, 0, pair)==0);
+        CHECK(fcntl(pair[0], F_SETFL, O_NONBLOCK)==0);
+        backlog_reads=sizes[i];
+        int result=vda_pending_reader_begin(&r,pair[0],100);
+        CHECK(!r.observation.summary.virtual_events && !vda_pending_candidate(&r.observation));
+        if (sizes[i]<4096) CHECK(result==0 && r.fd==pair[0]);
+        else CHECK(result==-1 && r.fd==-1 && r.observation.summary.error==EOVERFLOW);
+        vda_pending_reader_close(&r); CHECK(close(pair[1])==0);
+    }
+}
+static void delayed_window(void) {
+    int pair[2]; vda_pending_reader_t r;
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0);
+    CHECK(vda_pending_reader_start_window(&r,5100)==0); /* Slow setup/drain. */
+    CHECK(write(pair[1],EVENT,strlen(EVENT))==(ssize_t)strlen(EVENT));
+    CHECK(vda_pending_reader_poll(&r,5200)==0);
+    CHECK(vda_pending_reader_poll(&r,8099)==0 && !vda_pending_candidate(&r.observation));
+    CHECK(vda_pending_reader_poll(&r,8100)==1 && vda_pending_candidate(&r.observation)==0xd030d);
+    CHECK(r.observation.summary.elapsed_ms==3000 && close(pair[1])==0);
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0);
+    CHECK(vda_pending_reader_start_window(&r,99)==-1 && r.fd==-1);
+    CHECK(r.observation.summary.status==VDA_PENDING_CLOCK_ERROR && close(pair[1])==0);
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0);
+    CHECK(vda_pending_reader_start_window(&r,100)==0);
+    CHECK(vda_pending_reader_start_window(&r,200)==-1 && r.fd==-1); /* No repeated reset. */
+    CHECK(close(pair[1])==0);
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(write(pair[1],"old-partial",11)==11);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0 && r.observation.dropping);
+    CHECK(vda_pending_reader_start_window(&r,500)==0 && r.observation.dropping);
+    vda_pending_reader_close(&r); CHECK(close(pair[1])==0);
+}
 int main(void) {
     readers();
+    backlog_limits();
+    delayed_window();
     vda_pending_t s;
     begin(&s);
     for (size_t i = 0; i < strlen(EVENT); i++)

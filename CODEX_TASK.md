@@ -21,6 +21,9 @@ Details: [current status](project-memory/CURRENT_STATUS.md), [feature table](STE
 
 ## Current execution order
 
+- **M1-250 dev.7:** owner authorizes fixing both reviewed PR8 descriptor P1s, preserving contributor startup fixes, merging after successful checks and publishing a new experimental dev.7. Local Host/ASan/UBSan/Chromium220/SDKv0.43 checks pass; require exact-head CI before merge and selected-main push/repeated DEV gates before publication. The contributor's FW13.20/Puck report is EXTERNAL_HARDWARE at c3a7ddb; revised adapter and owner target FW13.60 remain hardware-unverified. See project-memory/PR8_REVIEW.md.
+
+
 - **Published dev.5 — M1-246 (2026-10-16):** owner explicitly authorizes the analogous event-correlation approach temporarily, then publication for the log author's tests. Implement one pending Add transaction in the existing registry, bounded typed virtual-event identification, local MBus only on Steam/PS with native protection, no Shell patches. Preserve distinction from a proven Add ABI, native coexistence and actual storage errno remain hardware gates. All software/build gates passed on `382e4ecef4937356b72f9e1786917ae7147c0415`; dev/v0.1.0-dev.5 is published via successful workflow38810046681. See docs/development/VDA_PENDING.md and current status for the receipt. Next: controlled tester evidence and remaining hardware gates; future publication needs separate approval.
 
 - **M1-248 tester follow-up (2026-10-31):** protected token initialization and a single bounded VDA log-reader retry were pushed to `main` at `e03f2c4`; exact-source Host and SDK workflows passed. The tester's existing dev.5 log is from the old ELF and does not test these fixes. No VDA Add/ownership, PS5 filesystem or firmware claim is made.
