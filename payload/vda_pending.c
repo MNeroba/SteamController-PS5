@@ -217,7 +217,10 @@ int vda_pending_reader_begin(vda_pending_reader_t *r, int fd, uint64_t now_ms) {
     }
     char buffer[1024];
     int partial = 0;
-    for (unsigned i = 0; i < 64; i++) {
+    /* Local patch: 64 x 1 KiB was too small for the existing /dev/klog
+     * backlog on real consoles and failed with EOVERFLOW (errno 84 on
+     * FreeBSD/PS5, misread as Linux EILSEQ). Drain up to 4 MiB. */
+    for (unsigned i = 0; i < 4096; i++) {
         ssize_t n = vda_reader_read(fd, buffer, sizeof(buffer));
         if (n > 0) {
             partial = buffer[n - 1] != '\n';
