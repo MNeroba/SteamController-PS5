@@ -468,3 +468,10 @@ The external dev.5 log reports `EILSEQ` while establishing the bounded event rea
 ## ADR-066 — dev.6 source scope and publication boundary (2026-10-31)
 
 ACCEPTED: prepare v0.1.0-dev.6 as the next experimental version containing the already-reviewed M1-248 protected-token initialization and bounded VDA log-source recovery. Do not expand the AddDevice ABI, event ownership, account binding, native DualSense behavior, firmware claims or security defaults for this version. Use one exact mainline source SHA with successful Host and SDK push gates, aligned changelog/version/metadata/workflow and a single SDK-built ELF. This request authorizes preparation; manual DEV workflow dispatch/release remains a separate approval because it publishes an artifact. Physical behavior stays NOT_RUN; published dev.5 is immutable.
+
+
+## ADR-067 — Preserve the filesystem syscall error indication (2026-11-01)
+
+ACCEPTED. For the pinned SDKv0.43 six existing *at() operations, capture amd64 CF and RAX together and normalize only actual errors to -1/errno. Never infer allocation from fd number or inode; callers retain metadata validation and cleanup. Public SDK/FreeBSD ABI reference only, no imported implementation. Real ownership/failure regressions and a no-kernel amd64 register/CF test cover this boundary. Keep native DualSense/session/USB behavior and /data/ghostpad unchanged. Revisit when a future SDK provides correct POSIX wrappers, retaining the same regressions.
+
+Selected dev.7, preserving dev.6/tag/assets and the strict existing dev.N release format. This is an experimental channel with full repeated software/build gates, not a stable hardware release.

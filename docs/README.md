@@ -1,6 +1,6 @@
 # Documentation
 
-Start with the [project overview](../README.md) and [current status](../project-memory/CURRENT_STATUS.md). Current published prerelease: [dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6). [Loading](development/LOADING.md), [build](BUILDING.md), [tile](development/SETTINGS_TILE.md) and [VDA/storage checklist](development/VDA_PENDING.md) describe the current version. Dated reviews and archived specifications retain the versions and results they actually reviewed.
+Start with the [project overview](../README.md) and [current status](../project-memory/CURRENT_STATUS.md). Current published prerelease: [dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7). [Loading](development/LOADING.md), [build](BUILDING.md), [tile](development/SETTINGS_TILE.md) and [VDA/storage checklist](development/VDA_PENDING.md) describe the current version. Dated reviews and archived specifications retain the versions and results they actually reviewed.
 
 | Area | Read |
 | --- | --- |
@@ -8,7 +8,7 @@ Start with the [project overview](../README.md) and [current status](../project-
 | Architecture | [Core/runtime contracts](ARCHITECTURE.md) · [Foundation selection](BASE_SELECTION_ADR.md) · [Mapping UI](WEBUI_REMAP.md) |
 | Evidence | [Feature status](../STEAM_CONTROLLER_2026.md) · [Test plan](TEST_PLAN.md) · [Hardware matrix](../project-memory/HARDWARE_MATRIX.md) · [Memory index](../project-memory/README.md) |
 | Research | [Sources and evidence](SOURCES_AND_EVIDENCE.md) · [BLE feasibility](BLE_FEASIBILITY.md) · [BLE decision](BLE_DECISION.md) |
-| Security | [Reporting policy](../SECURITY.md) · [Runtime safety review](development/PUBLIC_RUNTIME_REVIEW.md) · [dev.6 VDA contract/tester checklist](development/VDA_PENDING.md) · [LAN/enrollment/recovery](development/LOADING.md) |
+| Security | [Reporting policy](../SECURITY.md) · [Runtime safety review](development/PUBLIC_RUNTIME_REVIEW.md) · [dev.7 VDA contract/tester checklist](development/VDA_PENDING.md) · [LAN/enrollment/recovery](development/LOADING.md) |
 | Legal | [GPL text](../LICENSE) · [Provenance/pinned sources](PROVENANCE.md) · [Controller artwork notice](../payload/web/controllers/NOTICE.md) · [Icon license](../payload/web/icons/LICENSE.txt) |
 | Archive | [Original full execution specification](archive/CODEX_TASK-1.1.md) · [Historical build notes](archive/BUILDING-history.md) · [Upstream documents](archive/upstream/README.md) |
 

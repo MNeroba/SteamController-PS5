@@ -1,5 +1,8 @@
 # Experimental DEV build: loading and configuration
 
+Current prerelease: [v0.1.0-dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7). Use its one ELF and matching checksum. The contributor's earlier FW13.20/Puck report applies to original PR8 source, while this revised ELF still needs controlled console verification.
+
+
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
 
 Published experimental downloads are listed on the [GitHub Releases page](https://github.com/MNeroba/SteamController-PS5/releases). Select the exact prerelease you intend to test, then download its ELF and matching checksum from that same release. Confirm the version and source SHA in its release notes; never substitute an older or locally built ELF. Every DEV build remains experimental. Pending VDA recovery uses event correlation; actual PS5 input and native DualSense coexistence are unverified. Read the [contract and tester checklist](VDA_PENDING.md).

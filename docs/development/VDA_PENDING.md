@@ -1,6 +1,6 @@
 # Pending virtual-controller registration — dev.7
 
-2026-10-16 · M1-246 · experimental, physical PS5 verification NOT_RUN
+2026-11-01 · M1-250 · dev.7 experimental; maintainer physical PS5 acceptance NOT_RUN
 
 ## dev.7 correction (2026-11-01)
 

@@ -6,7 +6,11 @@ DEV builds are experimental software/build deliverables. They do not satisfy the
 
 Before publication, update CHANGELOG.md relative to the previous published version, with exactly **Bug Fixes** and **New Features / Improvements** (write `None.` when empty). Match payload/version.h, metadata and selected workflow version; never rewrite historical releases/tags. Both DEV packaging and stable tagged release workflows fail closed on a missing/mismatched entry. Notes include those two sections, actual source SHA and development/hardware status.
 
-## dev.7 preparation — M1-250 (2026-11-01)
+## Published experimental dev.7 — M1-250
+
+Published experimental [v0.1.0-dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7) from `f4ec9ae9e7e287c957a5602493a5b7d46449aed3` by [DEV workflow 41300890370](https://github.com/MNeroba/SteamController-PS5/actions/runs/41300890370) on 2026-11-01 11:15:23 UTC (2026-11-01 13:15:23 EET). Seven assets contain exactly one ELF, `SteamController-PS5-v0.1.0-dev.7.elf`, 2,091,960 bytes, SHA-256 `9bc6e1672bc8d20c8e9fcff85359c976523bdf6296a64e1e92dae34e6d7edb73`. PR8 was merged with contributor commits preserved; both descriptor P1s and the post-drain observation-window issue are resolved in code/host regressions. Exact PR, merged-main and repeated DEV Host/ASan/UBSan/Chromium220/asset/SDKv0.43/LLVM18/checksum gates passed. This is VERIFIED_HOST_TEST and VERIFIED_PS5_BUILD only. Contributor FW13.20/Puck observations at original c3a7ddb are EXTERNAL_HARDWARE; this revised ELF, owner target FW13.60, native DualSense coexistence, gameplay, motion/haptics, console cleanup and tile launch remain physically unverified. No historical result/tag/release was changed.
+
+## Historical dev.7 preparation — M1-250 (2026-11-01)
 
 The owner explicitly authorized correction of PR8, merge after successful checks and a new release. Select **v0.1.0-dev.7**, preserving dev.6 and all historical tags/assets. Contributor commits retain their authorship; the maintainer replaces the fd/inode error heuristic with explicit amd64 syscall error status and adds host/ABI/storage/backlog regressions. See [PR8 review and correction](../../project-memory/PR8_REVIEW.md). A standalone dev.N fits the existing version gate; do not relax it for a fix.1 suffix.
 

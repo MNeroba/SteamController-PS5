@@ -1,6 +1,13 @@
 # Project memory — current continuation entry
 
-## Current — v0.1.0-dev.6 publication and public source (2026-11-01)
+## Current — dev.7 publication checkpoint
+
+Published experimental [v0.1.0-dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7) from `f4ec9ae9e7e287c957a5602493a5b7d46449aed3` by [DEV workflow 41300890370](https://github.com/MNeroba/SteamController-PS5/actions/runs/41300890370) on 2026-11-01 11:15:23 UTC (2026-11-01 13:15:23 EET). Seven assets contain exactly one ELF, `SteamController-PS5-v0.1.0-dev.7.elf`, 2,091,960 bytes, SHA-256 `9bc6e1672bc8d20c8e9fcff85359c976523bdf6296a64e1e92dae34e6d7edb73`. PR8 was merged with contributor commits preserved; both descriptor P1s and the post-drain observation-window issue are resolved in code/host regressions. Exact PR, merged-main and repeated DEV Host/ASan/UBSan/Chromium220/asset/SDKv0.43/LLVM18/checksum gates passed. This is VERIFIED_HOST_TEST and VERIFIED_PS5_BUILD only. Contributor FW13.20/Puck observations at original c3a7ddb are EXTERNAL_HARDWARE; this revised ELF, owner target FW13.60, native DualSense coexistence, gameplay, motion/haptics, console cleanup and tile launch remain physically unverified. No historical result/tag/release was changed.
+
+Next: request a sanitized result from the exact dev.7 ELF with measured firmware, loader and transport. Verify native DualSense before/during/after and use the existing hardware checklist; do not promote the earlier contributor build to acceptance of this release. Further publication requires separate owner approval.
+
+
+## Historical — v0.1.0-dev.6 publication and public source (2026-11-01)
 
 The owner authorized publication followed by making the repository Public. [DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948) succeeded on main; published prerelease [dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) points to `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. It contains one ELF, 2,087,296 bytes, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`; all repeated Host, ASan/UBSan, Chromium, deterministic asset and SDK v0.43 build/checksum gates passed. The release is experimental; no physical PS5 test or firmware compatibility was established.
 

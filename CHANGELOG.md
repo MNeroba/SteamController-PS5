@@ -4,7 +4,7 @@ DEV entries describe software and build verification. They do not establish phys
 
 ## v0.1.0-dev.7
 
-Experimental release candidate. Contributor-reported results on a single FW 13.20/Puck console apply to the original PR #8 build; this revised release has no physical PS5 acceptance result.
+Published 1 November 2026 (UTC) from `f4ec9ae9e7e287c957a5602493a5b7d46449aed3`. [Release and downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7). Contributor-reported results on a single FW 13.20/Puck console apply to the original PR #8 build; this revised release has no physical PS5 acceptance result.
 
 ### Bug Fixes
 

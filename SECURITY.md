@@ -4,7 +4,7 @@ SteamController-PS5 is experimental software for a development console. Host tes
 
 ## Versions and updates
 
-The current experimental version is **v0.1.0-dev.6**. Report reproducible defects against current `main` or identify the exact release/source SHA. Earlier DEV builds remain available for historical evidence; there is no promise of separate maintenance branches or backported security fixes. Review the [changelog](CHANGELOG.md) and [release notes](https://github.com/MNeroba/SteamController-PS5/releases) before updating.
+The current experimental version is **v0.1.0-dev.7**. Report reproducible defects against current `main` or identify the exact release/source SHA. Earlier DEV builds remain available for historical evidence; there is no promise of separate maintenance branches or backported security fixes. Review the [changelog](CHANGELOG.md) and [release notes](https://github.com/MNeroba/SteamController-PS5/releases) before updating.
 
 ## Report a vulnerability privately
 

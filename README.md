@@ -5,7 +5,7 @@
 **Steam Controller 2026 → virtual DualSense on PS5**<br>
 USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
-[Download dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) · [Get started](docs/development/LOADING.md) · [Build](docs/BUILDING.md) · [Changelog](CHANGELOG.md) · [Contribute](CONTRIBUTING.md)
+[Download dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7) · [Get started](docs/development/LOADING.md) · [Build](docs/BUILDING.md) · [Changelog](CHANGELOG.md) · [Contribute](CONTRIBUTING.md)
 
 [![Host tests](https://github.com/MNeroba/SteamController-PS5/actions/workflows/host-tests.yml/badge.svg)](https://github.com/MNeroba/SteamController-PS5/actions/workflows/host-tests.yml)
 [![PS5 build](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml/badge.svg)](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml)
@@ -14,11 +14,11 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 </div>
 
-> **Experimental prerelease.** Host tests and SDK builds pass; the payload has **not been tested on a physical PS5**. FW **13.60** is the intended, unverified test target. A stock console cannot load this ELF. Use an independently confirmed compatible development loader and keep your native DualSense available.
+> **Experimental prerelease.** Host tests and SDK builds pass; this release has **no maintainer-run physical PS5 acceptance result**. FW **13.60** is the intended, unverified test target. A stock console cannot load this ELF. Use an independently confirmed compatible development loader and keep your native DualSense available.
 
-> **Dev.6:** fixes protected WebUI token initialization and adds one bounded VDA log-reader retry for the observed `EILSEQ` setup failure. Both changes passed host regression and repeated release gates; the logs that prompted them came from dev.5 and do **not** confirm the fixes on PS5. Dev.6 does not prove VDA ownership or successful virtual input. Keep other virtual-controller payloads stopped. [Technical contract and tester checklist](docs/development/VDA_PENDING.md).
+> **Dev.7:** fixes WebUI worker-stack sizing, larger klog backlog handling and PS5 filesystem error translation. New regressions protect file-descriptor ownership, token cleanup and the full pending-registration observation window. The revised ELF remains experimental. Keep other virtual-controller payloads stopped. [Technical contract and tester checklist](docs/development/VDA_PENDING.md).
 
-> **External hardware evidence:** The available dev.4/dev.5 tester logs show Steam Controller USB-C/Puck activity but stop before confirming virtual DualSense input. The dev.5 errors that prompted dev.6 have not been retested with the dev.6 ELF. No successful PS5 runtime result is established. Please [report reproducible results](.github/ISSUE_TEMPLATE/bug_report.yml) without tokens, account identifiers or console serials.
+> **External hardware evidence:** [TheBrokenG0d reports](https://github.com/MNeroba/SteamController-PS5/pull/8) WebUI and Puck input in system menus on one fat PS5/FW 13.20 at original PR source `c3a7ddb`. That build predates the revised filesystem adapter in dev.7; native DualSense coexistence and games were not systematically tested. It does not establish compatibility for this selected ELF or FW 13.60. Please [report reproducible results](.github/ISSUE_TEMPLATE/bug_report.yml) without tokens, account identifiers or serials.
 
 ## Overview
 
@@ -26,17 +26,17 @@ One native ELF connects **one Steam Controller 2026** over USB-C or the official
 
 The project builds on audited PuckbridgePS5 code. Steam-specific input stays in a reusable core; USB ownership, virtual-controller lifecycle and firmware-sensitive operations have separate responsibilities.
 
-## Latest release — v0.1.0-dev.6
+## Latest release — v0.1.0-dev.7
 
-[Release notes and all downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6) · [Loading and recovery guide](docs/development/LOADING.md)
+[Release notes and all downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7) · [Loading and recovery guide](docs/development/LOADING.md)
 
-- **[SteamController-PS5-v0.1.0-dev.6.elf](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.6/SteamController-PS5-v0.1.0-dev.6.elf)** — the only runtime binary (2,087,296 bytes).
-- **[Matching SHA-256](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.6/SteamController-PS5-v0.1.0-dev.6.elf.sha256)** — `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`; verify before loading.
+- **[SteamController-PS5-v0.1.0-dev.7.elf](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.7/SteamController-PS5-v0.1.0-dev.7.elf)** — the only runtime binary (2,091,960 bytes).
+- **[Matching SHA-256](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v0.1.0-dev.7/SteamController-PS5-v0.1.0-dev.7.elf.sha256)** — `9bc6e1672bc8d20c8e9fcff85359c976523bdf6296a64e1e92dae34e6d7edb73`; verify before loading.
 - Payload Manager JSON, loading instructions, release notes, notices and license accompany the ELF. They are metadata/documentation, not additional payloads.
 
-Published **31 October 2026 (UTC; 1 November in Riga)** from [`4c8b89bc789bf1dfd064264ff432d3919b5a1899`](https://github.com/MNeroba/SteamController-PS5/tree/4c8b89bc789bf1dfd064264ff432d3919b5a1899). [Release validation run 6](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948) completed successfully: normal host tests, ASan/UBSan, 220+ Chromium assertions, nine image/embedding contracts, deterministic asset generation, clean **SDK v0.43 / LLVM 18** cross-build and checksum verification. The release has seven assets and exactly one ELF.
+Published **1 November 2026 (UTC)** from [`f4ec9ae9e7e287c957a5602493a5b7d46449aed3`](https://github.com/MNeroba/SteamController-PS5/tree/f4ec9ae9e7e287c957a5602493a5b7d46449aed3). [Release validation run 41300890370](https://github.com/MNeroba/SteamController-PS5/actions/runs/41300890370) completed successfully: normal host tests, ASan/UBSan, 220 Chromium assertions, nine image/embedding contracts, deterministic assets, clean **SDK v0.43 / LLVM 18** cross-build and checksum verification. Seven assets contain exactly one ELF; its downloaded bytes were independently checked against the published SHA-256.
 
-Dev.6 includes the profiles, embedded WebUI, optional Settings tile, Steam motion/touch and haptics already present in dev.5. Its two fixes address protected token initialization and bounded VDA log-reader setup after `EILSEQ`; neither has been confirmed on physical PS5 hardware. [Full changelog →](CHANGELOG.md)
+Dev.7 retains profiles, the embedded WebUI, optional Settings tile, motion/touch and haptics. [PR #8](https://github.com/MNeroba/SteamController-PS5/pull/8) contributes the WebUI stack and bounded klog fixes; maintainer follow-ups protect descriptor ownership and the full observation window. [Full changelog →](CHANGELOG.md)
 
 ## Features and verification
 
@@ -99,7 +99,7 @@ Requirements: Python 3, make, host Clang, **LLVM 18** and community **PS5 Payloa
 git clone https://github.com/MNeroba/SteamController-PS5.git
 cd SteamController-PS5
 # To rebuild the published version:
-git checkout dev/v0.1.0-dev.6
+git checkout dev/v0.1.0-dev.7
 # Install the pinned SDK and export PS5_PAYLOAD_SDK/LLVM_CONFIG
 # using docs/BUILDING.md, then:
 make -C tests clean test
@@ -128,7 +128,7 @@ Transport owns I/O; the Steam decoder owns device details; mapping is independen
 
 ## Progress and roadmap
 
-- **Delivered:** audited foundation, host runtime hardening, reusable protocol/session/slot modules, mapping/profiles, embedded WebUI and experimental dev.1–dev.6 releases.
+- **Delivered:** audited foundation, host runtime hardening, reusable protocol/session/slot modules, mapping/profiles, embedded WebUI and experimental dev.1–dev.7 releases.
 - **Next:** measure actual firmware and validate USB-C/Puck, native DualSense coexistence, user recovery, game input, motion/touch/feedback, storage and shutdown on a physical console.
 - **Stable release:** blocked until the required hardware evidence matches the tested source. A passing SDK build does not establish firmware compatibility.
 - **Research:** passive native BLE feasibility, stable cross-transport identity and advanced platform integration. Active stock-radio experiments require separate approval.
@@ -147,6 +147,7 @@ Thanks to the authors whose work made this project possible:
 
 - **[PuckbridgePS5](https://github.com/ThisIsAkill/PuckbridgePS5)** — the audited implementation foundation, by ThisIsAkill.
 - **[Ghostcontrol](https://github.com/srbraboo/Ghostcontrol-PS5-USB-Controller-Patcher)** and **[PoorDS4](https://github.com/ItsBlurf/PoorDS4)** — inherited PS5 integration and bridge work, credited to StonedModder and ItsBlurf.
+- **[TheBrokenG0d / PR #8](https://github.com/MNeroba/SteamController-PS5/pull/8)** — PS5 hardware investigation, WebUI worker-stack and klog-backlog fixes.
 - **[PS5 Payload SDK](https://github.com/ps5-payload-dev/sdk)** — community toolchain and API references.
 - **[OmniPad-PS5](https://github.com/diegobarbosaa/OmniPad-PS5)** and **[LibrePadPS5](https://github.com/arwebSE/LibrePadPS5)** — reviewed engineering references; no implementation copied from these projects.
 - **Xelu** — CC0 controller prompts; **Akhil Moola** — the inherited controller drawing credit. Protocol and platform references are listed with exact pins in [sources](docs/SOURCES_AND_EVIDENCE.md).

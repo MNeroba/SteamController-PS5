@@ -1,8 +1,13 @@
 # Steam Controller 2026: feature and evidence status
 
+## Current experimental release — v0.1.0-dev.7
+
+Published experimental [v0.1.0-dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7) from `f4ec9ae9e7e287c957a5602493a5b7d46449aed3` by [DEV workflow 41300890370](https://github.com/MNeroba/SteamController-PS5/actions/runs/41300890370) on 2026-11-01 11:15:23 UTC (2026-11-01 13:15:23 EET). Seven assets contain exactly one ELF, `SteamController-PS5-v0.1.0-dev.7.elf`, 2,091,960 bytes, SHA-256 `9bc6e1672bc8d20c8e9fcff85359c976523bdf6296a64e1e92dae34e6d7edb73`. PR8 was merged with contributor commits preserved; both descriptor P1s and the post-drain observation-window issue are resolved in code/host regressions. Exact PR, merged-main and repeated DEV Host/ASan/UBSan/Chromium220/asset/SDKv0.43/LLVM18/checksum gates passed. This is VERIFIED_HOST_TEST and VERIFIED_PS5_BUILD only. Contributor FW13.20/Puck observations at original c3a7ddb are EXTERNAL_HARDWARE; this revised ELF, owner target FW13.60, native DualSense coexistence, gameplay, motion/haptics, console cleanup and tile launch remain physically unverified. No historical result/tag/release was changed.
+
+
 This page describes the Steam Controller 2026 work in **SteamController-PS5**. It is a feature-status page, **not an installation or compatibility guide**.
 
-> **No controlled physical PS5 acceptance tests have been performed by this project.** External dev.4 logs show Puck reports but failed virtual-controller registration and token setup; they do not verify dev.6 or establish compatibility. The owner reports a PS5 on firmware 13.60 (upgraded from 12.00 on 2026-10-11), which is the target and has not been compatibility-tested. Source code, host tests, a PS5 SDK cross-build, and a downloadable CI artifact do not establish that the payload loads or works on a console. There is no hardware-verified stable release. Experimental DEV prereleases are software/build deliverables. Read the [README](README.md) before building; do not treat this page as a recommendation to run the payload on a stock or primary console.
+> **No controlled physical PS5 acceptance tests have been performed by this project.** External dev.4 logs show Puck reports but failed virtual-controller registration and token setup; they do not verify dev.7 or establish compatibility. The owner reports a PS5 on firmware 13.60 (upgraded from 12.00 on 2026-10-11), which is the target and has not been compatibility-tested. Source code, host tests, a PS5 SDK cross-build, and a downloadable CI artifact do not establish that the payload loads or works on a console. There is no hardware-verified stable release. Experimental DEV prereleases are software/build deliverables. Read the [README](README.md) before building; do not treat this page as a recommendation to run the payload on a stock or primary console.
 
 ## Feature status
 
@@ -31,7 +36,7 @@ The current readiness matrix and test records are in [README](README.md), the [t
 
 ## Build outputs
 
-**Published experimental dev.6:** [dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6), source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. [DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948) completed successfully; release 430212834 is a prerelease, not a draft, published **2026-10-31 22:03:52 UTC** (1 November in Riga). Seven assets contain exactly one ELF, **2,087,296 bytes**, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`. Repeated normal host, ASan/UBSan, Chromium, nine image/embedding contracts, deterministic assets and clean SDK v0.43/LLVM 18 build/checksum gates passed. Physical Add/VDI/MBus behavior, native DualSense coexistence, firmware compatibility and target storage remain unverified. Dev.6 does not alter the event-correlation ownership contract; earlier releases/tags/assets remain unchanged.
+**Historical published experimental dev.6:** [dev/v0.1.0-dev.6](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6), source `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. [DEV workflow 41246199948](https://github.com/MNeroba/SteamController-PS5/actions/runs/41246199948) completed successfully; release 430212834 is a prerelease, not a draft, published **2026-10-31 22:03:52 UTC** (1 November in Riga). Seven assets contain exactly one ELF, **2,087,296 bytes**, SHA-256 `ef52b279be433c1d445ec4a616e6294c647fb87555c3bca34fddddb68da7df9b`. Repeated normal host, ASan/UBSan, Chromium, nine image/embedding contracts, deterministic assets and clean SDK v0.43/LLVM 18 build/checksum gates passed. Physical Add/VDI/MBus behavior, native DualSense coexistence, firmware compatibility and target storage remain unverified. Dev.6 does not alter the event-correlation ownership contract; earlier releases/tags/assets remain unchanged.
 
 The [PS5 cross-build workflow](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml) uploads `SteamController-PS5-cross-build` with an ELF and SHA-256 file after a successful build. Actions artifacts are temporary and expire under GitHub's retention policy. Authorized access is required while the repository is private; this restriction disappears for public downloads after visibility changes. An artifact is a build output, not an install package or a verified release.
 
@@ -46,7 +51,7 @@ The project is focused on one Steam Controller 2026 connected by USB-C or the of
 `VERIFIED_HOST_TEST`: full normal and ASan/UBSan suites PASS; profile 52 assertions, atomic storage 71, binding/proportional-pressure 165 and HTTP/auth 110. Nine portable artwork/generator contracts and 181 Edge/Playwright browser assertions PASS (all original 162 retained). The maximum-complexity stored profile is 14,573 bytes; complete 24-input/22-output/activator round-trip succeeds within the 24 KiB capacity. Final generated page: 685,503 UTF-8 bytes, 41 icons/four unchanged controller images. Clean SDK v0.43/LLVM 18.1.8 cross-build PASS, ELF SHA-256 `5bdd18153301213e7a4b82e3038dff24563fdc7e0e474ce41546d3c66ffc7dbc`. This is local source/build evidence; publication and Actions acknowledgement follow separately. Physical FW 12.00 remains NOT_RUN.
 
 
-## Features introduced in dev.3, retained in dev.6
+## Features introduced in dev.3, retained in dev.7
 
 | Capability | Software status | Physical PS5 status |
 |---|---|---|
