@@ -83,7 +83,7 @@ jobs:
           test "$(git rev-parse HEAD)" = "$SOURCE_SHA"
           python3 scripts/check_changelog.py --version "$DEV_VERSION"
           python3 -c 'import json; from pathlib import Path; from scripts.package_dev_release import validate_policy; validate_policy(json.loads(Path("docs/development/dev-release.json").read_text()))'
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: 24
       - name: Install pinned browser tooling and LLVM 18
