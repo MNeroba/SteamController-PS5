@@ -9,7 +9,7 @@ Experimental release candidate. Contributor-reported results on a single FW 13.2
 ### Bug Fixes
 
 - Prevented WebUI request handling from overflowing the default worker stack by allocating an explicit bounded stack (host-tested; contributor reported the original fix on FW 13.20).
-- Allowed virtual-controller startup to drain larger existing kernel-log backlogs safely instead of stopping before registration (host-tested; ownership and user assignment remain experimental).
+- Allowed virtual-controller startup to drain larger existing kernel-log backlogs safely and retain a full observation window before accepting a pending registration (host-tested; ownership and user assignment remain experimental).
 - Corrected PS5 filesystem error handling for credentials, profiles and optional tile files, preserving exclusive creation and descriptor ownership during failures and file replacement (host-tested; revised adapter awaits console testing).
 
 ### New Features / Improvements

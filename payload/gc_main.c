@@ -597,9 +597,9 @@ static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
         pthread_mutex_unlock(&g_vda_create_lock);return -1;
     }
     /* A concurrent legacy reader requires an independent loopback stream.
-     * Some firmware klog readers reject the stream with EILSEQ; retry once on
-     * the already-supported loopback source, still draining its backlog before
-     * AddDevice. Every other read error remains fail-closed. */
+     * Keep the bounded fallback for a genuine EILSEQ read error; the earlier
+     * reported target errno84 was EOVERFLOW from our own drain limit.
+     * Every other read error remains fail-closed. */
     int log_source=VDA_LOG_SOURCE_NONE;
     int fd=vda_log_open(&log_source);
     int fallback_attempted=0,primary_error=0;
@@ -624,6 +624,21 @@ static int32_t create_vda_for_slot(int slot, int *out_bind_ok) {
         pthread_mutex_unlock(&g_vda_create_lock);return -1;
     }
     gp_log("slot[%d] VDA bounded fresh log ready source=%s\n",slot,vda_log_source_name(log_source));
+    /* Opening/draining a large backlog must not consume the event window.
+     * Refresh before Add; never reset parser state or discard its partial-line
+     * guard, and never attempt Add if the clock/window cannot be established. */
+    int window_ready=0;
+    if(monotonic_ms(&now)!=0) {
+        int error=errno ? errno : EIO;
+        vda_pending_reader_close(&g_pending_vda.reader);
+        vda_pending_fail(&g_pending_vda.reader.observation,VDA_PENDING_CLOCK_ERROR,error);
+    } else window_ready=vda_pending_reader_start_window(&g_pending_vda.reader,now)==0;
+    if(!window_ready) {
+        diagnostics_vda_pending(g_pending_vda.reader.observation.summary);
+        gp_log("slot[%d] VDA not attempted: fresh observation window unavailable errno=%d\n",
+               slot,g_pending_vda.reader.observation.summary.error);
+        pthread_mutex_unlock(&g_vda_create_lock);return -1;
+    }
     _Static_assert(sizeof(vdp)==32,"inherited AddDevice input size");
     memset(&vdp,0,sizeof(vdp));vdp.size=sizeof(vdp);vdp.creation_word=1;
     int ret=scePadVirtualDeviceAddDevice(&vdp,VIRTUAL_DEVICE_TYPE_DUALSENSE);

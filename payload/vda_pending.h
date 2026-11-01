@@ -49,12 +49,17 @@ uint64_t vda_pending_candidate(const vda_pending_t *state);
 typedef struct {
     vda_pending_t observation;
     int fd;
+    int window_armed;
 } vda_pending_reader_t;
 typedef int (*vda_pending_fallback_open_fn)(void *context);
 /* Takes ownership of fd even on failure. Requires a freshly opened nonblocking
  * stream. Bounded drain must reach EAGAIN before the caller may perform Add. */
 int vda_pending_reader_begin(vda_pending_reader_t *reader, int fd, uint64_t now_ms);
 int vda_pending_reader_fallback_eligible(const vda_pending_reader_t *reader);
+/* Once after drain and immediately before Add: exclude setup/drain time from
+ * the minimum observation window, preserving stale partial-line exclusion.
+ * Invalid state or a backwards clock closes the reader and fails closed. */
+int vda_pending_reader_start_window(vda_pending_reader_t *reader, uint64_t now_ms);
 int vda_pending_reader_begin_recover(vda_pending_reader_t *reader, int fd,
                                      vda_pending_fallback_open_fn fallback_open,
                                      void *context, uint64_t now_ms,

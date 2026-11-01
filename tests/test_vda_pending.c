@@ -132,9 +132,39 @@ static void backlog_limits(void) {
         vda_pending_reader_close(&r); CHECK(close(pair[1])==0);
     }
 }
+static void delayed_window(void) {
+    int pair[2]; vda_pending_reader_t r;
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0);
+    CHECK(vda_pending_reader_start_window(&r,5100)==0); /* Slow setup/drain. */
+    CHECK(write(pair[1],EVENT,strlen(EVENT))==(ssize_t)strlen(EVENT));
+    CHECK(vda_pending_reader_poll(&r,5200)==0);
+    CHECK(vda_pending_reader_poll(&r,8099)==0 && !vda_pending_candidate(&r.observation));
+    CHECK(vda_pending_reader_poll(&r,8100)==1 && vda_pending_candidate(&r.observation)==0xd030d);
+    CHECK(r.observation.summary.elapsed_ms==3000 && close(pair[1])==0);
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0);
+    CHECK(vda_pending_reader_start_window(&r,99)==-1 && r.fd==-1);
+    CHECK(r.observation.summary.status==VDA_PENDING_CLOCK_ERROR && close(pair[1])==0);
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0);
+    CHECK(vda_pending_reader_start_window(&r,100)==0);
+    CHECK(vda_pending_reader_start_window(&r,200)==-1 && r.fd==-1); /* No repeated reset. */
+    CHECK(close(pair[1])==0);
+    CHECK(socketpair(AF_UNIX,SOCK_STREAM,0,pair)==0);
+    CHECK(fcntl(pair[0],F_SETFL,O_NONBLOCK)==0);
+    CHECK(write(pair[1],"old-partial",11)==11);
+    CHECK(vda_pending_reader_begin(&r,pair[0],100)==0 && r.observation.dropping);
+    CHECK(vda_pending_reader_start_window(&r,500)==0 && r.observation.dropping);
+    vda_pending_reader_close(&r); CHECK(close(pair[1])==0);
+}
 int main(void) {
     readers();
     backlog_limits();
+    delayed_window();
     vda_pending_t s;
     begin(&s);
     for (size_t i = 0; i < strlen(EVENT); i++)
