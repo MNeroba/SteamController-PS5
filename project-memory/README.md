@@ -15,3 +15,5 @@ Read current summaries first; use historical logs to trace a particular ADR, def
 
 
 M1-250: PR8 review/correction and published dev.7 are recorded in [PR8_REVIEW](PR8_REVIEW.md), current status and the append-only test/session logs. SDK errno84 is EOVERFLOW; the earlier EILSEQ diagnosis is superseded without changing historical records.
+
+M1-251: PR3–7 CI Actions maintenance, read-only artifact/API smoke evidence and Issue2 dev.7 refresh are recorded in [CI_ACTIONS](../docs/development/CI_ACTIONS.md) and current/test/session records. Published dev.7 remains unchanged.

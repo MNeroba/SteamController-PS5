@@ -32,6 +32,15 @@ It creates no tag, release or ELF and does not contact a console. Normal Host/AS
 
 ## Evidence and next step
 
-Compatibility is VERIFIED_CODE from the exact action.yml definitions/PR changes. Combined-branch and main execution results are pending and must be recorded before calling the integration complete. Do not infer successful DEV publication from the smoke check; the full existing manual release workflow remains mandatory for every future release.
+Compatibility is VERIFIED_CODE from the exact action.yml definitions/PR changes and VERIFIED_HOST_TEST from the combined candidate runs below. Do not infer successful DEV publication from the smoke check; the full existing manual release workflow remains mandatory for every future release.
 
 Issue2 is now scoped to dev.7 with its exact release SHA/checksum and controlled VDA/user/native-DualSense/storage checklist; the original dev.5 request is retained under historical details. It remains open for real measured evidence. PR1 remains closed and superseded; its incomplete tree is not reused.
+
+
+## M1-251 — verified CI Actions integration (2026-11-01)
+
+All five Dependabot heads from PR3–7 are preserved in the combined ancestry on complete dev.7-era main. Candidate 44b9426a18e69b8d384cf505581903612e8ffd97 passed fresh push checks: [Host/ASan/UBSan/Chromium](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639575), [SDK v0.43](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639619), [secret scan](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639576), and [CI Actions smoke](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639653), all completed/success.
+
+The smoke log confirms the reviewed checkout/upload/download/github-script revisions were executed; both upload and download jobs passed, every fixture checksum and exact LICENSE/source identity matched. All five upstream action licenses were reviewed as MIT at the referenced revisions (github-script uses LICENSE.md). Hosted Node24, explicit archive:true and digest-mismatch:error are compatible. No privileged-event fork-checkout bypass or write permission was added to the smoke.
+
+Payload, tests, scripts, config, SDK/version/policy and released dev.7 bytes are unchanged. This is CI maintenance, not a new payload release or hardware result. Issue2 now requests exact dev.7 evidence and remains open; its dev.5 text is preserved. PR1 stays closed/superseded. Future workflow updates should run this smoke check; future DEV publication still requires its separate manual full-gate procedure and owner approval. Next product task remains controlled physical dev.7 verification.

@@ -475,3 +475,12 @@ ACCEPTED: prepare v0.1.0-dev.6 as the next experimental version containing the a
 ACCEPTED. For the pinned SDKv0.43 six existing *at() operations, capture amd64 CF and RAX together and normalize only actual errors to -1/errno. Never infer allocation from fd number or inode; callers retain metadata validation and cleanup. Public SDK/FreeBSD ABI reference only, no imported implementation. Real ownership/failure regressions and a no-kernel amd64 register/CF test cover this boundary. Keep native DualSense/session/USB behavior and /data/ghostpad unchanged. Revisit when a future SDK provides correct POSIX wrappers, retaining the same regressions.
 
 Selected dev.7, preserving dev.6/tag/assets and the strict existing dev.N release format. This is an experimental channel with full repeated software/build gates, not a stable hardware release.
+
+
+## M1-251 — verified CI Actions integration (2026-11-01)
+
+All five Dependabot heads from PR3–7 are preserved in the combined ancestry on complete dev.7-era main. Candidate 44b9426a18e69b8d384cf505581903612e8ffd97 passed fresh push checks: [Host/ASan/UBSan/Chromium](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639575), [SDK v0.43](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639619), [secret scan](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639576), and [CI Actions smoke](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639653), all completed/success.
+
+The smoke log confirms the reviewed checkout/upload/download/github-script revisions were executed; both upload and download jobs passed, every fixture checksum and exact LICENSE/source identity matched. All five upstream action licenses were reviewed as MIT at the referenced revisions (github-script uses LICENSE.md). Hosted Node24, explicit archive:true and digest-mismatch:error are compatible. No privileged-event fork-checkout bypass or write permission was added to the smoke.
+
+Payload, tests, scripts, config, SDK/version/policy and released dev.7 bytes are unchanged. This is CI maintenance, not a new payload release or hardware result. Issue2 now requests exact dev.7 evidence and remains open; its dev.5 text is preserved. PR1 stays closed/superseded. Future workflow updates should run this smoke check; future DEV publication still requires its separate manual full-gate procedure and owner approval. Next product task remains controlled physical dev.7 verification.

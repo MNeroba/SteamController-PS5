@@ -1,5 +1,14 @@
 # Project memory — current continuation entry
 
+## M1-251 — verified CI Actions integration (2026-11-01)
+
+All five Dependabot heads from PR3–7 are preserved in the combined ancestry on complete dev.7-era main. Candidate 44b9426a18e69b8d384cf505581903612e8ffd97 passed fresh push checks: [Host/ASan/UBSan/Chromium](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639575), [SDK v0.43](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639619), [secret scan](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639576), and [CI Actions smoke](https://github.com/MNeroba/SteamController-PS5/actions/runs/41305639653), all completed/success.
+
+The smoke log confirms the reviewed checkout/upload/download/github-script revisions were executed; both upload and download jobs passed, every fixture checksum and exact LICENSE/source identity matched. All five upstream action licenses were reviewed as MIT at the referenced revisions (github-script uses LICENSE.md). Hosted Node24, explicit archive:true and digest-mismatch:error are compatible. No privileged-event fork-checkout bypass or write permission was added to the smoke.
+
+Payload, tests, scripts, config, SDK/version/policy and released dev.7 bytes are unchanged. This is CI maintenance, not a new payload release or hardware result. Issue2 now requests exact dev.7 evidence and remains open; its dev.5 text is preserved. PR1 stays closed/superseded. Future workflow updates should run this smoke check; future DEV publication still requires its separate manual full-gate procedure and owner approval. Next product task remains controlled physical dev.7 verification.
+
+
 ## Current — dev.7 publication checkpoint
 
 Published experimental [v0.1.0-dev.7](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7) from `f4ec9ae9e7e287c957a5602493a5b7d46449aed3` by [DEV workflow 41300890370](https://github.com/MNeroba/SteamController-PS5/actions/runs/41300890370) on 2026-11-01 11:15:23 UTC (2026-11-01 13:15:23 EET). Seven assets contain exactly one ELF, `SteamController-PS5-v0.1.0-dev.7.elf`, 2,091,960 bytes, SHA-256 `9bc6e1672bc8d20c8e9fcff85359c976523bdf6296a64e1e92dae34e6d7edb73`. PR8 was merged with contributor commits preserved; both descriptor P1s and the post-drain observation-window issue are resolved in code/host regressions. Exact PR, merged-main and repeated DEV Host/ASan/UBSan/Chromium220/asset/SDKv0.43/LLVM18/checksum gates passed. This is VERIFIED_HOST_TEST and VERIFIED_PS5_BUILD only. Contributor FW13.20/Puck observations at original c3a7ddb are EXTERNAL_HARDWARE; this revised ELF, owner target FW13.60, native DualSense coexistence, gameplay, motion/haptics, console cleanup and tile launch remain physically unverified. No historical result/tag/release was changed.
