@@ -249,3 +249,8 @@ VERIFIED_HOST_TEST: production auth/fsync ENOSPC28 injection starts a protected 
 ## F118 — dev.5 tester log does not evaluate the M1-248 source fixes (2026-10-31)
 
 EXTERNAL_HARDWARE: the supplied follow-up still identifies itself as a dev.5 run. It shows Steam USB-C/Puck input, a protected WebUI `file-inspect/EINVAL` failure, and VDA observer initialization `EILSEQ` before AddDevice. It does not reveal the tested ELF SHA, measured firmware or selected log-reader source. Therefore it does not establish behavior of source commit `e03f2c4` or any PS5 ownership/assignment result. Keep prior logs outside Git and retain NOT_RUN hardware rows until a version-identified run occurs.
+
+
+## M1-250 — PR8-R1/R2 source resolution (2026-11-01)
+
+VERIFIED_CODE / VERIFIED_HOST_TEST: the new PS5 filesystem adapter preserves kernel CF separately from returned value; real descriptor/errno collisions and post-open identity races no longer confuse ownership. R1/R2 are HOST_FIXED, pending exact-head CI and PS5 test. The existing callers retain post-open validation/cleanup. SDK d9c9519 raw stubs and FreeBSD amd64 SYS.h at d106002967eff712894ab8b5337bbbff106ce5e0 establish the reference convention; no implementation copied. The contributor's WebUI stack and klog changes are retained. Errno84 on the pinned target is EOVERFLOW, correcting the historical EILSEQ interpretation. [Full record](PR8_REVIEW.md).

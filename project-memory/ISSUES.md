@@ -189,3 +189,8 @@ EXTERNAL-FW550-01 UNVERIFIED_FAILURE_REPORT: supplied dev.2/FAT5.50 comment says
 P1-STORAGE-DIAG-04 FIXED_HOST: fixed stages/errno, original failure through cleanup, zeroed partial credentials and no redundant fchmod for already private owned directory/new token.1226 injected/real filesystem checks plus full normal/sanitizer/server/build coverage. Actual Prospero failure cause remains unverified.
 P2-KLOG-PRIVACY-04 FIXED_HOST: raw-sink identity filter, no Safe Mode system observer, disabled handoff early return, optional bridge text/table redaction. Historic external logs unchanged; opt-in binary captures not guaranteed anonymized.
 P0-VDA-PENDING-04 BLOCKED: pending803b0006/no receipt distinguished and output-change mask exposed without values or ownership promotion. This is diagnostics/containment, not restored PS5 injection. Analog sources lack an adequate safe receipt ABI; AGENTS ownership/unknown-side-effect hard stops remain. Next release still blocked.
+
+
+## M1-250 — PR8-R1/R2 source resolution (2026-11-01)
+
+VERIFIED_CODE / VERIFIED_HOST_TEST: the new PS5 filesystem adapter preserves kernel CF separately from returned value; real descriptor/errno collisions and post-open identity races no longer confuse ownership. R1/R2 are HOST_FIXED, pending exact-head CI and PS5 test. The existing callers retain post-open validation/cleanup. SDK d9c9519 raw stubs and FreeBSD amd64 SYS.h at d106002967eff712894ab8b5337bbbff106ce5e0 establish the reference convention; no implementation copied. The contributor's WebUI stack and klog changes are retained. Errno84 on the pinned target is EOVERFLOW, correcting the historical EILSEQ interpretation. [Full record](PR8_REVIEW.md).
