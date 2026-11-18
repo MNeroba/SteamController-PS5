@@ -1507,3 +1507,11 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Release `dev/v1.0.0-experimental`: seven assets, one ELF, 2,067,360 bytes, SHA-256 `79ab4f11176a76687a6e987ab1a8addd401618b04e1d5ca4fb7771901d986855`; sidecar `shasum -c` OK; embedded source/version verified.
 - Superseded `.2` release/tag archived and deleted. Only `dev/v1.0.0-experimental` remains.
 - Physical PS5/FW13.60, native coexistence, motion/haptics, tile registration and rest/wake: NOT_RUN.
+
+## 2026-11-19 — M1-260 rebuilt 1.0.0 Experimental (tile + direct-HID)
+- Push gates on `f5208adb9608a589708f3f9d2f987ff0857e07bc`: Host 44409571347, PS5 cross-build 44409571226, secret scan 44409571336 — all success.
+- DEV workflow 44410095266: select-source/validate-build/publish-prerelease all success; published 2026-11-18T22:27:39Z.
+- Release `dev/v1.0.0-experimental`: seven assets, one ELF, 2,069,488 bytes, SHA-256 `3f2ed1f28122391bfda161db9d2221a645daa216993ae6c4edf1a44e69660c4c`; sidecar `shasum -c` OK; embedded source/version verified.
+- Host and sanitizer suites pass, including transient-insert classification, tile marker/installed and NID/name-fallback adapter tests; changelog/policy/metadata checks pass; full-history gitleaks reports zero findings.
+- Previous 1.0.0 artifact (source `3bad173`, SHA-256 `79ab4f…`) archived as `v1.0.0-experimental-pre-tile` and replaced.
+- Physical PS5/FW13.60, native coexistence, motion/haptics, tile visibility and rest/wake: NOT_RUN.

@@ -2,7 +2,7 @@
 
 ## Current experimental release — 1.0.0 Experimental
 
-Published experimental [1.0.0 Experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.0.0-experimental) from `3bad173a6593dcc94d47f1e7f7da4e1d7372496f` by [DEV workflow 44403927035](https://github.com/MNeroba/SteamController-PS5/actions/runs/44403927035) on 2026-11-18T21:43:48Z. Seven assets contain exactly one ELF, `SteamController-PS5-v1.0.0-experimental.elf`, 2,067,360 bytes, SHA-256 `79ab4f11176a76687a6e987ab1a8addd401618b04e1d5ca4fb7771901d986855`. The tag points to the selected source; downloaded assets, embedded source/version, metadata and sidecar checksum were independently verified.
+Published experimental [1.0.0 Experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.0.0-experimental) from `f5208adb9608a589708f3f9d2f987ff0857e07bc` by [DEV workflow 44410095266](https://github.com/MNeroba/SteamController-PS5/actions/runs/44410095266) on 2026-11-18T22:27:39Z. Seven assets contain exactly one ELF, `SteamController-PS5-v1.0.0-experimental.elf`, 2,069,488 bytes, SHA-256 `3f2ed1f28122391bfda161db9d2221a645daa216993ae6c4edf1a44e69660c4c`. The tag points to the selected source; downloaded assets, embedded source/version, metadata and sidecar checksum were independently verified.
 
 This cumulative build includes the full dev.9 feature set, the neutral-gravity release-report fix, loopback `Host`-port validation against the actual listener port, bounded/validated game-icon reads, `404` for unknown routes, removal of the unused auth/peer modules and dead `/pair` routes from the payload, and corrected authentication documentation. The WebUI is code-free and PS5-loopback-only.
 

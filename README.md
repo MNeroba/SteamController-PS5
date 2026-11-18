@@ -16,7 +16,7 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 
 > **Experimental prerelease.** Host tests and SDK builds pass; this release has **no maintainer-run physical PS5 acceptance result**. FW **13.60** is the intended, unverified test target. A stock console cannot load this ELF. Use an independently confirmed compatible development loader and keep your native DualSense available.
 
-> **1.0.0 Experimental:** the consolidated public build. It includes the full dev.9 feature set, the neutral-gravity release-report fix, loopback `Host`-port validation, bounded icon reads, 404 for unknown routes, and removal of the unused auth/peer modules and dead pairing routes. Physical console behavior remains unverified.
+> **1.0.0 Experimental:** the consolidated public build. It includes the full dev.9 feature set, the neutral-gravity release-report fix, loopback `Host`-port validation, bounded icon reads, 404 for unknown routes, removal of the unused auth/peer modules and dead pairing routes, transient direct-HID retry, a three-second controller-link grace, and Media-tile registration by firmware NID with a post-success marker. Physical console behavior remains unverified.
 
 > **External hardware evidence:** [TheBrokenG0d reports](https://github.com/MNeroba/SteamController-PS5/pull/8) WebUI and Puck input in system menus on one fat PS5/FW 13.20 at original PR source `c3a7ddb`. That build predates the revised filesystem adapter in dev.7; native DualSense coexistence and games were not systematically tested. It does not establish compatibility for this selected ELF or FW 13.60. Please [report reproducible results](.github/ISSUE_TEMPLATE/bug_report.yml) without tokens, account identifiers or serials.
 
@@ -32,11 +32,11 @@ The project builds on audited PuckbridgePS5 code. Steam-specific input stays in 
 
 [Release notes and downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.0.0-experimental) · [Loading guide](docs/development/LOADING.md)
 
-- **[Download the only ELF](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.0.0-experimental/SteamController-PS5-v1.0.0-experimental.elf)** — 2,067,360 bytes.
-- **[SHA-256 file](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.0.0-experimental/SteamController-PS5-v1.0.0-experimental.elf.sha256)** — `79ab4f11176a76687a6e987ab1a8addd401618b04e1d5ca4fb7771901d986855`.
+- **[Download the only ELF](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.0.0-experimental/SteamController-PS5-v1.0.0-experimental.elf)** — 2,069,488 bytes.
+- **[SHA-256 file](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.0.0-experimental/SteamController-PS5-v1.0.0-experimental.elf.sha256)** — `3f2ed1f28122391bfda161db9d2221a645daa216993ae6c4edf1a44e69660c4c`.
 - Payload Manager metadata, loading instructions, notices and license accompany the ELF.
 
-Published 2026-11-18T21:43:48Z from [`3bad173a6593dcc94d47f1e7f7da4e1d7372496f`](https://github.com/MNeroba/SteamController-PS5/tree/3bad173a6593dcc94d47f1e7f7da4e1d7372496f) by [release workflow 44403927035](https://github.com/MNeroba/SteamController-PS5/actions/runs/44403927035). Seven assets contain one ELF; the downloaded digest, embedded source SHA/version and experimental warning were independently verified. The workflow repeats the normal host, ASan/UBSan, Chromium, SDK v0.43 and checksum gates. Physical PS5 acceptance remains outstanding.
+Published 2026-11-18T22:27:39Z from [`f5208adb9608a589708f3f9d2f987ff0857e07bc`](https://github.com/MNeroba/SteamController-PS5/tree/f5208adb9608a589708f3f9d2f987ff0857e07bc) by [release workflow 44410095266](https://github.com/MNeroba/SteamController-PS5/actions/runs/44410095266). Seven assets contain one ELF; the downloaded digest, embedded source SHA/version and experimental warning were independently verified. The workflow repeats the normal host, ASan/UBSan, Chromium, SDK v0.43 and checksum gates. Physical PS5 acceptance remains outstanding.
 
 ## Features and verification
 

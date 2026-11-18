@@ -1528,3 +1528,10 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Verified the downloaded ELF (2,067,360 bytes, SHA-256 `79ab4f11176a76687a6e987ab1a8addd401618b04e1d5ca4fb7771901d986855`), sidecar, embedded source/version and seven assets.
 - Archived and deleted the superseded `.2` release. Updated README with exact size/hash/source/workflow receipt.
 - Deleted stale local and remote branches (`codex/*`, `dependabot/*`, `fix/p0-safety`, temporary prep/release branches); only `main` and the local `archive/pre-squash-main` safety ref remain.
+
+## 2026-11-19 — M1-260 tile verification and 1.0.0 rebuild
+- Compared tile registration with ps5-payload-dev/ftpsrv (92072f2), websrv (7748df9), BFpilot (0eeb6f4), Payload Manager and ps5-web-file-manager. Confirmed category 65536/deeplink/512x512 schema and the canonical `Wudg3Xe3heE` TitleDir NID.
+- Added NID resolution with name fallback, a post-success `.steamcontroller-registered` marker with exact-asset verification, and retry of staged-but-unregistered directories. Did not adopt global `AppInstallAll`.
+- Added transient direct-HID insert retry (`EAGAIN/EBUSY/EINTR`) with a host classifier regression, and a three-second link-loss grace that neutralizes and holds the owned virtual pad.
+- Re-squashed, force-pushed `f5208ad`, passed all push gates, published rebuilt v1.0.0-experimental via workflow 44410095266 and verified the ELF/sidecar.
+- Archived the previous 1.0.0 artifact as v1.0.0-experimental-pre-tile; only one release/tag remains. Physical PS5 remains NOT_RUN.
