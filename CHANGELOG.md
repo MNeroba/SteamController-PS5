@@ -1,0 +1,207 @@
+# Changelog
+
+DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
+
+## v1.5.0-experimental
+
+Source-release candidate for the mechanism-audit fixes. Not a stable release and not a hardware claim: physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.
+
+### Bug Fixes
+
+- The Media tile installer resolves `sceAppInstUtilInitialize` (`540lotO7oHE`), `sceAppInstUtilTerminate` (`kLLazhNh6d4`) and `sceAppInstUtilAppInstallTitleDir` (`Wudg3Xe3heE`) by firmware NID with a symbol-name fallback, instead of requiring the initialize/terminate C names that an NID-only system SPRX does not export. A failed probe, initialization or unload no longer latches a process-lifetime retry block, and an accepted registration with failed cleanup is reported as success-with-warning.
+- First-run tile installation builds an owned `SCPS50001.partial` directory and renames it into place, so an interrupted install cannot leave an unclaimed title directory that later runs refuse. Owned or empty partial directories are recovered; foreign ones still fail safe.
+- A virtual-device creation refused before `AddDevice` (bounded log/window unavailable or a rest/wake race) now clears its reservation instead of setting the registry's lifetime ambiguity latch, which previously disabled every later registration and suppressed input after logout recovery.
+- A retired haptic OUT endpoint now restarts the owned USB session instead of leaving haptics permanently busy while advertised as available. The portal-selected haptic test method is reset on every new session, and dropped pulses (no owner or full queue) are counted and exposed as `drop` in the status JSON.
+- A stale `<id>.ini.tmp` left by a crash no longer blocks profile saves: the store removes only a private owned regular temp and retries once, and fsyncs the directory after the atomic rename. The shared private-text writer performs the same stale-temp recovery.
+- Shutdown is bounded: the main loop retries cleanup for at most 30 seconds before forcing credential restore and PID-lock removal; the DualSense hand-off, WebUI clients and first-run tile worker use completion waits instead of unbounded joins.
+- The status log is rotated and opened only after this process owns the runtime PID lock, so a duplicate launch cannot destroy the live instance's diagnostics. It now uses the private no-follow directory/file policy.
+- A held long-press binding no longer re-arms and fires again at a profile-generation boundary; a latched toggle keeps the output mask it latched while Shift changes.
+- Bridge-probe output is a whitelisted private status file (no game `pid`/account `user_id`) instead of a raw copy of the PoorDS4 report.
+- The sanitizer gate fails on undefined behaviour: `make -C tests sanitize` now builds with `-fno-sanitize-recover=all` and `UBSAN_OPTIONS=halt_on_error=1`.
+- GitHub Actions are pinned to full commit SHAs, and stable `v*` tags must point at an ancestor of `main` before the release jobs may publish.
+
+### New Features / Improvements
+
+- Version `v1.5.0-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
+- Documented that in-game vibration/trigger feedback requires the opt-in `ENABLE_GAME_HOOKS=1` runtime policy; the default virtual-DualSense backend has no reverse feedback channel. The console UI now shows when hooks are unavailable instead of implying they will attach.
+- Corrected architecture, tile, loading and security documentation for NID resolution, unreachable legacy adapter/dialog scaffolding, the portless literal `Host` form, private install locking and the lifetime kernel-credential scope.
+
+## v1.0.0-experimental
+
+Cumulative 1.0.0 Experimental build. Not a stable release; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is the intended, unverified target.
+
+### Bug Fixes
+
+- The pause and DualSense-takeover release report keeps the documented neutral gravity vector `(0, 1, 0)` instead of reporting zero acceleration.
+- Direct-HID input insertion now retries transient `EAGAIN`/`EBUSY`/`EINTR` instead of stopping the payload, and a brief controller link loss holds the owned virtual pad for three seconds before detaching it.
+- Media-tile registration resolves `sceAppInstUtilAppInstallTitleDir` by the firmware NID `Wudg3Xe3heE` with a symbol-name fallback instead of relying on name lookup alone.
+- Automatic tile installation skips only after a post-success marker and exact embedded-asset match, so a staged but unregistered directory is retried.
+- Reject a loopback `Host` value whose explicit port is not the port the WebUI actually bound, so another local service cannot borrow the listener identity.
+- Return an explicit error instead of a truncated PNG when a game icon is empty, unreadable or larger than the response buffer.
+- Return `404` for unknown routes instead of reporting `405 Method Not Allowed`.
+
+### New Features / Improvements
+
+- Consolidated the project into one publication commit and one cumulative 1.0.0 Experimental release.
+- Removed the unused pairing/token and peer-policy modules and the permanently forbidden `/pair` and `/api/pair-refresh` routes from the shipped payload; the modules remain host-test-only.
+- Corrected architecture, security, test-plan, VDA/tester and audit documentation that still described bearer or pairing authentication as active.
+
+## v1.0.0-experimental.2
+
+Experimental hardening build. Not a stable release; physical PS5 acceptance remains NOT_RUN.
+
+### Bug Fixes
+
+- Reject a loopback `Host` value whose explicit port is not the port the WebUI actually bound, so another local service cannot borrow the listener identity.
+- Return an explicit error instead of a truncated PNG when a game icon is empty, unreadable or larger than the response buffer.
+- Return `404` for unknown routes instead of reporting `405 Method Not Allowed`.
+
+### New Features / Improvements
+
+- Removed the unused pairing/token and peer-policy modules and the permanently forbidden `/pair` and `/api/pair-refresh` routes from the shipped payload; the modules remain host-test-only.
+- Corrected architecture, security, test-plan and tester documentation that still described bearer/pairing authentication as active.
+
+## v1.0.0-experimental.1
+
+Experimental consolidation build. It is not a stable release; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is the intended, unverified target.
+
+### Bug Fixes
+
+- The pause and DualSense-takeover release report now keeps the documented neutral gravity vector `(0, 1, 0)` instead of reporting zero acceleration.
+
+### New Features / Improvements
+
+- Consolidated the project history into one publication commit and moved the experimental channel to the `v1.0.0-experimental.N` version series.
+
+## v0.1.0-dev.9
+
+Published 2026-11-15T10:18:02Z from `d6d51af1ce1d0cf14438fb73efae3cd2652b1d25`. PS5 runtime and automatic tile registration are unverified.
+
+### Bug Fixes
+
+- Removed the one-time pairing code and storage dependency that could prevent console WebUI access.
+
+### New Features / Improvements
+
+- Restricted WebUI access to the PS5 itself and added browser-origin protection.
+- Added automatic first-run Media tile registration with conservative handling of existing files.
+
+## v0.1.0-dev.8
+
+Published 3 November 2026 from `1cf624f2ccaf869eecd8c29dd29e834529f8a3d9`. SDK v0.43; physical PS5 testing NOT_RUN. Direct HID remains opt-in with strict native-controller protection; see docs/development/DEV8_CANDIDATE.md.
+
+### Bug Fixes
+
+- Corrected acceleration/angular-velocity ordering in the native input structure and separated Create from the PS button (source-reviewed and host-tested; console pending).
+- Prevented a continuously refilled haptic queue from monopolizing the input reader; pending effects remain ordered and rumble-stop processing continues (host-tested).
+
+### New Features / Improvements
+
+- Preserved left-stick touch and both raw touchpad pressures in the shared Steam input model, with source-derived boundary tests; no new PS5 output or editor control is claimed.
+- Added an opt-in direct HID backend with explicit handle receipts, retained failed-deletion ownership, full touch/Create/motion translation and validation/neutralization of invalid reports (host-tested; hardware pending).
+- Added rest/wake session quiescence and rediscovery after confirmed working-state observations (host-tested policy; hardware pending).
+- Added a pinned comparison of controller projects and SDK versions, including direct-HID registration and rest/wake follow-up requirements.
+
+## v0.1.0-dev.7
+
+Published 1 November 2026 (UTC) from `f4ec9ae9e7e287c957a5602493a5b7d46449aed3`. [Release and downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.7). Contributor-reported results on a single FW 13.20/Puck console apply to the original PR #8 build; this revised release has no physical PS5 acceptance result.
+
+### Bug Fixes
+
+- Prevented WebUI request handling from overflowing the default worker stack by allocating an explicit bounded stack (host-tested; contributor reported the original fix on FW 13.20).
+- Allowed virtual-controller startup to drain larger existing kernel-log backlogs safely and retain a full observation window before accepting a pending registration (host-tested; ownership and user assignment remain experimental).
+- Corrected PS5 filesystem error handling for credentials, profiles and optional tile files, preserving exclusive creation and descriptor ownership during failures and file replacement (host-tested; revised adapter awaits console testing).
+
+### New Features / Improvements
+
+- Added regressions for target syscall arguments and error flags, descriptor exhaustion, concurrent file replacement and credential cleanup after failed initialization.
+
+## v0.1.0-dev.6
+
+Published 31 October 2026 (UTC; 1 November in Riga) from `4c8b89bc789bf1dfd064264ff432d3919b5a1899`. [Release and downloads](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v0.1.0-dev.6).
+
+### Bug Fixes
+
+- Fixed protected WebUI token initialization so a missing token is detected by the existing no-follow open, without a second metadata lookup; exclusive creation and validation remain in place (host-tested; target filesystem unverified).
+- Improved pending VDA log setup with one fresh loopback retry when the selected `/dev/klog` reader returns `EILSEQ`; registration remains blocked if the fallback cannot drain safely (host-tested; PS5 behavior unverified).
+
+### New Features / Improvements
+
+None.
+
+## v0.1.0-dev.5
+
+Published on 2026-10-15 (UTC) from `382e4ecef4937356b72f9e1786917ae7147c0415`. Pending registration uses event correlation; the actual PS5 ABI and native-controller coexistence remain unverified.
+
+### Bug Fixes
+
+- Handled pending virtual-controller registration without repeating device creation or restarting USB input; cancelled registration retains cleanup ownership (host-tested; PS5 verification pending).
+- Prevented reconnect from creating another virtual controller while earlier cleanup is unresolved (host-tested).
+- Avoided unnecessary permission changes when the settings directory and new credential file already have the required private permissions (host-tested).
+- Removed account identifiers from raw application logs and disabled the optional handoff log observer in Safe Mode (host-tested).
+- Preserved the original storage error through cleanup and cleared partial credentials after failed initialization (host-tested).
+
+### New Features / Improvements
+
+- Added bounded registration diagnostics and precise storage-stage/errno reporting without exposing credentials or account IDs.
+- Added protected session-only WebUI access when persistent credential storage fails; pairing and authentication remain required.
+
+## v0.1.0-dev.4
+
+Published on 2026-10-14 from `a5c20346392eac0eb9fa04cc201cd214e2957363`; physical PS5 testing was not performed.
+
+### Bug Fixes
+
+- Stopped repeated virtual-controller creation after an ambiguous result, including concurrent registration attempts (host-tested).
+- Rechecked an opened USB device before claiming its interfaces after hotplug (host-tested; PS5 ioctl validation pending).
+- Fixed an overflow while handling an invalid USB feedback status (UBSan-tested).
+
+### New Features / Improvements
+
+None.
+
+## v0.1.0-dev.3
+
+Published on 2026-10-12 from `9aab6dbae166b28416a9a00e6346f85bf12e524e`; physical PS5 testing was not performed.
+
+### Bug Fixes
+
+- Prevented cancelled USB requests from reusing buffers while late completions remain possible; preserved input received during haptic output (host-tested).
+- Added serialized virtual-device creation and recovery that retains ownership when deletion fails (host-tested).
+
+### New Features / Improvements
+
+- Added virtual DualSense recovery after confirmed logout and stable login, keeping the Steam USB connection intact (host-tested; PS5 validation pending).
+- Added authenticated diagnostic downloads with bounded, filtered application logs.
+- Added clearer connection, initialization and recovery messages, plus Payload Manager metadata.
+- Embedded the supplied icon and optional PS5 Settings tile installer in the existing single ELF; installation requires explicit confirmation.
+- Made a two-section changelog mandatory for future release notes and packaging.
+
+## v0.1.0-dev.2
+
+Published from `6ed81c2ba477285e932bd4593aa029554cadf757`; physical PS5 testing was not performed.
+
+### Bug Fixes
+
+- Kept USB transfer buffers alive through cleanup, rejected invalid completed frames and added stale-input neutralization (host-tested).
+- Made profile writes safer during concurrent edits and added explicit recovery for a corrupt Default profile.
+- Hardened optional game-hook installation and rollback so failed cleanup retains ownership (host-tested).
+
+### New Features / Improvements
+
+- Enabled the authenticated WebUI on first launch, with a short-lived console pairing code and browser enrollment; manual FTP setup is no longer required.
+- Expanded HTTP admission, storage, browser and release-evidence checks.
+
+## v0.1.0-dev.1
+
+First published experimental version, source `ffff5e08905d394b67a7da070fcf4657a250f070`; physical PS5 testing was not performed.
+
+### Bug Fixes
+
+None.
+
+### New Features / Improvements
+
+- Introduced the experimental single-ELF Steam Controller 2026 USB-C/Puck implementation, with virtual DualSense, profiles, motion, trackpads and haptic translation.
+- Included an authenticated optional WebUI with image-based remapping and profile import/export.
+- Added reproducible Host, sanitizer, Chromium and SDK v0.43 build gates, checksums, source references and safety documentation.

@@ -1,0 +1,74 @@
+# Public repository preparation — 2026-10-12
+
+**Historical public-readiness inventory/privacy scope.** On 2026-11-01, after dev.6 publication, the owner made the repository Public; GitHub private vulnerability reporting, dependency graph and Dependabot alerts were enabled. The inventory below records the earlier private-state review and remains historical. For the current published **dev.5**, use the [README](../../README.md), [loading guide](LOADING.md), [current status](../../project-memory/CURRENT_STATUS.md) and [VDA/storage contract](VDA_PENDING.md). Earlier holds, positive-only VDA policies, counts and source hashes below describe their dated checkpoints. Dev.5 implements an owner-approved experimental correlated pending path and protected session-only WebUI; a successful fix on physical PS5 is not established. Historical results and releases are unchanged.
+
+This checkpoint prepares documentation and contributor entry points. Repository visibility was checked as **private**; this task does not change it. Public source access and a hardware-verified stable release are separate decisions.
+
+## Reviewed state
+
+- Authoritative pre-update main: `3a99866d63c13744c6dc3df90439f70d1c713b90`, complete tree `6f81350afedb36c1c30d9e4218e1cbada2830f94`, 282 files. Host38229733009 and SDK38229732850 completed successfully; no open PRs were returned.
+- Published experimental dev.3: source/tag `9aab6dbae166b28416a9a00e6346f85bf12e524e`, workflow38225113776 passed, seven release assets containing one ELF. Dev.1/dev.2 and all release tags/assets remain unchanged.
+- Downloaded dev.3 ELF: 2,029,288 bytes; SHA-256 `013e27f60091cd5de87577beb9acd40ac5ae5eeba08092b7dff65bf56847c752`. M1-238 records its independent download/source verification.
+- README/build/UI/feature guidance now identifies dev.3, SDK v0.43, 220 browser assertions and intended **FW13.60, unverified**. Earlier12.00 records are historical and retained.
+- Added contributor bug/feature issue forms and [SECURITY.md](../../SECURITY.md). Runtime code and default safety policy are unchanged.
+
+## Publication and privacy review
+
+A local inventory was compared against all282 current remote file SHAs. Only SESSION_LOG/TEST_LOG differed initially by the already-recorded local publication self-receipt; all other bytes matched. A bounded signature scan of these text files found no private-key headers, GitHub PAT patterns, AWS access-key patterns or URLs with embedded credentials. No token, environment-secret, ELF/object/archive or private-key filename was present in this snapshot.
+
+Two MAC-shaped strings belong to deliberately artificial diagnostic-redaction fixtures (`01:23:45:67:89:ab`). The only email match is `fixture@example.invalid`. Fifteen historical local paths contain the maintainer's existing GitHub username. They are retained as command/environment evidence; they are not live console captures or credentials. The four WebPs and four documentation PNGs contain no detected EXIF/XMP/text metadata chunks. Tile JPEG/PNG metadata was inspected: resolution/orientation/dimensions/color-space/toolkit fields only, no GPS, creator/copyright or populated IPTC records found. This is a targeted review, not a guarantee that every possible identifier is absent.
+
+At the initial M1-239 checkpoint, full history and attachment review were NOT_RUN. The follow-up M1-240 below supersedes that scope limitation for reachable Git objects and repository discussions. It does not erase the initial result or certify every historical release asset.
+
+## Reachable-history review — M1-240
+
+Reviewed remote main `af183a2a0ed9b98e427864c216df9d68da854363` and `fix/p0-safety` at `97097c5e715c2fdd13399895dc462c4d30fda596`, plus all three `dev/` tags. Authenticated GitHub API enumeration returned **140 distinct commits and 140 complete, untruncated trees**, ending at root `61780b03bcef6859935cac1ef288cf3eef12d3ba`. Every parent and tag target belongs to this closed inventory. The inherited local branch was not used as the history authority.
+
+- Read and scanned **all 1,413 distinct UTF-8 blobs** from those remote trees. Targeted rules covered private keys, GitHub/AWS/Slack/Google/Stripe credentials, JWTs, credential-bearing URLs and quoted credential assignments; additional checks covered email, MAC addresses, private IPs and local user paths. No credential-pattern matches were found. This was a custom bounded signature review, not a Gitleaks/TruffleHog run or a guarantee against every secret format.
+- Resolved **all 63 binary image blobs** to matching current bytes or SHA-verified local Git objects. PNG/WebP metadata inspection found no text/EXIF/XMP chunks except the already-reviewed tile PNG; tile JPEG/PNG technical metadata remains unchanged. No new metadata privacy finding. Historical screenshots were structurally inspected, not independently OCR-reviewed in this follow-up.
+- Text findings are the synthetic diagnostic MAC, `fixture@example.invalid`, documented/test private-network addresses and `/Users/mneroba` paths in historical execution records. The inherited Makefile default `192.168.69.44` is a private-network address, not a credential or verified console address. Commit authors use the owner's GitHub noreply address. No personal email, real controller MAC, credential filename, committed ELF/SDK archive or private key was found by these checks.
+- One closed PR (#1), no standalone issues, and zero issue comments, PR review comments or reviews were returned. Its head is included above. The only attachment reference found in Git documentation is an inherited upstream controller demonstration URL; its remote media content was not independently inspected. No project issue/PR attachment was returned.
+- Reviewed all three release bodies and inventories: **19 assets**, three experimental prereleases with corresponding tagged sources and warnings. Re-scanned the already-downloaded dev.2/dev.3 ELF bytes after confirming their current GitHub SHA-256 digests; no private-key/PAT/AWS/MAC signature matches, only `/home/runner` build paths. Dev.1 ELF and every historical sidecar were not independently downloaded/re-scanned in this follow-up; earlier publication evidence is retained. Do not call this an exhaustive binary-forensics audit.
+- Exact reviewed main CI is green: Host **38243782521**, PS5 cross-build **38243782563**. No physical PS5 validation was performed.
+
+**No confirmed public-publication blocker was identified in the reviewed scope.** The repository can be presented as experimental source with the documented artwork rights and hardware limitations. Maintainer username paths and historical negative results will be public. Deleted/unreachable GitHub objects, unseen discussions outside this repository and arbitrary secret formats are outside this review. If an actual credential is later identified, revoke it and propose separate history remediation; no history or release was rewritten here.
+
+## Rights and source availability
+
+GPL code/notices, PoorDS4 attribution, community SDK provenance and archived upstream documents are retained. SDK archives, proprietary firmware and credentials are not committed. Release tags expose the corresponding source/build scripts, and release notices accompany binaries.
+
+Controller photos and the tile image have owner-authorized repository/release publication. No separate open asset license or photographer attribution was supplied. Public access does not establish a GPL/CC0 grant for those assets; keep their [controller](../../payload/web/controllers/NOTICE.md) and [tile](../../payload/settings-tile/NOTICE.md) notices. If broader artwork reuse is desired, obtain an explicit asset license separately.
+
+## Owner actions before visibility change
+
+1. Review the M1-240 scope and residual limitations above. Reachable branch/tag text history is covered; historical logs and maintainer username paths will become public.
+2. Retain all existing source/license/asset notices and experimental release warnings. An additional independent secret-scanner or exhaustive historical binary review may provide extra assurance; neither was claimed here.
+3. After changing visibility to Public, enable and verify GitHub private vulnerability reporting. M1-241 checked the authenticated Security overview and Advanced Security settings: no private-reporting option is exposed while the repository remains private. [GitHub's guide](https://docs.github.com/en/code-security/how-tos/report-and-fix-vulnerabilities/configure-vulnerability-reporting/configure-for-a-repository) specifies public repositories. SECURITY.md keeps its conditional route; no invented contact email or response SLA is advertised.
+4. **About updated and verified — M1-241.** The owner requested the update. The saved description is:
+
+   > Experimental Steam Controller 2026 payload for PS5: USB-C/Puck, remapping, gyro, trackpads and haptics. One ELF; host-tested, PS5 hardware unverified.
+
+   The old12.00 description was replaced through the authenticated repository metadata form and verified in the rendered page and GitHub API. Optional topics remain unapplied. Repository visibility, releases and tags are unchanged.
+5. Review README, LICENSE, asset notices, CONTRIBUTING, SECURITY and the issue forms, then change visibility yourself when ready. No source or binary claims a compatible firmware or a tested loader.
+
+Hardware H-01–H-15 remain NOT_RUN/BLOCKED where applicable; native BLE remains research. Opening the source does not authorize console deployment, stock-radio operation or stable publication.
+
+
+## Documentation publication and validation
+
+Documentation source `e7f53f2cf1466bed0f8462bc350155b45b101eb9` published on main. Complete tree286 files retains every282 previous path;29 focused paths changed, four new guides/forms, no runtime source/asset/test/script/workflow changes. Current Host38243078629 and SDK38243078701 completed successfully, including normal, sanitizer, Chromium and cross-build checks. Targeted109 link checks, changelog5 and DEV package7 tests, issue-form YAML/ID/field validation and diff checks passed. This receipt corrects earlier workflow labels without changing results. Repository visibility/metadata/security settings remain unchanged.
+
+
+## Final runtime audit follow-up — M1-242, 2026-10-14
+
+Three post-dev.3 source defects were reproduced and fixed on mainc204524: ambiguous Add retries/global reservation gap, reopened USB identity before driver claim, and invalid OUT-status signed overflow. Fresh exact source normal/sanitizer/SDK checks and five-module static analysis pass; Chromium220 retained. Remote Host38581146662/SDK38581146350 queued at14:32 UTC. Published dev.3/older ELFs lack these changes; README and Unreleased changelog disclose this. Owner-supplied dev.2/FW5.50 comment reports failures but has no log/digest; no hardware cause/fix claimed. See [runtime review](PUBLIC_RUNTIME_REVIEW.md). No source-publication blocker found after scoped fixes; firmware/VDA/native-coexistence guarantees still require hardware. Visibility remains private; no new release/tag approved or published.
+
+
+## M1-243 — Published dev.4, 2026-10-14
+
+Owner explicitly approved creation/publication. Tag dev/v0.1.0-dev.4 points to a5c20346392eac0eb9fa04cc201cd214e2957363; DEV workflow38588689667 completed/success and all three jobs passed. GitHub release412878689, prerelease=true/draft=false, published 2026-10-14T15:29:58Z; seven assets contain exactly one ELF (2029632 bytes, SHA25634ae9fa0d55f8fdadbec4384d4171b029243e2fc6d0eb94a3d0120a6165f9ea4). Selected source has287 blobs/45 production C; prior releases/tags/assets remain unchanged. Exact-source push Host38587348600/SDK38587348499 and repeated DEV normal44 C/Python, ASan/UBSan, Chromium220, deterministic assets, SDKv0.43 build/dependency/package/checksum gates passed. Earlier local browser fixture version mismatch and checksum command wrong-directory negatives retained; corrected reruns passed. Fresh local exact-source normal/sanitizer/build/package PASS; local ELFc236bf1aff8cd842eea092f06568f9b45a9d48fb5404028c9dd84e8414607650 is separate from published Linux output. Three M1-242 safety fixes included; full dev.3 functionality retained. Firmware13.60 unmeasured, physical hardware NOT_RUN, external dev.2/FW5.50 cause/token-storage/native-input problem unconfirmed. Repo visibility unchanged; no console/radio/firmware/tile action. Latest setup/download/changelog/security/status documents updated after publication acknowledgement. Next: review existing tester gc_status.log/.prev or authenticated diagnostic report when supplied; do not ask for secrets or rerun the failing old ELF. Tester reply prepared; no Reddit destination URL known and no external comment posted.
+
+
+## External runtime failure follow-up — 2026-10-15 (M1-244)
+
+External dev.4 logs now show Puck decoding but failed VDA ownership and WebUI token initialization. The earlier source/privacy review is not a successful runtime result. Future DEV publication is blocked in the critical manifest; the existing release/assets are unchanged. Read [external log analysis](EXTERNAL_RUNTIME_REPORT.md) before any console testing. Raw third-party logs include account identifiers and are not committed; only hashes and sanitized counts are recorded. Source visibility remains an owner decision; no physical compatibility claim or hardware gate is satisfied.

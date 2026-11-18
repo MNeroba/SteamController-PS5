@@ -1,0 +1,141 @@
+#!/usr/bin/env python3
+"""Validate experimental policy and package an actual SDK ELF; no hardware claims."""
+import argparse
+import hashlib
+import json
+import re
+import shutil
+import struct
+try:
+    from .check_changelog import validate as validate_changelog
+except ImportError:
+    from check_changelog import validate as validate_changelog
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[1]
+WARNING = ('Experimental development build. Not verified on physical PS5 hardware. '
+           'PS5 firmware 13.60 is the intended test environment, not a confirmed '
+           'compatible firmware. Use at your own risk.')
+SDK_SHA = 'a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb'
+
+
+def validate_policy(policy):
+    if (policy.get('schema') != 1 or policy.get('channel') != 'experimental-dev' or
+            policy.get('target_firmware') != '13.60' or
+            policy.get('firmware_verified') is not False or policy.get('sdk') != 'v0.43' or
+            policy.get('critical_code_blockers') != [] or not policy.get('review')):
+        raise ValueError('DEV policy missing, altered, or has critical code blockers')
+
+
+def validate_identifiers(source_sha, version):
+    if not re.fullmatch(r'[0-9a-f]{40}', source_sha):
+        raise ValueError('Select a full lowercase source commit SHA')
+    if not re.fullmatch(r'v\d+\.\d+\.\d+(?:-dev\.\d+|-experimental(?:\.\d+)?)', version):
+        raise ValueError('Version must have the form vMAJOR.MINOR.PATCH-dev.N or vMAJOR.MINOR.PATCH-experimental[.N]')
+
+
+def validate_elf(data):
+    # ELF64 little-endian x86-64 ET_DYN/ET_EXEC; SDK output is ET_DYN.
+    if (len(data) < 64 or data[:7] != b'\x7fELF\x02\x01\x01' or
+            struct.unpack_from('<H', data, 16)[0] not in (2, 3) or
+            struct.unpack_from('<H', data, 18)[0] != 62):
+        raise ValueError('Missing or invalid ELF64 x86-64 payload')
+
+
+def validate_metadata(metadata,version,asset):
+    expected=f'https://github.com/MNeroba/SteamController-PS5/releases/download/dev/{version}/{asset}'
+    if (metadata.get('name')!='SteamController-PS5' or metadata.get('filename')!=asset or
+        metadata.get('version')!=version or metadata.get('url')!=expected or
+        metadata.get('category')!='Controller' or not metadata.get('description') or
+        'unverified' not in metadata['description']):
+        raise ValueError('Payload Manager metadata/version/artifact mismatch')
+    if 'checksum' in metadata and not re.fullmatch(r'[0-9a-f]{64}',metadata['checksum']):
+        raise ValueError('Invalid Payload Manager checksum')
+
+
+def package(source_sha, version, elf, output):
+    validate_identifiers(source_sha, version)
+    validate_policy(json.loads((ROOT / 'docs/development/dev-release.json').read_text()))
+    changes=validate_changelog(version,ROOT)
+    metadata=json.loads((ROOT/'config/payload/SteamController-PS5.elf.json').read_text())
+    asset=f'SteamController-PS5-{version}.elf'
+    validate_metadata(metadata,version,asset)
+    data = elf.read_bytes()
+    validate_elf(data)
+    if source_sha.encode() not in data or version.encode() not in data:
+        raise ValueError("ELF must embed selected source SHA and version")
+    for name in ('icon0.png', 'param.json'):
+        embedded = (ROOT / 'payload/settings-tile' / name).read_bytes()
+        if not embedded or embedded not in data:
+            raise ValueError(f'Missing embedded settings tile asset: {name}')
+    if output.exists() and any(output.iterdir()):
+        raise ValueError("Use an empty output directory; do not mix release artifacts")
+    output.mkdir(parents=True, exist_ok=True)
+    asset = f'SteamController-PS5-{version}.elf'
+    (output / asset).write_bytes(data)
+    digest = hashlib.sha256(data).hexdigest()
+    (output / f'{asset}.sha256').write_text(f'{digest}  {asset}\n')
+    metadata['checksum']=digest
+    (output / f'{asset}.json').write_text(json.dumps(metadata,indent=2)+'\n')
+    shutil.copyfile(ROOT / 'LICENSE', output / 'LICENSE')
+    shutil.copyfile(ROOT / 'docs/development/LOADING.md', output / 'LOADING.md')
+    source = f'https://github.com/MNeroba/SteamController-PS5/tree/{source_sha}'
+    notices = ('# Notices and corresponding source\n\n'
+               f'Payload source: [{source_sha}]({source}). The release tag points to this exact revision. '
+               'GitHub provides the matching source archive alongside these assets.\n\n'
+               'Code: GPL-3.0-or-later; full text in LICENSE. Preserve inherited notices. '
+               'PuckbridgePS5 / Ghostcontrol / PoorDS4 / LibrePadPS5 engineering-reference provenance and pins: docs/PROVENANCE.md in that source.\n\n'
+               'Community SDK v0.43 corresponding source: '
+               'https://github.com/ps5-payload-dev/sdk/tree/d9c9519116944a7f1c22d262012c53b80b3520b7. '
+               'SDK headers retain their individual GPL/BSD exceptions. SDK archive checksum: '
+               f'`{SDK_SHA}`. No proprietary Sony SDK is included.\n\n')
+    for file in ('payload/settings-tile/NOTICE.md', 'payload/bridge/NOTICE.md', 'payload/web/icons/LICENSE.txt',
+                 'payload/web/controllers/NOTICE.md'):
+        notices += f'## {file}\n\n' + (ROOT / file).read_text() + '\n'
+    (output / 'NOTICES.md').write_text(notices)
+    notes = (f'# SteamController-PS5 {version} — experimental DEV\n\n**{WARNING}**\n\n' +
+             changes+'\n'+
+             f'- Source: [`{source_sha}`]({source})\n'
+             '- SDK: PS5 Payload SDK v0.43 / LLVM 18\n'
+             f'- SDK archive SHA-256: `{SDK_SHA}`\n'
+             f'- Payload: `{asset}`\n- ELF SHA-256: `{digest}`\n\n'
+             'Required workflow gates: normal host, ASan/UBSan, 220+ Chromium assertions, '
+             'nine image/embedding contracts, deterministic asset generation, clean PS5 cross-build '
+             'and checksum verification. These establish software/build evidence only.\n\n'
+             'Contributor PR8 reports WebUI and Puck/system-menu input on one FW13.20 fat PS5 at source c3a7ddb; '
+             'that original build predates the revised filesystem adapter in this release. '
+             'These are external reports, not acceptance tests of this selected ELF. '
+             'USB-C/Puck, virtual DualSense, motion/touch/haptics and shutdown remain physically unverified. '
+             'One active Steam Controller 2026 session. Native BLE and Edge identity are research only. '
+             'Game hooks, bridge probing and DualSense handoff are disabled by default. '
+             'An absent runtime policy starts WebUI on PS5 loopback port 8090 without a pairing code. '
+             'It cannot be accessed from phones, PCs or the LAN. Host and Origin checks protect browser requests. '
+             'A first-run background task attempts to register the Media tile using its owned assets. '
+             'Actual registration, browser behavior and console runtime are unverified.\n\n'
+             'Opt-in direct HID (ENABLE_DIRECT_HID=1) uses a full touch/Create/motion report and requires '
+             'one confirmed foreground user and a successfully read disconnected native pad. '
+             'A connected/unknown native controller or missing readable native handle leaves registration waiting; '
+             'no native disconnect is performed. Direct HID and rest/wake behavior are not physically verified. '
+             'See the dev.8 candidate guide and raw-report contract in the source documentation.\n\n'
+             'Default-library pending virtual-controller registration may use a unique typed system event after one Add. '
+             'This is experimental temporal correlation, not a proven ownership ABI; keep other '
+             'virtual-controller payloads stopped. Connected/unknown native DualSense state prevents '
+             'local binding; use the console profile picker. Do not repeatedly reload an unresolved '
+             'registration. Preserve native DualSense and stop on unexpected native input loss. '
+             'Actual storage errno and '
+             'Add/VDI/MBus behavior require a controlled console test.\n\n'
+             'Read LOADING.md and NOTICES.md before testing. Verify the checksum before sending '
+             'the ELF through an independently confirmed compatible development loader. '
+             'One ELF embeds the optional Media settings tile icon/metadata. The first-run worker attempts registration automatically; the UI provides an explicit retry. The tile opens http://127.0.0.1:8090/ while this payload is running; it does not start the payload. Registration and browser behavior on FW 13.60 require physical testing. No PKG/FPKG or second ELF is required. The stable hardware release gate remains blocked.\n')
+    (output / 'RELEASE_NOTES.md').write_text(notes)
+    print(f'{asset}: SHA-256 {digest}')
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--source-sha', required=True)
+    parser.add_argument('--version', required=True)
+    parser.add_argument('--elf', type=Path, default=ROOT / 'payload/ghost-control-ps5.elf')
+    parser.add_argument('--output', type=Path, required=True)
+    args = parser.parse_args()
+    package(args.source_sha, args.version, args.elf, args.output)

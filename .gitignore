@@ -1,0 +1,16 @@
+*.elf
+*.o
+.DS_Store
+tests/build/
+/.build-cache/
+steam-controller.jpg
+/.playwright-cli/
+/output/playwright/
+/payload/webui_html.h
+*.elf.sha256
+__pycache__/
+*.pyc
+
+payload/settings_tile_assets.h
+
+payload/build_info.h

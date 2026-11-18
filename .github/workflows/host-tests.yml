@@ -1,0 +1,39 @@
+name: Host tests
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24
+      - name: Install pinned Playwright CLI and Chromium
+        run: |
+          npm install --global @playwright/cli@0.1.22
+          playwright-cli install-browser chromium --with-deps
+      - name: Generate self-contained portal page
+        run: python3 payload/gen_html.py
+      - name: Run portable host suite
+        run: make -C tests clean test
+      - name: Run AddressSanitizer and UndefinedBehaviorSanitizer suite
+        run: make -C tests sanitize
+      - name: Run remap browser regression
+        run: bash scripts/run_webui_browser.sh
+      - name: Preserve browser diagnostics
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7
+        with:
+          archive: true
+          name: SteamController-PS5-browser-evidence
+          path: |
+            output/playwright/
+            .playwright-cli/
+          if-no-files-found: warn

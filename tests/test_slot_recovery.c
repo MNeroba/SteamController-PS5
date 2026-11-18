@@ -1,0 +1,233 @@
+/* SPDX-License-Identifier: GPL-3.0-or-later */
+#include "slot_lifecycle.h"
+#include <assert.h>
+#include <pthread.h>
+#include <stdio.h>
+typedef struct {
+    int creates, deletes, fail_delete, release_during_create;
+    int32_t next;
+    slot_registry_t *r;
+    slot_registry_token_t t;
+} fake_t;
+static int create(uint32_t slot, int32_t *h, int *bind, void *ctx) {
+    fake_t *f = ctx;
+    assert(slot == f->t.index);
+    f->creates++;
+    *h = ++f->next;
+    *bind = 0;
+    if (f->release_during_create)
+        assert(slot_registry_request_release(f->r, f->t) == 0);
+    return 0;
+}
+static int del(int32_t h, void *ctx) {
+    fake_t *f = ctx;
+    assert(h > 0);
+    f->deletes++;
+    return f->fail_delete ? -1 : 0;
+}
+static void *race(void *ctx) {
+    fake_t *f = ctx;
+    if (slot_registry_begin_virtual_create(f->r, f->t) == 0)
+        return (void *)1;
+    return 0;
+}
+static int uncertain_create(uint32_t slot, int32_t *h, int *bind, void *ctx) {
+    fake_t *f = ctx;
+    assert(slot == f->t.index);
+    f->creates++; /* The backend may have created a device without a receipt. */
+    *h = f->next;
+    *bind = 0;
+    return -1;
+}
+static void test_unattributable_creation_never_retries(void) {
+    const int32_t outcomes[] = {0, -1, (int32_t)0x803B0006u};
+    for (unsigned i = 0; i < sizeof(outcomes) / sizeof(outcomes[0]); ++i) {
+        slot_registry_t r;
+        assert(slot_registry_init(&r) == 0);
+        fake_t f = {.r = &r, .next = outcomes[i]};
+        assert(slot_registry_claim(&r, "uncertain", 0x28de, 0x1304, &f.t) == 0);
+        assert(slot_registry_activate(&r, f.t) == 0);
+        slot_lifecycle_ops_t ops = {.create_virtual = uncertain_create, .delete_virtual = del};
+        for (int n = 0; n < 32; ++n)
+            assert(slot_lifecycle_attach(&r, f.t, &ops, &f, 0) != 0);
+        assert(f.creates == 1 && f.deletes == 0);
+        assert(slot_lifecycle_release(&r, f.t, del, &f) == 0);
+        /* Hotplug/new generations and account recovery cannot clear the latch. */
+        assert(slot_registry_claim(&r, "reconnect", 0x28de, 0x1302, &f.t) == 0);
+        assert(slot_registry_activate(&r, f.t) == 0);
+        assert(slot_lifecycle_attach(&r, f.t, &ops, &f, 0) != 0);
+        assert(f.creates == 1 && f.deletes == 0);
+        assert(slot_lifecycle_release(&r, f.t, del, &f) == 0);
+        slot_registry_destroy(&r);
+    }
+}
+static void test_global_creation_reservation(void) {
+    slot_registry_t r;
+    slot_registry_token_t a,b;
+    assert(slot_registry_init(&r)==0);
+    assert(slot_registry_claim(&r,"pending-a",0x28de,0x1302,&a)==0);
+    assert(slot_registry_claim(&r,"pending-b",0x28de,0x1304,&b)==0);
+    assert(slot_registry_activate(&r,a)==0 && slot_registry_activate(&r,b)==0);
+    assert(slot_registry_begin_virtual_create(&r,a)==0);
+    /* Reserve through callback result recording, not just the raw SDK call. */
+    assert(slot_registry_begin_virtual_create(&r,b)==SLOT_REGISTRY_BUSY);
+    assert(slot_registry_finish_virtual_create(&r,a,-1)==SLOT_REGISTRY_ERROR);
+    assert(slot_registry_begin_virtual_create(&r,b)==SLOT_REGISTRY_BUSY);
+    fake_t f={0};
+    assert(slot_lifecycle_release(&r,a,del,&f)==0);
+    assert(slot_lifecycle_release(&r,b,del,&f)==0 && f.deletes==0);
+    slot_registry_destroy(&r);
+}
+static int skipped_create(uint32_t slot,int32_t *h,int *bind,void *ctx) {
+    fake_t *f=ctx;(void)slot;
+    f->creates++;*h=-1;*bind=0;
+    return SLOT_LIFECYCLE_CREATE_SKIPPED;
+}
+static void test_skipped_create_does_not_latch(void) {
+    slot_registry_t r; slot_registry_entry_t e;
+    assert(slot_registry_init(&r)==0);
+    fake_t f={.r=&r,.next=40};
+    assert(slot_registry_claim(&r,"skipped",0x28de,0x1304,&f.t)==0);
+    assert(slot_registry_activate(&r,f.t)==0);
+    slot_lifecycle_ops_t ops={.create_virtual=skipped_create,.delete_virtual=del};
+    assert(slot_lifecycle_attach(&r,f.t,&ops,&f,0)==SLOT_LIFECYCLE_CREATE_SKIPPED);
+    assert(f.creates==1 && f.deletes==0);
+    assert(slot_registry_snapshot(&r,f.t,&e)==0);
+    assert(!e.virtual_creating && !e.virtual_ready && !e.virtual_blocked);
+    assert(!r.creation_blocked);
+    /* The same session retries after the precondition clears. */
+    ops.create_virtual=create;
+    assert(slot_lifecycle_attach(&r,f.t,&ops,&f,0)==0);
+    assert(slot_registry_snapshot(&r,f.t,&e)==0 && e.virtual_ready && e.virtual_handle==f.next);
+    assert(slot_lifecycle_release(&r,f.t,del,&f)==0);
+    slot_registry_destroy(&r);
+}
+static int deferred_create(uint32_t slot,int32_t *h,int *bind,void *ctx) {
+    fake_t *f=ctx;(void)slot;f->creates++;*h=-1;*bind=0;return 1;
+}
+static void test_async_pending(void) {
+    slot_registry_t r;slot_registry_token_t t;slot_registry_entry_t e;
+    assert(slot_registry_init(&r)==0);
+    assert(slot_registry_claim(&r,"pending",0x28de,0x1304,&t)==0);
+    assert(slot_registry_activate(&r,t)==0);
+    fake_t f={.r=&r,.t=t};slot_lifecycle_ops_t ops={.create_virtual=deferred_create,.delete_virtual=del};
+    assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    assert(slot_registry_snapshot(&r,t,&e)==0 && e.virtual_creating && !e.virtual_ready);
+    for(int n=0;n<32;n++)assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    assert(f.creates==1 && !r.creation_blocked);
+    assert(slot_registry_request_release(&r,t)==0);
+    assert(slot_registry_release(&r,t)==SLOT_REGISTRY_BUSY);
+    assert(slot_lifecycle_finish_pending(&r,t,0xd030d,0,&ops,&f)==0);
+    assert(f.deletes==1);
+    assert(slot_registry_snapshot(&r,t,&e)==0 && !e.virtual_ready && e.state==SLOT_REGISTRY_RELEASING);
+    assert(slot_lifecycle_release(&r,t,del,&f)==0);
+    assert(slot_registry_claim(&r,"pending-again",0x28de,0x1304,&t)==0);
+    assert(slot_registry_activate(&r,t)==0);f.t=t;
+    assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    f.fail_delete=1;
+    assert(slot_lifecycle_finish_pending(&r,t,0xd030e,1,&ops,&f)==SLOT_REGISTRY_DELETE_FAILED);
+    assert(slot_registry_snapshot(&r,t,&e)==0 && e.virtual_ready && e.virtual_correlated);
+    assert(e.virtual_device_id==0xd030e && e.virtual_handle==0xd030e);
+    assert(slot_lifecycle_attach(&r,t,&ops,&f,0)==SLOT_REGISTRY_BUSY);
+    f.fail_delete=0;assert(slot_lifecycle_release(&r,t,del,&f)==0);
+    slot_registry_destroy(&r);
+}
+int main(void) {
+    test_skipped_create_does_not_latch();
+    test_async_pending();
+    test_global_creation_reservation();
+    test_unattributable_creation_never_retries();
+    slot_registry_t r;
+    assert(slot_registry_init(&r) == 0);
+    slot_registry_token_t t;
+    assert(slot_registry_claim(&r, "/dev/ugen1.1", 0x28de, 0x1304, &t) == 0);
+    assert(slot_registry_activate(&r, t) == 0);
+    fake_t f = {.r = &r, .t = t, .next = 30};
+    slot_lifecycle_ops_t ops = {.create_virtual = create, .delete_virtual = del};
+    slot_recovery_t recovery = {0};
+    user_session_snapshot_t u = {.read_ok = 1, .can_register = 1};
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) == 0 && f.creates == 0);
+    assert(slot_lifecycle_attach(&r, t, &ops, &f, 0) == 0); /* startup at login screen */
+    slot_registry_entry_t e;
+    assert(slot_registry_snapshot(&r, t, &e) == 0 && e.virtual_handle == 31);
+    u.logout_epoch = 1;
+    u.logged_out = 1;
+    u.can_register = 0;
+    f.fail_delete = 1;
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) ==
+           SLOT_REGISTRY_DELETE_FAILED);
+    assert(f.creates == 1 && recovery.pending);
+    assert(slot_registry_snapshot(&r, t, &e) == 0 && e.virtual_handle == 31 && e.virtual_ready);
+    assert(slot_lifecycle_attach(&r, t, &ops, &f, 0) == SLOT_REGISTRY_BUSY); /* no duplicate */
+    f.fail_delete = 0;
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) == 1);
+    for (int i = 0; i < 10; i++)
+        assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) == 1);
+    assert(f.creates == 1);
+    u.logged_out = 0;
+    u.can_register = 1;
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) == 0 && f.creates == 2 &&
+           recovery.recovered == 1);
+    assert(slot_registry_snapshot(&r, t, &e) == 0 && e.token.generation == t.generation &&
+           e.virtual_handle == 32);
+    /* A paused/released controller never resurrects. Explicit resume is separate. */
+    u.logout_epoch = 2;
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 0, &ops, &f) == 0 && f.creates == 2);
+    assert(slot_registry_delete_virtual(&r, t, del, &f) == 0);
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) == 0 && f.creates == 2);
+    /* A pending AddDevice reserves its generation even when release races. */
+    assert(slot_registry_begin_virtual_create(&r, t) == 0);
+    assert(slot_lifecycle_recover(&r, t, &recovery,
+                                  &(user_session_snapshot_t){.logout_epoch = 3, .can_register = 1},
+                                  1, &ops, &f) == SLOT_REGISTRY_BUSY);
+    assert(slot_registry_request_release(&r, t) == 0);
+    assert(slot_registry_release(&r, t) == SLOT_REGISTRY_BUSY);
+    assert(slot_registry_finish_virtual_create(&r, t, 55) == 0);
+    assert(slot_lifecycle_release(&r, t, del, &f) == 0);
+    assert(slot_registry_claim(&r, "new-session", 0x28de, 0x1302, &f.t) == 0);
+    assert(slot_registry_activate(&r, f.t) == 0);
+    assert(f.t.generation != t.generation);
+    assert(slot_lifecycle_recover(&r, t, &recovery, &u, 1, &ops, &f) ==
+           SLOT_LIFECYCLE_INVALID); /* stale generation */
+    pthread_t threads[12];
+    int winners = 0;
+    for (int i = 0; i < 12; i++)
+        assert(pthread_create(&threads[i], 0, race, &f) == 0);
+    for (int i = 0; i < 12; i++) {
+        void *win;
+        assert(pthread_join(threads[i], &win) == 0);
+        winners += win != 0;
+    }
+    assert(winners == 1);
+    assert(slot_registry_finish_virtual_create(&r, f.t, -1) == SLOT_REGISTRY_ERROR);
+    assert(slot_registry_begin_virtual_create(&r, f.t) == SLOT_REGISTRY_BUSY);
+    assert(slot_lifecycle_release(&r, f.t, del, &f) == 0);
+    slot_registry_destroy(&r);
+    assert(slot_registry_init(&r) == 0); /* independent positive-receipt race */
+    assert(slot_registry_claim(&r, "release-race", 0x28de, 0x1302, &f.t) == 0);
+    assert(slot_registry_activate(&r, f.t) == 0);
+    f.release_during_create = 1;
+    assert(slot_lifecycle_attach(&r, f.t, &ops, &f, 0) == 0);
+    assert(slot_registry_snapshot(&r, f.t, &e) == 0 && e.state == SLOT_REGISTRY_RELEASING &&
+           e.virtual_ready);
+    assert(slot_lifecycle_release(&r, f.t, del, &f) ==
+           0); /* Ambiguous receipt neither deletes another owner's handle nor loops at shutdown. */
+    slot_registry_token_t a, b;
+    assert(slot_registry_claim(&r, "owner", 0x28de, 0x1302, &a) == 0);
+    assert(slot_registry_activate(&r, a) == 0);
+    assert(slot_registry_set_virtual(&r, a, 99) == 0);
+    assert(slot_registry_claim(&r, "alias", 0x28de, 0x1304, &b) == 0);
+    assert(slot_registry_activate(&r, b) == 0);
+    assert(slot_registry_begin_virtual_create(&r, b) == 0);
+    assert(slot_registry_finish_virtual_create(&r, b, 99) == SLOT_REGISTRY_HANDLE_IN_USE);
+    assert(slot_lifecycle_release(&r, b, del, &f) == 0); /* owns no independently proven handle */
+    assert(slot_lifecycle_release(&r, a, del, &f) == 0);
+    assert(slot_registry_claim(&r, "blocked", 0x28de, 0x1302, &b) == 0);
+    assert(slot_registry_activate(&r, b) == 0);
+    assert(slot_registry_begin_virtual_create(&r, b) ==
+           SLOT_REGISTRY_BUSY); /* inhibit all new Add */
+    assert(slot_lifecycle_release(&r, b, del, &f) == 0);
+    slot_registry_destroy(&r);
+    puts("owned slot recovery/pending registration/race checks passed");
+    return 0;
+}

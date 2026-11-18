@@ -1,0 +1,846 @@
+#ifndef _POSIX_C_SOURCE
+#define _POSIX_C_SOURCE 200809L
+#endif
+#if defined(__APPLE__) && !defined(_DARWIN_C_SOURCE)
+#define _DARWIN_C_SOURCE
+#endif
+
+/* sc2_profile.c — button profiles, storage, and per-game auto-switching */
+
+#include "sc2_profile.h"
+#include "private_file.h"
+#include "runtime_control.h"
+#include "gc_types.h"
+#include "game_list.h"
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <strings.h>
+#include <unistd.h>
+#include <dirent.h>
+#include <pthread.h>
+#include <sys/stat.h>
+#include <stdarg.h>
+#include <ctype.h>
+#include <errno.h>
+#include <limits.h>
+
+#ifdef __PROSPERO__
+void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/ghostpad/gc_status.log */
+#define LOG(...) ghostpad_status_log("[GC] " __VA_ARGS__)
+#else
+#define LOG(...) fprintf(stderr, __VA_ARGS__)
+#endif
+
+const char *const sc2_in_keys[SC2_IN_COUNT] = {
+    "A","B","X","Y", "LB","RB","LT","RT", "L3","R3",
+    "DUP","DDOWN","DLEFT","DRIGHT",
+    "VIEW","MENU","STEAM","QAM",
+    "L4","L5","R4","R5",
+    "LPAD_CLICK","RPAD_CLICK",
+};
+
+static const struct { const char *n; uint32_t m; } k_out[] = {
+    {"CROSS",SCE_PAD_BUTTON_CROSS},{"CIRCLE",SCE_PAD_BUTTON_CIRCLE},
+    {"SQUARE",SCE_PAD_BUTTON_SQUARE},{"TRIANGLE",SCE_PAD_BUTTON_TRIANGLE},
+    {"L1",SCE_PAD_BUTTON_L1},{"R1",SCE_PAD_BUTTON_R1},
+    {"L2",SCE_PAD_BUTTON_L2},{"R2",SCE_PAD_BUTTON_R2},
+    {"L3",SCE_PAD_BUTTON_L3},{"R3",SCE_PAD_BUTTON_R3},
+    {"UP",SCE_PAD_BUTTON_UP},{"DOWN",SCE_PAD_BUTTON_DOWN},
+    {"LEFT",SCE_PAD_BUTTON_LEFT},{"RIGHT",SCE_PAD_BUTTON_RIGHT},
+    {"OPTIONS",SCE_PAD_BUTTON_OPTIONS},{"CREATE",SCE_PAD_BUTTON_SHARE},
+    {"PS",SCE_PAD_BUTTON_PS},{"TOUCHPAD",SCE_PAD_BUTTON_TOUCH_PAD},
+    {"PB_MENU",PB_ACT_MENU},
+    {"PB_GYRO_ON",PB_ACT_GYRO_ON},{"PB_GYRO_OFF",PB_ACT_GYRO_OFF},{"PB_GYRO_TOGGLE",PB_ACT_GYRO_TOGGLE},
+};
+#define N_OUT ((int)(sizeof(k_out)/sizeof(k_out[0])))
+
+static const char *k_pad[] = { "OFF", "TOUCH", "STICK", "DPAD" };
+static const char *k_gyro[GYRO_MODES] = { "OFF", "ALWAYS", "GRIP", "GRIPS", "RPAD", "RSTICK" };
+static const char *k_gyro_axis[] = { "YAW", "ROLL" };
+
+/* ── profile <-> text ─────────────────────────────────────────────────── */
+
+void sc2_profile_default(sc2_profile_t *p) {
+    memset(p, 0, sizeof(*p));
+    strcpy(p->name, "Default");
+    p->map[IN_A] = SCE_PAD_BUTTON_CROSS;    p->map[IN_B] = SCE_PAD_BUTTON_CIRCLE;
+    p->map[IN_X] = SCE_PAD_BUTTON_SQUARE;   p->map[IN_Y] = SCE_PAD_BUTTON_TRIANGLE;
+    p->map[IN_LB] = SCE_PAD_BUTTON_L1;      p->map[IN_RB] = SCE_PAD_BUTTON_R1;
+    p->map[IN_LT] = SCE_PAD_BUTTON_L2;      p->map[IN_RT] = SCE_PAD_BUTTON_R2;
+    p->map[IN_L3] = SCE_PAD_BUTTON_L3;      p->map[IN_R3] = SCE_PAD_BUTTON_R3;
+    p->map[IN_DUP] = SCE_PAD_BUTTON_UP;     p->map[IN_DDOWN] = SCE_PAD_BUTTON_DOWN;
+    p->map[IN_DLEFT] = SCE_PAD_BUTTON_LEFT; p->map[IN_DRIGHT] = SCE_PAD_BUTTON_RIGHT;
+    p->map[IN_VIEW] = SCE_PAD_BUTTON_SHARE; p->map[IN_MENU] = SCE_PAD_BUTTON_OPTIONS;
+    p->map[IN_STEAM] = SCE_PAD_BUTTON_PS;   /* … (IN_QAM) is reserved for pause/resume */
+    p->map[IN_L4] = SCE_PAD_BUTTON_L3;      p->map[IN_L5] = SCE_PAD_BUTTON_L1 | SCE_PAD_BUTTON_R1;
+    p->map[IN_R4] = SCE_PAD_BUTTON_R3;      p->map[IN_R5] = SCE_PAD_BUTTON_L3 | SCE_PAD_BUTTON_R3;
+    p->map[IN_LPAD_CLICK] = SCE_PAD_BUTTON_TOUCH_PAD;
+    p->map[IN_RPAD_CLICK] = SCE_PAD_BUTTON_TOUCH_PAD;
+    p->lpad = PAD_TOUCH; p->rpad = PAD_TOUCH;
+    p->deadzone = 9;
+    p->shift_in = -1;
+    p->long_ms = 400; p->double_ms = 250; p->turbo_ms = 60;
+    p->gyro_mode = GYRO_OFF; p->gyro_axis = GYRO_AXIS_YAW;
+    p->gyro_sens_x = 20; p->gyro_sens_y = 16;
+    p->gyro_adz = 10;
+    p->gyro_steady = 5;
+    p->gyro_curve = 10;
+    p->rstick = RSTICK_NORMAL;
+    p->flick_speed = 360;
+    p->trig_fx = 100;
+    p->motion = 1;
+}
+
+static char *trim(char *s) {
+    while (*s == ' ' || *s == '\t') s++;
+    size_t n = strlen(s);
+    while (n && (s[n-1] == ' ' || s[n-1] == '\t' || s[n-1] == '\r' || s[n-1] == '\n')) s[--n] = 0;
+    return s;
+}
+
+static uint32_t parse_combo(const char *v) {
+    uint32_t m = 0;
+    char tmp[256];
+    if (!v) return 0;
+    strncpy(tmp, v, sizeof(tmp)-1); tmp[sizeof(tmp)-1] = 0;
+    char *tok = tmp;
+    while (*tok) {
+        while (*tok == '+' || *tok == ' ' || *tok == '\t') tok++;
+        if (!*tok) break;
+        char *end = tok;
+        while (*end && *end != '+' && *end != ' ' && *end != '\t') end++;
+        if (*end) *end++ = '\0';
+        for (int i = 0; i < N_OUT; i++)
+            if (!strcasecmp(tok, k_out[i].n)) { m |= k_out[i].m; break; }
+        tok = end;
+    }
+    return m;
+}
+
+/* Profile text comes from both disk and an authenticated network endpoint.
+ * strtol plus explicit range/consumption checks avoids atoi overflow and
+ * rejects partially numeric values instead of silently treating them as 0. */
+static int parse_profile_int(const char *text, int *out) {
+    char *end;
+    long value;
+    if (!text || !out) return 0;
+    errno = 0;
+    value = strtol(text, &end, 10);
+    if (end == text || errno == ERANGE || value < INT_MIN || value > INT_MAX)
+        return 0;
+    while (*end == ' ' || *end == '\t') end++;
+    if (*end != '\0') return 0;
+    *out = (int)value;
+    return 1;
+}
+
+static void parse_profile_flag(const char *text, uint8_t *out) {
+    int value;
+    if (parse_profile_int(text, &value)) *out = (uint8_t)(value != 0);
+}
+
+void sc2_profile_parse(const char *text, sc2_profile_t *p) {
+    char line[512];
+    const char *s = text;
+    while (*s) {
+        size_t n = strcspn(s, "\n");
+        if (n >= sizeof(line)) { s += n; if (*s) s++; continue; }
+        memcpy(line, s, n); line[n] = 0;
+        s += n; if (*s == '\n') s++;
+
+        char *l = trim(line);
+        if (!*l || *l == '#' || *l == ';') continue;
+        char *eq = strchr(l, '='); if (!eq) continue;
+        *eq = 0;
+        char *k = trim(l), *v = trim(eq + 1);
+
+        if (!strcasecmp(k, "name")) {
+            strncpy(p->name, v, sizeof(p->name)-1); p->name[sizeof(p->name)-1] = 0;
+            continue;
+        }
+        int done = 0;
+        char *dot = strchr(k, '.');
+        if (dot) {                                     /* KEY.activator */
+            *dot = 0; const char *act = dot + 1;
+            for (int i = 0; i < SC2_IN_COUNT && !done; i++) {
+                if (strcasecmp(k, sc2_in_keys[i])) continue;
+                done = 1;
+                if      (!strcasecmp(act, "long"))   p->lng[i]    = parse_combo(v);
+                else if (!strcasecmp(act, "double")) p->dbl[i]    = parse_combo(v);
+                else if (!strcasecmp(act, "shift"))  p->shf[i]    = parse_combo(v);
+                else if (!strcasecmp(act, "turbo"))  parse_profile_flag(v, &p->turbo[i]);
+                else if (!strcasecmp(act, "toggle")) parse_profile_flag(v, &p->toggle[i]);
+                else if (!strcasecmp(act, "full") && (i == IN_LT || i == IN_RT))
+                    p->full[i == IN_RT] = parse_combo(v);
+            }
+            continue;
+        }
+        for (int i = 0; i < SC2_IN_COUNT && !done; i++)
+            if (!strcasecmp(k, sc2_in_keys[i])) { p->map[i] = parse_combo(v); done = 1; }
+        if (done) continue;
+        if (!strcasecmp(k, "SHIFT")) {
+            p->shift_in = -1;
+            for (int i = 0; i < SC2_IN_COUNT; i++) if (!strcasecmp(v, sc2_in_keys[i])) p->shift_in = (int8_t)i;
+            continue;
+        }
+        if (!strcasecmp(k, "LONG_MS"))   { int x; if (parse_profile_int(v, &x)) p->long_ms = (uint16_t)(x < 150 ? 150 : x > 2000 ? 2000 : x); continue; }
+        if (!strcasecmp(k, "DOUBLE_MS")) { int x; if (parse_profile_int(v, &x)) p->double_ms = (uint16_t)(x < 100 ? 100 : x > 800 ? 800 : x); continue; }
+        if (!strcasecmp(k, "TURBO_MS"))  { int x; if (parse_profile_int(v, &x)) p->turbo_ms = (uint16_t)(x < 20 ? 20 : x > 500 ? 500 : x); continue; }
+        if (!strcasecmp(k, "LPAD") || !strcasecmp(k, "RPAD")) {
+            for (int i = 0; i < 4; i++) if (!strcasecmp(v, k_pad[i])) {
+                if (k[0] == 'L' || k[0] == 'l') p->lpad = (uint8_t)i; else p->rpad = (uint8_t)i;
+            }
+        } else if (!strcasecmp(k, "INVERT_LY"))  parse_profile_flag(v, &p->invert_ly);
+        else if (!strcasecmp(k, "INVERT_RY"))    parse_profile_flag(v, &p->invert_ry);
+        else if (!strcasecmp(k, "SWAP_STICKS"))  parse_profile_flag(v, &p->swap_sticks);
+        else if (!strcasecmp(k, "DEADZONE")) {
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 40) d = 40; p->deadzone = (uint8_t)d; }
+        }
+        else if (!strcasecmp(k, "GYRO")) {
+            for (int i = 0; i < GYRO_MODES; i++) if (!strcasecmp(v, k_gyro[i])) p->gyro_mode = (uint8_t)i;
+        }
+        else if (!strcasecmp(k, "GYRO_AXIS")) {
+            for (int i = 0; i < 2; i++) if (!strcasecmp(v, k_gyro_axis[i])) p->gyro_axis = (uint8_t)i;
+        }
+        else if (!strcasecmp(k, "GYRO_SENS_X") || !strcasecmp(k, "GYRO_SENS_Y")) {
+            int x; if (parse_profile_int(v, &x)) {
+                x = x < 1 ? 1 : x > 100 ? 100 : x;
+                if (k[10] == 'X' || k[10] == 'x') p->gyro_sens_x = (uint8_t)x; else p->gyro_sens_y = (uint8_t)x;
+            }
+        }
+        else if (!strcasecmp(k, "GYRO_INVERT_X")) parse_profile_flag(v, &p->gyro_invert_x);
+        else if (!strcasecmp(k, "GYRO_INVERT_Y")) parse_profile_flag(v, &p->gyro_invert_y);
+        else if (!strcasecmp(k, "GYRO_ANTI_DEADZONE")) {
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 40) d = 40; p->gyro_adz = (uint8_t)d; }
+        }
+        else if (!strcasecmp(k, "GYRO_CURVE")) {
+            int d; if (parse_profile_int(v, &d)) { if (d < 10) d = 10; if (d > 30) d = 30; p->gyro_curve = (uint8_t)d; }
+        }
+        else if (!strcasecmp(k, "RSTICK")) p->rstick = !strcasecmp(v, "FLICK") ? RSTICK_FLICK : RSTICK_NORMAL;
+        else if (!strcasecmp(k, "TRIGGER_FX")) {
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 200) d = 200; p->trig_fx = (uint8_t)d; }
+        }
+        else if (!strcasecmp(k, "FLICK_SPEED")) {
+            int d; if (parse_profile_int(v, &d)) { if (d < 90) d = 90; if (d > 1440) d = 1440; p->flick_speed = (uint16_t)d; }
+        }
+        else if (!strcasecmp(k, "MOTION")) parse_profile_flag(v, &p->motion);
+        else if (!strcasecmp(k, "GYRO_STEADINESS")) {
+            int d; if (parse_profile_int(v, &d)) { if (d < 0) d = 0; if (d > 30) d = 30; p->gyro_steady = (uint8_t)d; }
+        }
+    }
+    /* Match the editor and binding engine: Toggle wins an ambiguous import,
+     * independently of line order. Format/save then emits canonical flags. */
+    for (int i = 0; i < SC2_IN_COUNT; i++)
+        if (p->toggle[i]) p->turbo[i] = 0;
+    /* … is reserved for pause/resume: drop anything older profiles bound to it */
+    p->map[IN_QAM] = p->lng[IN_QAM] = p->dbl[IN_QAM] = p->shf[IN_QAM] = 0;
+    p->turbo[IN_QAM] = p->toggle[IN_QAM] = 0;
+    if (p->shift_in == IN_QAM) p->shift_in = -1;
+}
+
+static int valid_combo(const char *value) {
+    if (!strcasecmp(value, "NONE")) return 1;
+    char copy[256];
+    if (!*value || strlen(value) >= sizeof(copy)) return 0;
+    strcpy(copy, value);
+    char *token = copy;
+    while (token) {
+        char *next = strchr(token, '+');
+        if (next) *next++ = 0;
+        token = trim(token);
+        int found = 0;
+        for (int j = 0; j < N_OUT; j++) if (!strcasecmp(token, k_out[j].n)) found = 1;
+        if (!found) return 0;
+        token = next;
+    }
+    return 1;
+}
+
+int sc2_profile_parse_checked(const char *text, sc2_profile_t *p, int complete) {
+    static const char *const settings[] = {
+        "name", "SHIFT", "LONG_MS", "DOUBLE_MS", "TURBO_MS", "LPAD", "RPAD",
+        "INVERT_LY", "INVERT_RY", "SWAP_STICKS", "DEADZONE", "GYRO", "GYRO_AXIS",
+        "GYRO_SENS_X", "GYRO_SENS_Y", "GYRO_INVERT_X", "GYRO_INVERT_Y",
+        "GYRO_ANTI_DEADZONE", "GYRO_STEADINESS", "GYRO_CURVE", "RSTICK",
+        "FLICK_SPEED", "TRIGGER_FX", "MOTION"
+    };
+    uint64_t seen = 0;
+    uint8_t activators[SC2_IN_COUNT] = {0};
+    if (!text || !p || strlen(text) >= SC2_PROFILE_CAPACITY) return -1;
+    for (const char *s = text; *s;) {
+        char line[512];
+        size_t n = strcspn(s, "\n");
+        if (n >= sizeof(line)) return -1;
+        memcpy(line, s, n); line[n] = 0; s += n; if (*s) s++;
+        for (size_t j = 0; j < n; j++)
+            if ((unsigned char)line[j] < 32 && line[j] != '\t' && line[j] != '\r') return -1;
+        char *key = trim(line);
+        if (!*key || *key == '#' || *key == ';') continue;
+        char *eq = strchr(key, '='); if (!eq) return -1;
+        *eq = 0; key = trim(key); char *value = trim(eq + 1);
+        char *dot = strchr(key, '.'); if (dot) *dot++ = 0;
+        int input = -1, setting = -1;
+        for (int i = 0; i < SC2_IN_COUNT; i++) if (!strcasecmp(key, sc2_in_keys[i])) input = i;
+        if (input >= 0) {
+            if (dot) {
+                static const char *const acts[] = {"long","double","shift","turbo","toggle","full"};
+                int act = -1;
+                for (int i = 0; i < 6; i++) if (!strcasecmp(dot, acts[i])) act = i;
+                if (act < 0 || (act == 5 && input != IN_LT && input != IN_RT) || (activators[input] & (1u << act))) return -1;
+                activators[input] |= (uint8_t)(1u << act);
+                if (act == 3 || act == 4) { int v; if (!parse_profile_int(value, &v) || (v != 0 && v != 1)) return -1; }
+                else if (!valid_combo(value)) return -1;
+            } else {
+                if ((seen & (UINT64_C(1) << input)) || !valid_combo(value)) return -1;
+                seen |= UINT64_C(1) << input;
+            }
+            if (input == IN_QAM && strcasecmp(value, "NONE") && strcmp(value, "0")) return -1;
+            continue;
+        }
+        if (dot) return -1;
+        for (size_t i = 0; i < sizeof(settings)/sizeof(settings[0]); i++) if (!strcasecmp(key, settings[i])) setting = (int)i;
+        if (setting < 0 || (seen & (UINT64_C(1) << (SC2_IN_COUNT + setting)))) return -1;
+        seen |= UINT64_C(1) << (SC2_IN_COUNT + setting);
+        if (setting == 0) { if (strlen(value) >= sizeof(p->name)) return -1; }
+        else if (setting == 1) {
+            int found = !strcasecmp(value, "NONE");
+            for (int i = 0; i < SC2_IN_COUNT; i++) if (i != IN_QAM && !strcasecmp(value, sc2_in_keys[i])) found = 1;
+            if (!found) return -1;
+        } else if (setting == 5 || setting == 6) {
+            int found = 0; for (int i = 0; i < 4; i++) if (!strcasecmp(value, k_pad[i])) found = 1;
+            if (!found) return -1;
+        } else if (setting == 11) {
+            int found = 0; for (int i = 0; i < GYRO_MODES; i++) if (!strcasecmp(value, k_gyro[i])) found = 1;
+            if (!found) return -1;
+        } else if (setting == 12) { if (strcasecmp(value, "YAW") && strcasecmp(value, "ROLL")) return -1; }
+        else if (setting == 20) { if (strcasecmp(value, "NORMAL") && strcasecmp(value, "FLICK")) return -1; }
+        else {
+            static const int minimum[] = {0,0,150,100,20,0,0,0,0,0,0,0,0,1,1,0,0,0,0,10,0,90,0,0};
+            static const int maximum[] = {0,0,2000,800,500,0,0,1,1,1,40,0,0,100,100,1,1,40,30,30,0,1440,200,1};
+            int v; if (!parse_profile_int(value, &v)) return -1;
+            int is_flag = maximum[setting] == 1;
+            if ((complete || is_flag) && (v < minimum[setting] || v > maximum[setting])) return -1;
+        }
+    }
+    const unsigned required = SC2_IN_COUNT + (unsigned)(sizeof(settings)/sizeof(settings[0]));
+    if (complete && seen != ((UINT64_C(1) << required) - 1)) return -1;
+    sc2_profile_t candidate = *p;
+    sc2_profile_parse(text, &candidate);
+    *p = candidate;
+    return 0;
+}
+
+int sc2_profile_format(const sc2_profile_t *p, char *out, size_t n) {
+    size_t o = 0;
+    if (!p || !out || !n) return -1;
+    out[0] = 0;
+    if (!memchr(p->name, 0, sizeof(p->name)) || strpbrk(p->name, "\r\n")) return -1;
+    uint32_t supported = 0;
+    for (int j = 0; j < N_OUT; j++) supported |= k_out[j].m;
+    for (int i = 0; i < SC2_IN_COUNT; i++)
+        if ((p->map[i] | p->lng[i] | p->dbl[i] | p->shf[i]) & ~supported) return -1;
+    if ((p->full[0] | p->full[1]) & ~supported) return -1;
+#define PUT(...) do { int w = snprintf(out + o, n - o, __VA_ARGS__); \
+    if (w < 0 || (size_t)w >= n - o) goto overflow; o += (size_t)w; } while (0)
+    PUT("name=%s\n", p->name);
+#define PUTCOMBO(prefix, key, suffix, mask) do { \
+        PUT(prefix "%s" suffix "=", key); int first_ = 1; \
+        for (int j = 0; j < N_OUT; j++) \
+            if (k_out[j].m && ((mask) & k_out[j].m) == k_out[j].m) { PUT("%s%s", first_ ? "" : "+", k_out[j].n); first_ = 0; } \
+        PUT("%s\n", first_ ? "NONE" : ""); } while (0)
+    for (int i = 0; i < SC2_IN_COUNT; i++) PUTCOMBO("", sc2_in_keys[i], "", p->map[i]);
+    for (int i = 0; i < SC2_IN_COUNT; i++) {
+        if (p->lng[i])    PUTCOMBO("", sc2_in_keys[i], ".long",   p->lng[i]);
+        if (p->dbl[i])    PUTCOMBO("", sc2_in_keys[i], ".double", p->dbl[i]);
+        if (p->shf[i])    PUTCOMBO("", sc2_in_keys[i], ".shift",  p->shf[i]);
+        if (p->turbo[i])  PUT("%s.turbo=1\n",  sc2_in_keys[i]);
+        if (p->toggle[i]) PUT("%s.toggle=1\n", sc2_in_keys[i]);
+    }
+    if (p->full[0]) PUTCOMBO("", "LT", ".full", p->full[0]);
+    if (p->full[1]) PUTCOMBO("", "RT", ".full", p->full[1]);
+#undef PUTCOMBO
+    PUT("SHIFT=%s\n", p->shift_in >= 0 && p->shift_in < SC2_IN_COUNT ? sc2_in_keys[(int)p->shift_in] : "NONE");
+    PUT("LONG_MS=%d\nDOUBLE_MS=%d\nTURBO_MS=%d\n", p->long_ms, p->double_ms, p->turbo_ms);
+    PUT("LPAD=%s\nRPAD=%s\n", k_pad[p->lpad & 3], k_pad[p->rpad & 3]);
+    PUT("INVERT_LY=%d\nINVERT_RY=%d\nSWAP_STICKS=%d\nDEADZONE=%d\n",
+        p->invert_ly, p->invert_ry, p->swap_sticks, p->deadzone);
+    PUT("GYRO=%s\nGYRO_AXIS=%s\nGYRO_SENS_X=%d\nGYRO_SENS_Y=%d\nGYRO_INVERT_X=%d\nGYRO_INVERT_Y=%d\nGYRO_ANTI_DEADZONE=%d\nGYRO_STEADINESS=%d\nGYRO_CURVE=%d\n",
+        k_gyro[p->gyro_mode < GYRO_MODES ? p->gyro_mode : 0], k_gyro_axis[p->gyro_axis & 1],
+        p->gyro_sens_x, p->gyro_sens_y, p->gyro_invert_x, p->gyro_invert_y, p->gyro_adz, p->gyro_steady, p->gyro_curve);
+    PUT("RSTICK=%s\nFLICK_SPEED=%d\n", p->rstick == RSTICK_FLICK ? "FLICK" : "NORMAL", p->flick_speed);
+    PUT("TRIGGER_FX=%d\n", p->trig_fx);
+    PUT("MOTION=%d\n", p->motion);
+#undef PUT
+    return (int)o;
+overflow:
+    out[0] = 0;
+    return -1;
+}
+
+void sc2_combo_name(uint32_t mask, char *out, size_t n) {
+    static const char *nice[] = { "Cross","Circle","Square","Triangle","L1","R1","L2","R2",
+        "L3","R3","Up","Down","Left","Right","Options","Create","PS","Touchpad","Puckbridge menu",
+        "Gyro on (hold)","Gyro off (hold)","Gyro on/off" };
+    size_t o = 0; if (!out || !n) return; out[0] = 0;
+    for (int j = 0; j < N_OUT; j++)
+        if (mask & k_out[j].m) {
+            int w = snprintf(out + o, n - o, "%s%s", o ? " + " : "", nice[j]);
+            if (w < 0 || (size_t)w >= n - o) return;
+            o += (size_t)w;
+        }
+    if (!o) snprintf(out, n, "Nothing");
+}
+
+/* ── active profile ───────────────────────────────────────────────────── */
+
+static pthread_mutex_t g_act_lock = PTHREAD_MUTEX_INITIALIZER;
+static sc2_profile_t   g_active;
+static int             g_active_init = 0;
+static uint32_t        g_active_generation = 0;
+
+void sc2_active_set(const sc2_profile_t *p) {
+    pthread_mutex_lock(&g_act_lock);
+    g_active = *p; g_active_init = 1;
+    if (++g_active_generation == 0) ++g_active_generation;
+    pthread_mutex_unlock(&g_act_lock);
+}
+
+void sc2_active_get_versioned(sc2_profile_t *p, uint32_t *generation) {
+    pthread_mutex_lock(&g_act_lock);
+    if (!g_active_init) { sc2_profile_default(&g_active); g_active_init = 1; }
+    *p = g_active;
+    if (generation) *generation = g_active_generation;
+    pthread_mutex_unlock(&g_act_lock);
+}
+
+void sc2_active_get(sc2_profile_t *p) {
+    sc2_active_get_versioned(p, NULL);
+}
+
+/* ── storage ──────────────────────────────────────────────────────────── */
+
+int sc2_store_valid_id(const char *id) {
+    if (!id) return 0;
+    size_t n = strlen(id);
+    if (n == 0 || n > SC2_ID_MAX) return 0;
+    for (size_t i = 0; i < n; i++) {
+        char c = id[i];
+        if (!((c>='A'&&c<='Z')||(c>='a'&&c<='z')||(c>='0'&&c<='9')||c=='_'||c=='-')) return 0;
+    }
+    return 1;
+}
+
+static int profile_directory(void) {
+#ifndef SC2_PROFILE_TEST
+    int parent = private_directory_open("/data/ghostpad");
+    if (parent < 0) return -1;
+    close(parent);
+#endif
+    return private_directory_open(SC2_DIR);
+}
+
+/* Profile writes are small and infrequent; serialize replacement and delete so
+ * concurrent menu/portal/watcher operations cannot share the same .tmp file. */
+static pthread_mutex_t g_store_lock = PTHREAD_MUTEX_INITIALIZER;
+
+int sc2_store_load(const char *id, sc2_profile_t *p) {
+    if (!p || !sc2_store_valid_id(id)) return SC2_STORE_INVALID;
+    int dir = profile_directory();
+    if (dir < 0) return SC2_STORE_IO_ERROR;
+    char name[SC2_ID_MAX+8];snprintf(name,sizeof(name),"%s.ini",id);
+    int fd=private_regular_open(dir,name);int saved_errno=errno;close(dir);
+    if(fd<0)return saved_errno==ENOENT?SC2_STORE_NOT_FOUND:SC2_STORE_IO_ERROR;
+    FILE *f = fdopen(fd,"r");
+    if(!f){close(fd);return SC2_STORE_IO_ERROR;}
+    char buf[SC2_PROFILE_CAPACITY];
+    size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+    int extra = fgetc(f), bad = ferror(f);
+    int close_error = fclose(f);
+    if (bad || close_error) return SC2_STORE_IO_ERROR;
+    if (extra != EOF || !n || buf[n - 1] != '\n' || memchr(buf, 0, n)) return SC2_STORE_INVALID;
+    buf[n] = 0;
+    sc2_profile_t candidate;
+    sc2_profile_default(&candidate);
+    if (sc2_profile_parse_checked(buf, &candidate, 1) != 0) return SC2_STORE_INVALID;
+    *p = candidate;
+    return 0;
+}
+
+/* A crash between creating the fixed temp path and renameat leaves it behind.
+ * Recover only a private regular file owned by this process; directories,
+ * symlinks and foreign files are left untouched so the save still fails safe. */
+static int discard_stale_temp(int dir,const char *tmp) {
+    struct stat st;
+    if(fstatat(dir,tmp,&st,AT_SYMLINK_NOFOLLOW)!=0)return -1;
+    if(!S_ISREG(st.st_mode)||st.st_uid!=geteuid()||st.st_nlink!=1||(st.st_mode&0077))return -1;
+    return unlinkat(dir,tmp,0);
+}
+
+static int store_save_locked(const char *id, const sc2_profile_t *p) {
+    if (!p || !sc2_store_valid_id(id)) return -1;
+    char buf[SC2_PROFILE_CAPACITY];
+    int n = sc2_profile_format(p, buf, sizeof(buf));
+    sc2_profile_t checked;
+    sc2_profile_default(&checked);
+    if (n < 0 || sc2_profile_parse_checked(buf, &checked, 1) != 0) return -1;
+    int dir=profile_directory();
+    if(dir<0)return -1;
+    char path[SC2_ID_MAX+8], tmp[SC2_ID_MAX+16];
+    snprintf(path, sizeof(path), "%s.ini", id);
+    snprintf(tmp, sizeof(tmp), "%s.tmp", path);
+    int fd=openat(dir,tmp,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
+    if(fd<0&&errno==EEXIST&&discard_stale_temp(dir,tmp)==0)
+        fd=openat(dir,tmp,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW,0600);
+    if(fd<0){close(dir);return -1;}
+    FILE *f=fdopen(fd,"w");
+    if(!f){close(fd);unlinkat(dir,tmp,0);close(dir);return -1;}
+#ifdef SC2_PROFILE_STORE_TEST
+    extern void sc2_profile_test_store_critical_enter(void);
+    sc2_profile_test_store_critical_enter();
+#endif
+#ifdef SC2_PROFILE_STORE_TEST
+    extern int sc2_profile_test_fail_replace(void);
+    int injected_failure = sc2_profile_test_fail_replace();
+#endif
+    size_t w = fwrite(buf, 1, (size_t)n, f);
+    int sync_error=fflush(f);
+    if(!sync_error)sync_error=fsync(fileno(f));
+    int close_error = fclose(f);
+#ifdef SC2_PROFILE_STORE_TEST
+    if (injected_failure == 2) w = 0;
+    if (injected_failure == 3) close_error = -1;
+#endif
+    if ((int)w != n || close_error != 0 || sync_error != 0) {
+        unlinkat(dir,tmp,0);
+        close(dir);
+        return -1;
+    }
+#ifdef SC2_PROFILE_STORE_TEST
+    int result = injected_failure == 1 ? -1 : renameat(dir,tmp,dir,path);
+#else
+    int result = renameat(dir,tmp,dir,path);
+#endif
+    if (result != 0) unlinkat(dir,tmp,0);
+    else (void)fsync(dir);                    /* persist the rename itself */
+    close(dir);
+    return result;
+}
+int sc2_store_save(const char *id, const sc2_profile_t *p) {
+    pthread_mutex_lock(&g_store_lock);
+    int result=store_save_locked(id,p);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
+}
+
+int sc2_store_update(const char *id, sc2_profile_update_fn update, void *context) {
+    if(!id||!update)return SC2_STORE_INVALID;
+    pthread_mutex_lock(&g_store_lock);
+    sc2_profile_t profile;
+    int result=sc2_store_load(id,&profile);
+    if(result==SC2_STORE_NOT_FOUND){sc2_profile_default(&profile);result=0;}
+    if(!result)result=update(&profile,context);
+    if(!result)result=store_save_locked(id,&profile);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
+}
+
+int sc2_store_recover_default(void) {
+    pthread_mutex_lock(&g_store_lock);
+    sc2_profile_t old, fresh;
+    int loaded=sc2_store_load("default",&old),result=-1;
+    if(loaded==SC2_STORE_INVALID || loaded==SC2_STORE_NOT_FOUND){
+        int dir=profile_directory();
+        if(dir>=0){
+            int backed_up=loaded==SC2_STORE_NOT_FOUND;
+            if(!backed_up){
+                int fd=private_regular_open(dir,"default.ini");
+                if(fd>=0){close(fd);
+                    for(unsigned i=0;i<16;++i){char backup[64];
+                        snprintf(backup,sizeof(backup),"default.ini.recovery.%u",i);
+                        if(linkat(dir,"default.ini",dir,backup,0)==0){backed_up=1;break;}
+                        if(errno!=EEXIST)break;
+                    }
+                }
+            }
+            close(dir);
+            if(backed_up){sc2_profile_default(&fresh);result=store_save_locked("default",&fresh);}
+        }
+    }
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
+}
+
+int sc2_store_delete(const char *id) {
+    if (!sc2_store_valid_id(id) || !strcmp(id, "default")) return -1;
+    char path[128]; snprintf(path, sizeof(path), SC2_DIR "/%s.ini", id);
+    pthread_mutex_lock(&g_store_lock);
+#ifdef SC2_PROFILE_STORE_TEST
+    extern void sc2_profile_test_store_critical_enter(void);
+    sc2_profile_test_store_critical_enter();
+#endif
+    int result = unlink(path);
+    pthread_mutex_unlock(&g_store_lock);
+    return result;
+}
+
+void sc2_store_list(void (*cb)(const char *, const char *, void *), void *u) {
+    int dir = profile_directory();
+    if (dir < 0) return;
+    close(dir);
+    DIR *d = opendir(SC2_DIR);
+    if (!d) return;
+    struct dirent *e;
+    while ((e = readdir(d))) {
+        size_t n = strlen(e->d_name);
+        if (n < 5 || strcmp(e->d_name + n - 4, ".ini")) continue;
+        char id[SC2_ID_MAX + 1];
+        if (n - 4 > SC2_ID_MAX) continue;
+        memcpy(id, e->d_name, n - 4); id[n - 4] = 0;
+        sc2_profile_t p;
+        if (sc2_store_load(id, &p) == 0) cb(id, p.name, u);
+    }
+    closedir(d);
+}
+
+/* ── per-game selection ───────────────────────────────────────────────── */
+
+int sceLncUtilGetAppIdOfRunningBigApp(void);
+int sceLncUtilGetAppTitleId(uint32_t app_id, char *title_id);
+
+void (*sc2_notify_fn)(const char *msg) = NULL;
+static void notifyf(const char *fmt, ...) __attribute__((format(printf, 1, 2)));
+static void notifyf(const char *fmt, ...) {
+    char m[256]; va_list ap;
+    va_start(ap, fmt); vsnprintf(m, sizeof(m), fmt, ap); va_end(ap);
+    LOG("%s\n", m);
+    if (sc2_notify_fn) sc2_notify_fn(m);
+}
+
+static pthread_mutex_t g_sel_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_t g_watch_thread;
+static int g_watch_thread_started;
+static char g_title_name[GC_GAME_NAME_MAX] = "";
+static char g_active_name[48] = "Default";
+static char g_title[SC2_ID_MAX + 1]    = "";
+static char g_selected[SC2_ID_MAX + 1] = "";
+static char g_override[SC2_ID_MAX + 1] = "";
+/* Invalidates profile loads that started before a newer selection request. */
+static uint32_t g_selection_generation;
+
+static void selection_changed_locked(void) {
+    if (++g_selection_generation == 0) ++g_selection_generation;
+}
+
+#ifdef SC2_PROFILE_TEST
+void sc2_profile_test_before_commit(const char *id, uint32_t generation);
+#define PROFILE_TEST_BEFORE_COMMIT(id, generation) \
+    sc2_profile_test_before_commit((id), (generation))
+#else
+#define PROFILE_TEST_BEFORE_COMMIT(id, generation) ((void)0)
+#endif
+
+static void current_title(char *out) {
+    out[0] = 0;
+    int app = sceLncUtilGetAppIdOfRunningBigApp();
+    if (app <= 0 || app == -1) return;
+    char tid[32]; memset(tid, 0, sizeof(tid));
+    if (sceLncUtilGetAppTitleId((uint32_t)app, tid) != 0) return;
+    tid[sizeof(tid)-1] = 0;
+    if (sc2_store_valid_id(tid)) strcpy(out, tid);
+}
+
+/* Find the saved profile for a title: exact id, case-insensitive, or same
+ * 9-char base id (e.g. "PPSA01949_00" or "ppsa01949"). */
+struct find_ctx { const char *title; char found[SC2_ID_MAX + 1]; };
+static void find_cb(const char *id, const char *name, void *u) {
+    (void)name;
+    struct find_ctx *c = u;
+    if (c->found[0]) return;
+    if (!strcasecmp(id, c->title) ||
+        (strlen(id) >= 9 && strlen(c->title) >= 9 && !strncasecmp(id, c->title, 9)))
+        snprintf(c->found, sizeof(c->found), "%s", id);
+}
+static int profile_for_title(const char *title, char *out) {
+    struct find_ctx c; c.title = title; c.found[0] = 0;
+    if (!title[0]) return 0;
+    sc2_store_list(find_cb, &c);
+    if (!c.found[0]) return 0;
+    strcpy(out, c.found);
+    return 1;
+}
+
+struct names_ctx { char buf[200]; };
+static void names_cb(const char *id, const char *name, void *u) {
+    (void)name;
+    struct names_ctx *c = u;
+    size_t l = strlen(c->buf);
+    snprintf(c->buf + l, sizeof(c->buf) - l, "%s%s", l ? "," : "", id);
+}
+
+/* Pick override → game profile → default; apply if changed (or forced).
+ * force: 0 = only if changed, 1 = reload, 2 = reload and announce (game changed) */
+static void apply_selection(int force) {
+    char want[SC2_ID_MAX + 1], title[SC2_ID_MAX + 1], tname[GC_GAME_NAME_MAX];
+    pthread_mutex_lock(&g_sel_lock);
+    strcpy(title, g_title);
+    strcpy(tname, g_title_name);
+    uint32_t generation = g_selection_generation;
+    int locked = g_override[0] != 0;
+    if (locked) strcpy(want, g_override);
+    pthread_mutex_unlock(&g_sel_lock);
+
+    if (!locked && !profile_for_title(title, want)) strcpy(want, "default");
+
+    pthread_mutex_lock(&g_sel_lock);
+    int changed = strcmp(want, g_selected) != 0;
+    pthread_mutex_unlock(&g_sel_lock);
+    if (!changed && !force) return;
+
+    sc2_profile_t p;
+    if (sc2_store_load(want, &p) != 0) { sc2_profile_default(&p); strcpy(want, "default"); }
+    PROFILE_TEST_BEFORE_COMMIT(want, generation);
+
+    /* Disk lookup ran unlocked; commit only if its title/override is current. */
+    pthread_mutex_lock(&g_sel_lock);
+    if (generation != g_selection_generation) {
+        pthread_mutex_unlock(&g_sel_lock);
+        return;
+    }
+    changed = strcmp(want, g_selected) != 0;
+    if (!changed && !force) {
+        pthread_mutex_unlock(&g_sel_lock);
+        return;
+    }
+    sc2_active_set(&p);
+    strcpy(g_selected, want);
+    snprintf(g_active_name, sizeof(g_active_name), "%s", p.name);
+    pthread_mutex_unlock(&g_sel_lock);
+
+    if (!changed && force != 2) { LOG("sc2: profile '%s' (%s) reloaded\n", want, p.name); return; }
+    if (locked)
+        notifyf("Puckbridge: \"%s\" profile locked", p.name);
+    else if (strcmp(want, "default")) {
+        if (!tname[0] || !strcmp(tname, p.name))
+            notifyf("Puckbridge: profile attached: %s", p.name);
+        else
+            notifyf("Puckbridge: \"%s\" profile attached to %s", p.name, tname);
+    }
+    else if (title[0]) {
+        struct names_ctx nc; nc.buf[0] = 0;
+        sc2_store_list(names_cb, &nc);
+        LOG("sc2: no profile for %s (saved: %s)\n", title, nc.buf);
+        notifyf("Puckbridge: no profile for %s, using Default", tname[0] ? tname : title);
+    } else
+        notifyf("Puckbridge: Default profile active");
+}
+
+void sc2_select_override(const char *id) {
+    pthread_mutex_lock(&g_sel_lock);
+    if (id && sc2_store_valid_id(id)) strcpy(g_override, id); else g_override[0] = 0;
+    selection_changed_locked();
+    pthread_mutex_unlock(&g_sel_lock);
+    apply_selection(1);
+}
+
+void sc2_select_reload(void) {
+    pthread_mutex_lock(&g_sel_lock);
+    selection_changed_locked();
+    pthread_mutex_unlock(&g_sel_lock);
+    apply_selection(1);
+}
+
+void sc2_select_title_name(char *out, size_t n) {
+    pthread_mutex_lock(&g_sel_lock);
+    snprintf(out, n, "%s", g_title_name);
+    pthread_mutex_unlock(&g_sel_lock);
+}
+
+void sc2_select_active_name(char *out, size_t n) {
+    pthread_mutex_lock(&g_sel_lock);
+    snprintf(out, n, "%s", g_active_name);
+    pthread_mutex_unlock(&g_sel_lock);
+}
+
+void sc2_select_edit_target(char *id_out) {
+    char title[SC2_ID_MAX + 1], tname[GC_GAME_NAME_MAX], sel[SC2_ID_MAX + 1];
+    pthread_mutex_lock(&g_sel_lock);
+    strcpy(title, g_title); strcpy(tname, g_title_name); strcpy(sel, g_selected);
+    int locked = g_override[0] != 0;
+    pthread_mutex_unlock(&g_sel_lock);
+
+    if (locked || !title[0]) { strcpy(id_out, sel[0] ? sel : "default"); return; }
+    if (profile_for_title(title, id_out)) return;
+
+    /* Create this game's profile from whatever is active right now */
+    sc2_profile_t p;
+    sc2_active_get(&p);
+    snprintf(p.name, sizeof(p.name), "%s", tname[0] ? tname : title);
+    if (sc2_store_save(title, &p) != 0) {
+        LOG("sc2: game profile creation failed\n");
+        strcpy(id_out, sel[0] ? sel : "default");
+        return;
+    }
+    strcpy(id_out, title);
+}
+
+void sc2_select_status(char *title, char *active, char *ovr) {
+    pthread_mutex_lock(&g_sel_lock);
+    strcpy(title, g_title); strcpy(active, g_selected); strcpy(ovr, g_override);
+    pthread_mutex_unlock(&g_sel_lock);
+}
+
+static void *watch_thread(void *arg) {
+    (void)arg;
+    while (!runtime_is_stopping()) {
+        char t[SC2_ID_MAX + 1];
+        current_title(t);
+        pthread_mutex_lock(&g_sel_lock);
+        int changed = strcmp(t, g_title) != 0;
+        if (changed) {
+            strcpy(g_title, t);
+            selection_changed_locked();
+        }
+        pthread_mutex_unlock(&g_sel_lock);
+        if (changed) {
+            char nm[GC_GAME_NAME_MAX] = "";
+            if (t[0]) gc_game_name(t, nm, sizeof(nm));
+            pthread_mutex_lock(&g_sel_lock);
+            snprintf(g_title_name, sizeof(g_title_name), "%s", nm);
+            selection_changed_locked();
+            pthread_mutex_unlock(&g_sel_lock);
+            LOG("sc2: running title '%s' (%s)\n", t[0] ? t : "(none)", nm);
+        }
+        apply_selection(changed && t[0] ? 2 : 0);
+        runtime_sleep_ms(2000);
+    }
+    return NULL;
+}
+
+void sc2_select_start(void) {
+    int dir = profile_directory();
+    if (dir < 0) return;
+    close(dir);
+    sc2_profile_t p;
+    int loaded = sc2_store_load("default", &p);
+    if (loaded != 0) {
+        sc2_profile_default(&p);
+        /* Preserve an invalid existing file for recovery; only bootstrap a
+         * genuinely absent default. apply_selection uses safe defaults. */
+        if (loaded == SC2_STORE_NOT_FOUND) {
+            if (sc2_store_save("default", &p) != 0) LOG("sc2: default profile save failed\n");
+        } else LOG("sc2: invalid default profile retained; using defaults\n");
+    }
+    apply_selection(1);
+    int r = pthread_create(&g_watch_thread, NULL, watch_thread, NULL);
+    if (r == 0) g_watch_thread_started = 1;
+    else LOG("sc2: profile watcher thread failed (%d)\n", r);
+}
+
+int sc2_select_stop(void) {
+    if (!g_watch_thread_started) return 0;
+    int result = pthread_join(g_watch_thread, NULL);
+    if (result != 0) return -1;
+    g_watch_thread_started = 0;
+    return 0;
+}
