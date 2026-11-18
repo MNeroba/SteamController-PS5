@@ -1,0 +1,100 @@
+#pragma once
+#include <stdint.h>
+#include <dev/usb/usb.h>
+#include <dev/usb/usb_ioctl.h>
+#include "gc_types.h"
+#include "sc2_binding.h"
+#include "sc2_flick.h"
+#include "sc2_trigfx.h"
+#include "sc2_control.h"
+#include "steam_usb.h"
+#include "usb_session.h"
+
+/*
+ * Steam Controller (2026) — "Ibex"
+ *   0x28DE:0x1304  Puck (2.4 GHz wireless receiver)   ← primary target
+ *   0x28DE:0x1302  Controller on USB-C cable
+ *
+ * Puck interfaces (Linux hid-steam.c):
+ *   0-1 internal (not HID) | 2-5 controller slots | 6 pogo pin (ignore)
+ * Wired controller: one unified HID interface.
+ *
+ * Input report 0x42 (54 bytes incl. ID) / 0x45 (46 bytes):
+ *   [1] seq   [2..5] buttons (see controller_sc2.c)
+ *   [6..9]   LT, RT  s16 (uncalibrated)
+ *   [10..17] LX LY RX RY  s16 (+Y = up)
+ *   [18..21] left pad X/Y   [24..27] right pad X/Y   s16
+ *   [34..45] accel XYZ, gyro XYZ (only if IMU enabled)
+ * Wireless event 0x79: [1] = 1 disconnect, 2 connect, 3 pair
+ *
+ * No control transfers needed: the pad streams 0x42 even in lizard mode;
+ * lizard keyboard/mouse reports share the endpoint and are filtered out.
+ */
+
+#define PID_SC2_WIRED  0x1302u
+#define PID_SC2_PUCK   0x1304u
+
+#define SC2_MAX_EPS    8
+
+enum {
+    SC2_USB_MAP_UNAVAILABLE = -1,
+    SC2_USB_MAP_INVALID = -2,
+    SC2_USB_MAP_DEVICE_GONE = -3
+};
+
+/* Read the USB configuration once into a map. For Pucks, retain controller
+ * interfaces 2 through 5. Returns interface count, SC2_USB_MAP_UNAVAILABLE
+ * for a non-ENXIO GET_FULL_DESC error, SC2_USB_MAP_DEVICE_GONE for ENXIO,
+ * or SC2_USB_MAP_INVALID for a malformed map. */
+typedef steam_usb_map_t sc2_ep_map_t;
+int  sc2_ep_map(int fd, int puck_only, sc2_ep_map_t *m);
+/* Collect interrupt-IN endpoints from the already parsed map. */
+int  sc2_collect_in_eps(const sc2_ep_map_t *m, uint8_t *out, int max);
+int  sc2_iface_of_in(const sc2_ep_map_t *m, uint8_t in_ep);
+
+/* With FS already initialised (ep_index_max >= n), open all candidate
+ * endpoints, wait up to timeout_ms for a 0x42/0x45 report and return the
+ * endpoint address that produced it (0 = none yet, <0 = gone/error). All USB
+ * operations use the reader's session table and resource tracker. COMPLETE
+ * may return any active endpoint; that endpoint is accounted before decoding.
+ * Failed stop/close operations remain owned by session cleanup. */
+typedef int (*sc2_scan_cancel_fn)(void *context);
+int  sc2_find_active_ep(int fd, usb_resources_t *resources,
+                        const usb_session_ops_t *ops, void *ops_context,
+                        struct usb_fs_endpoint *eps,
+                        const uint8_t *addrs, int n, int timeout_ms,
+                        sc2_scan_cancel_fn should_cancel,
+                        void *cancel_context);
+
+/* Per-controller input state. No packet history is shared between USB/Puck
+ * sessions; the USB reader owns one instance for its lifetime. */
+typedef struct {
+    sc2_bind_state_t binding;
+    sc2_flick_state_t flick;
+    sc2_trigfx_state_t trigfx;
+    int64_t qam_since_ms;
+    uint32_t previous_actions;
+    uint8_t qam_latched;
+} sc2_input_state_t;
+
+void sc2_input_state_reset(sc2_input_state_t *state);
+
+/* Returns 1 if pad updated (inject), 0 skip.
+ * *link is set to 0 on wireless disconnect, 1 on connect/input. */
+int  sc2_handle_packet(const uint8_t *buf, uint32_t len,
+                       ScePadData *out_pad, int *link,
+                       sc2_input_state_t *input_state);
+
+/* Paused (hold … for 5 s, or the portal): the Steam Controller is still read,
+ * so the same hold resumes, but nothing is sent to the PS5 and the game hooks
+ * see it as switched off, so the DualSense is fully back in charge. */
+/* Battery (report 0x43): level in %, -1 until the controller reports it. */
+enum { SC2_BATT_DISCHARGING = 1, SC2_BATT_CHARGING, SC2_BATT_FULL };
+void sc2_battery_reset(void);
+
+void sc2_set_paused(int on);
+
+/* Ask the controller to power itself off (ID_TURN_OFF_CONTROLLER, 0x9F "off!",
+ * through feature report 1 on its interface). Returns 0 if the request was
+ * accepted; whether the controller obeys shows up as a wireless disconnect. */
+int  sc2_power_off(int fd, int iface);

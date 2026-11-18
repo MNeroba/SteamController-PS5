@@ -1,0 +1,1358 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>SteamController-PS5</title>
+<style>
+
+:root{
+  --bg:#0f1420; --panel:#181f30; --panel2:#212a3f; --panel3:#2a3450; --line:#2f3a54; --line2:#3b4866;
+  --text:#eef1f7; --muted:#97a2bb; --dim:#6d7891;
+  --cross:#6f9bff; --circle:#ff7a7a; --square:#f29ad4; --triangle:#5fd3a6;
+  --accent:#6f9bff; --accent2:#8f7aff; --ok:#5fd3a6; --warn:#f5c26b; --bad:#e5484d;
+  --r:16px; --shadow:0 1px 2px rgba(0,0,0,.3),0 8px 24px rgba(0,0,0,.22);
+  --hh:60px; --sub:52px;
+  font-family:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+}
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+html,body{margin:0;background:var(--bg);color:var(--text)}
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:radial-gradient(1100px 600px at 80% -10%,rgba(111,155,255,.10),transparent 60%),radial-gradient(900px 500px at -10% 10%,rgba(143,122,255,.08),transparent 55%)}
+body{font-size:16px;line-height:1.45;padding:env(safe-area-inset-top) 0 calc(96px + env(safe-area-inset-bottom));overflow-y:scroll;overflow-x:hidden}
+.wrap{max-width:1240px;margin:0 auto;padding:0 20px}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 15px;min-height:42px;cursor:pointer;transition:background .12s,border-color .12s,transform .04s}
+button:hover{border-color:var(--line2);background:var(--panel3)}
+button:active{transform:translateY(1px)}
+button.primary{background:linear-gradient(180deg,var(--accent),#5b86f0);border-color:transparent;color:#0b1120;font-weight:700;box-shadow:0 4px 14px rgba(111,155,255,.3)}
+button.primary:hover{background:linear-gradient(180deg,#83abff,var(--accent))}
+button.ghost{background:transparent}
+button.danger{color:var(--circle)}
+button:disabled{opacity:.45;cursor:default;transform:none}
+select,input[type=search],input[type=number]{background:var(--panel2);border:1px solid var(--line);border-radius:11px;padding:9px 12px;min-height:42px}
+select{appearance:none;-webkit-appearance:none;padding-right:34px;background-image:linear-gradient(45deg,transparent 50%,var(--muted) 50%),linear-gradient(135deg,var(--muted) 50%,transparent 50%);background-position:right 17px top 52%,right 12px top 52%;background-size:5px 5px;background-repeat:no-repeat;max-width:100%}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+small{color:var(--muted)}
+h2,h3{margin:0;line-height:1.25}
+[hidden]{display:none!important}
+
+/* header */
+header{position:sticky;top:0;z-index:6;background:rgba(15,20,32,.84);backdrop-filter:blur(14px) saturate(1.2);-webkit-backdrop-filter:blur(14px) saturate(1.2);border-bottom:1px solid var(--line)}
+.head{display:flex;align-items:center;gap:16px;height:60px}
+.brand{font-weight:700;font-size:1.18rem;letter-spacing:-.01em;margin-right:auto;white-space:nowrap;background:linear-gradient(90deg,var(--accent),var(--accent2));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
+.brand small{color:var(--muted);-webkit-text-fill-color:var(--muted);font-weight:400;margin-left:8px;font-size:.9rem}
+.batt{display:inline-flex;align-items:center;gap:4px;padding-left:8px;border-left:1px solid var(--line);font-variant-numeric:tabular-nums}
+.batt.low{color:var(--bad)}
+.batt i{display:inline-block;width:18px;height:9px;border:1.5px solid currentColor;border-radius:2px;position:relative}
+.batt i::after{content:"";position:absolute;right:-4px;top:2px;width:2px;height:4px;background:currentColor;border-radius:0 1px 1px 0}
+.batt i b{position:absolute;left:1px;top:1px;bottom:1px;background:currentColor;border-radius:1px}
+.pill{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border:1px solid var(--line);border-radius:999px;font-size:.9rem;color:var(--muted);white-space:nowrap;min-height:34px}
+.dot{width:9px;height:9px;border-radius:50%;background:#5a6378;flex:none}
+.dot.paused{background:var(--warn)}
+.dot.on{background:var(--triangle);box-shadow:0 0 0 4px rgba(95,211,166,.18)}
+nav.tabs{display:flex;gap:4px}
+nav.tabs button{background:transparent;border-color:transparent;color:var(--muted);border-radius:11px}
+nav.tabs button[aria-selected=true]{background:var(--panel2);border-color:var(--line);color:var(--text);font-weight:700;box-shadow:inset 0 0 0 1px rgba(111,155,255,.25)}
+.short{display:none}
+
+/* now playing */
+.now{display:grid;grid-template-columns:64px 1fr auto;gap:14px;align-items:center;background:var(--panel);border:1px solid var(--line);border-radius:var(--r);padding:12px 14px;margin:18px 0}
+.art{width:64px;height:64px;border-radius:12px;background:var(--panel2);display:grid;place-items:center;overflow:hidden;font-weight:700;color:var(--muted);font-size:1.2rem}
+.art img{width:100%;height:100%;object-fit:cover;display:block}
+.now h1{font-size:1.15rem;margin:0;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.now .sub{color:var(--muted);font-size:.92rem;margin-top:3px;min-height:1.4em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.now .acts{display:flex;gap:10px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.badge{display:inline-flex;align-items:center;gap:6px;font-size:.85rem;padding:3px 10px;border-radius:999px;border:1px solid currentColor;white-space:nowrap}
+.badge.ok{color:var(--triangle)} .badge.warn{color:var(--warn)} .badge.lock{color:var(--cross)}
+
+/* cards & sections */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow)}
+.sec{margin:0 0 28px;scroll-margin-top:calc(var(--hh) + var(--sub) + 10px)}
+.sech{display:flex;align-items:baseline;gap:10px;flex-wrap:wrap;margin:0 0 10px;padding:0 2px}
+.sech h2{font-size:1.15rem}
+.sech small{font-size:.92rem}
+.ch{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:16px;border-bottom:1px solid var(--line)}
+.ch h3{font-size:1.05rem}
+.ch p{margin:3px 0 0;color:var(--muted);font-size:.92rem}
+.rows{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,420px),1fr));gap:1px;background:var(--line);border-radius:0 0 var(--r) var(--r);overflow:hidden}
+.card>.rows:first-child{border-radius:var(--r)}
+.opt{display:flex;align-items:center;justify-content:space-between;gap:12px 16px;padding:12px 16px;min-height:56px;background:var(--panel);flex-wrap:wrap}
+.opt>.lbl{flex:1 1 170px;min-width:0}
+.opt .lbl small{display:block;font-size:.88rem;line-height:1.35;margin-top:2px}
+.opt>:not(.lbl){margin-left:auto}
+.opt select{flex:0 1 auto;min-width:0;max-width:100%}
+.opt.full,.rows>:last-child:nth-child(odd){grid-column:1/-1}
+.dim .opt:not(.keep){opacity:.5}
+.dim .opt:not(.keep):focus-within{opacity:1}
+details.adv{grid-column:1/-1;background:var(--panel)}
+details.adv>summary{list-style:none;cursor:pointer;padding:12px 16px;color:var(--accent);font-weight:700;display:flex;align-items:center;gap:8px;min-height:48px;user-select:none}
+details.adv>summary::-webkit-details-marker{display:none}
+details.adv>summary::before{content:"";width:7px;height:7px;border-right:2px solid currentColor;border-bottom:2px solid currentColor;transform:rotate(-45deg);margin:0 4px 0 2px;transition:transform .15s}
+details.adv[open]>summary::before{transform:rotate(45deg)}
+details.adv>.rows{border-radius:0;border-top:1px solid var(--line)}
+
+/* segmented control & toggles */
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:11px;overflow:hidden;flex:none;background:var(--panel2);max-width:100%}
+.seg button{border:0;border-radius:0;min-height:36px;padding:5px 12px;background:transparent;font-size:.9rem;color:var(--muted);flex:1 1 auto;white-space:nowrap}
+.seg button+button{border-left:1px solid var(--line)}
+.seg button:hover{background:var(--panel3);color:var(--text)}
+.seg button[aria-pressed=true]{background:var(--accent);color:#0f1a33;font-weight:700}
+input[type=checkbox]{appearance:none;-webkit-appearance:none;position:relative;width:48px;height:28px;border-radius:999px;background:var(--panel3);border:1px solid var(--line);cursor:pointer;flex:none;transition:background .15s;margin:0}
+input[type=checkbox]::after{content:"";position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#cdd5e6;transition:transform .15s}
+input[type=checkbox]:checked{background:linear-gradient(180deg,var(--accent),#5b86f0);border-color:transparent}
+input[type=checkbox]:checked::after{transform:translateX(20px);background:#fff}
+input[type=checkbox].box{width:22px;height:22px;border-radius:6px}
+input[type=checkbox].box::after{display:none}
+input[type=checkbox].box:checked{background:var(--accent)}
+input[type=checkbox].box:checked::before{content:"";position:absolute;left:7px;top:3px;width:5px;height:10px;border:solid #0f1a33;border-width:0 2.5px 2.5px 0;transform:rotate(45deg)}
+
+/* slider component */
+.opt.sl{display:block;padding:12px 16px 10px}
+.slh{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}
+.slh .lbl{flex:1 1 auto;min-width:0}
+.numbox{display:inline-flex;align-items:center;gap:6px;flex:none}
+.num{width:5.2em;padding:6px 8px;min-height:38px;text-align:right;border-radius:9px;font-variant-numeric:tabular-nums;-moz-appearance:textfield;appearance:textfield}
+.num::-webkit-outer-spin-button,.num::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.num:focus{border-color:var(--accent)}
+.unit{color:var(--muted);font-size:.9rem;white-space:nowrap}
+.hint{display:block;color:var(--dim);font-size:.85rem;min-height:1.2em;margin-top:-2px}
+input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:32px;margin:4px 0 0;background:transparent;cursor:pointer;touch-action:pan-y;--p:0%}
+input[type=range]::-webkit-slider-runnable-track{height:6px;border-radius:3px;background:linear-gradient(90deg,var(--accent) var(--p),var(--panel3) var(--p))}
+input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;margin-top:-8px;border-radius:50%;background:#fff;border:2px solid var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+input[type=range]::-moz-range-track{height:6px;border-radius:3px;background:var(--panel3)}
+input[type=range]::-moz-range-progress{height:6px;border-radius:3px;background:var(--accent)}
+input[type=range]::-moz-range-thumb{width:18px;height:18px;border-radius:50%;background:#fff;border:2px solid var(--accent);box-shadow:0 1px 4px rgba(0,0,0,.4)}
+input[type=range]:focus-visible{outline:none}
+input[type=range]:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 4px rgba(111,155,255,.35)}
+input[type=range]:focus-visible::-moz-range-thumb{box-shadow:0 0 0 4px rgba(111,155,255,.35)}
+
+/* sub navigation */
+nav.sub{position:sticky;top:var(--hh);z-index:5;margin:0 -20px 18px;padding:0 20px;background:rgba(15,20,32,.9);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+nav.sub .subs{display:flex;gap:6px;overflow-x:auto;padding:8px 0;scrollbar-width:none;-ms-overflow-style:none}
+nav.sub .subs::-webkit-scrollbar{display:none}
+nav.sub button{flex:none;min-height:36px;padding:6px 14px;border-radius:999px;background:transparent;border-color:transparent;color:var(--muted);font-size:.92rem}
+nav.sub button:hover{background:var(--panel2);color:var(--text)}
+nav.sub button[aria-current=true]{background:var(--panel2);border-color:var(--line);color:var(--text);font-weight:700}
+
+/* profile bar */
+.pbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px;margin:0 0 14px}
+.field{display:flex;align-items:center;flex:1 1 240px;min-width:0;background:var(--panel2);border:1px solid var(--line);border-radius:11px;overflow:hidden}
+.field>span{padding:0 0 0 12px;color:var(--muted);font-size:.9rem;white-space:nowrap}
+.field select{flex:1;min-width:0;border:0;border-radius:0;background-color:transparent;text-overflow:ellipsis}
+.field:focus-within{border-color:var(--accent)}
+.pacts{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-left:auto}
+.pstate{display:inline-flex;align-items:center;gap:6px;color:var(--muted);font-size:.9rem;white-space:nowrap;padding:0 6px}
+.pstate::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--ok)}
+.pstate.dirty{color:var(--warn)} .pstate.dirty::before{background:var(--warn)}
+
+/* remap: buttons */
+.controller-workspace{padding:20px;margin-bottom:16px}
+.controller-pair{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:24px}
+.controller{min-width:0}
+.controller-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:12px}
+.controller-head small{font-size:.7rem;letter-spacing:.16em;color:var(--muted)}
+.controller-head h3{margin:2px 0 0;font-size:1.12rem}
+.viewswitch{display:flex;gap:3px;padding:3px;background:var(--panel2);border:1px solid var(--line);border-radius:10px;flex-shrink:0}
+.viewswitch button{border:0;background:transparent;padding:6px 9px;font-size:.8rem;min-height:36px}
+.viewswitch button[aria-pressed=true]{background:var(--panel);color:var(--text);box-shadow:0 1px 5px #0004}
+.controller-stage{aspect-ratio:1.36;display:flex;align-items:center;justify-content:center}
+.controller-stage svg{width:100%;height:100%;overflow:visible}
+.controller-stage svg[hidden]{display:none}
+.controller-stage image{pointer-events:none}
+.viewhint{font-size:.82rem;color:var(--muted);text-align:center;min-height:2.5em;margin:10px 0 0}
+.caption{color:var(--muted);line-height:1.6;overflow-wrap:anywhere}
+.caption b{color:var(--text)}
+.mapping-preview{border-top:1px solid var(--line);margin-top:14px;padding-top:14px;text-align:center;min-height:76px}
+.mapping-badges{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:6px}
+.mapping-badges .chip{display:inline-flex;align-items:center;gap:5px}
+.ctl,.destination{cursor:pointer;outline:none}
+.controller-stage .s{fill:transparent;stroke:transparent;stroke-width:3;vector-effect:non-scaling-stroke;transition:fill .12s,stroke .12s;pointer-events:all}
+.ctl.changed .s{stroke:var(--accent);stroke-width:1.5}
+.ctl:hover .s,.ctl:focus .s,.informational:hover .s,.informational:focus .s{fill:#6f9bff33;stroke:var(--accent)}
+.ctl.sel .s{fill:#6f9bff40;stroke:var(--accent);stroke-width:3}
+.ctl.live .s{fill:#6f9bff88;stroke:var(--accent)}
+.destination.assigned .s{fill:#62dba633;stroke:var(--ok)}
+.destination:hover .s,.destination:focus .s{fill:#62dba655;stroke:var(--ok)}
+.face-symbol{font:52px system-ui,sans-serif;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+.face-CROSS{fill:var(--cross)}.face-CIRCLE{fill:var(--circle)}.face-SQUARE{fill:var(--square)}.face-TRIANGLE{fill:var(--triangle)}
+.ctl.reserved,.informational{cursor:help}
+.ps-symbol{font-size:1.3em;font-weight:700;line-height:1;display:inline-block;min-width:1.1em;text-align:center}
+.ps-CROSS{color:#7baaff}.ps-CIRCLE{color:#ff8187}.ps-SQUARE{color:#efa5dc}.ps-TRIANGLE{color:#70dfb0}
+.assignment-list summary{padding:16px;cursor:pointer;font-weight:700}
+.assignment-list summary small{color:var(--muted);font-weight:400;margin-left:10px}
+.assignment-list .list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
+.sheetpreview{display:flex;align-items:center;gap:12px;margin:8px 0}
+.sheetpreview .controller-stage{width:220px;height:154px;aspect-ratio:auto;flex-shrink:0}
+.sheetpreview .viewswitch{display:inline-flex}
+.sheetpreview .mapping-badges{justify-content:flex-start}
+@media(max-width:720px){.controller-pair{grid-template-columns:minmax(0,1fr);gap:24px}.controller-workspace{padding:14px}.controller-head h3{font-size:1rem}.assignment-list .list{grid-template-columns:minmax(0,1fr)}.sheetpreview .controller-stage{width:150px;height:108px}.legend{flex-wrap:wrap;gap:8px!important}}
+@media(prefers-reduced-motion:reduce){.controller-stage .s{transition:none}}
+.legend{display:flex;gap:16px;justify-content:center;color:var(--muted);font-size:.85rem;margin-top:6px}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:14px;height:10px;border-radius:3px;border:2px solid var(--line);display:inline-block}
+.list{overflow:hidden}
+.group h3{margin:0;padding:14px 16px 6px;font-size:.82rem;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.row{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:8px 16px;cursor:pointer;min-height:48px}
+.row:hover{background:var(--panel2)}
+.row:focus-visible{outline-offset:-2px}
+.row.live{background:rgba(122,167,255,.16);box-shadow:inset 3px 0 0 var(--accent)}
+.row .phys{font-weight:700;display:flex;align-items:center;min-width:0}
+.row.reserved{cursor:default}
+.row.reserved .chips{min-width:0;flex:1 1 auto}
+.row.reserved .tag{white-space:normal;text-align:right;border-radius:10px}
+.ic{width:28px;height:28px;margin-right:10px;flex:none}
+.ic.sm{width:18px;height:18px;margin:0 5px 0 -2px;vertical-align:-4px}
+.chips{display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.chip{font-size:.82rem;padding:2px 9px;border-radius:999px;border:1px solid var(--line);white-space:nowrap}
+.chip.none{color:var(--muted);border-style:dashed}
+.c-CROSS{color:var(--cross);border-color:currentColor}.c-CIRCLE{color:var(--circle);border-color:currentColor}
+.c-SQUARE{color:var(--square);border-color:currentColor}.c-TRIANGLE{color:var(--triangle);border-color:currentColor}
+.tag{font-size:.75rem;color:var(--muted);border:1px dashed var(--line);border-radius:999px;padding:1px 8px;white-space:nowrap}
+
+/* gyro meter */
+.gmeter{position:relative;width:54px;height:54px;border-radius:50%;border:1px solid var(--line);background:var(--panel2);flex:none}
+.gmeter::before,.gmeter::after{content:"";position:absolute;background:var(--line)}
+.gmeter::before{left:50%;top:6px;bottom:6px;width:1px}.gmeter::after{top:50%;left:6px;right:6px;height:1px}
+.gmeter i{position:absolute;left:50%;top:50%;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:var(--muted);z-index:1;transition:transform .1s linear}
+.gmeter.on i{background:var(--accent)}
+.glive{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.9rem;text-align:right;flex:none;max-width:46%}
+
+/* games */
+.games-head{display:flex;gap:12px;align-items:center;margin-bottom:16px;flex-wrap:wrap}
+.games-head input{flex:1 1 260px;min-width:0}
+.games{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:16px}
+.game{padding:10px;display:flex;flex-direction:column;gap:8px}
+.game.playing{border-color:var(--triangle);box-shadow:0 0 0 1px var(--triangle)}
+.game .art{width:100%;height:auto;aspect-ratio:1;font-size:2rem}
+.game .name{font-weight:700;line-height:1.25;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:2.5em}
+.game .meta{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-size:.85rem;min-height:26px;gap:6px}
+.game .meta span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.game button{width:100%}
+.empty{color:var(--muted);padding:40px 20px;text-align:center;grid-column:1/-1}
+.empty b{display:block;color:var(--text);margin-bottom:4px}
+
+/* settings & help */
+.help{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,460px),1fr));gap:18px;align-items:start}
+.help .sec{margin:0}
+.help .sec.wide{grid-column:1/-1}
+.help .ch{border-bottom:0}
+.help .ch+.rows,.help .ch+.body{border-top:1px solid var(--line)}
+.body{padding:14px 16px 16px}
+.body p{margin:0 0 12px;color:var(--muted)}
+.body p:last-child{margin-bottom:0}
+.btns{display:flex;gap:8px;flex-wrap:wrap}
+kbd{background:var(--panel2);border:1px solid var(--line);border-bottom-width:2px;border-radius:6px;padding:1px 7px;font:inherit;font-size:.9em}
+ol{margin:0;padding-left:20px;color:var(--muted)} ol li{margin:4px 0} ol b{color:var(--text)}
+pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:12px;font-size:.8rem;max-height:50vh;overflow:auto;margin:12px 0 0}
+.status{color:var(--muted);font-size:.92rem;margin:0;min-height:1.4em}
+.kv .opt{min-height:48px;padding:10px 16px}
+
+/* save bar, sheet, toast */
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:7;background:rgba(30,38,55,.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line);transform:translateY(110%);transition:transform .18s;box-shadow:0 -8px 24px rgba(0,0,0,.25)}
+.savebar.show{transform:none}
+.savebar .wrap{display:flex;gap:10px;align-items:center;justify-content:space-between;min-height:68px;padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
+.savebar .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.savebar .msg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:8px;vertical-align:1px}
+.sheet{position:fixed;inset:0;background:rgba(10,14,24,.6);display:none;align-items:center;justify-content:center;z-index:8;padding:20px}
+.sheet.show{display:flex}
+.sheet .box{background:var(--panel);border:1px solid var(--line);border-radius:18px;width:100%;max-width:560px;padding:20px;max-height:88vh;overflow:auto}
+.sheet h3{margin:0 0 4px;font-size:1.2rem;display:flex;align-items:center}
+.sheet p{color:var(--muted);margin:0}
+.pick{display:grid;gap:12px;margin:14px 0}
+.pick-group h4{font-size:.76rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:0 0 6px}
+.pick-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(100px,1fr));gap:8px}
+.pick-grid button{display:flex;align-items:center;justify-content:center;gap:4px;padding:8px 6px;font-size:.9rem;line-height:1.2;min-height:44px}
+.pick-grid button[aria-pressed=true]{background:var(--accent);border-color:var(--accent);color:#0f1a33;font-weight:700}
+.pick-grid .g-CROSS[aria-pressed=false]{color:var(--cross)}.pick-grid .g-CIRCLE[aria-pressed=false]{color:var(--circle)}
+.pick-grid .g-SQUARE[aria-pressed=false]{color:var(--square)}.pick-grid .g-TRIANGLE[aria-pressed=false]{color:var(--triangle)}
+.pick-grid [class^=g-PB_][aria-pressed=false]{color:var(--warn)}
+.editor-label{font-size:.72rem;font-weight:700;letter-spacing:.1em;color:var(--muted);margin:14px 0 -8px}
+.sheet .foot{display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;position:sticky;bottom:-20px;margin:0 -20px -20px;padding:12px 20px calc(12px + env(safe-area-inset-bottom));background:var(--panel);border-top:1px solid var(--line)}
+.sheet .scrollhint{flex-basis:100%;color:var(--muted);font-size:.8rem}
+.acts-tabs{display:flex;gap:4px;margin:14px 0 0;flex-wrap:wrap}
+.acts-tabs button{min-height:36px;padding:6px 12px;font-size:.9rem;background:transparent;color:var(--muted)}
+.acts-tabs button[aria-selected=true]{background:var(--panel2);color:var(--text);font-weight:700;border-color:var(--line)}
+.acts-tabs button .n{display:inline-block;min-width:8px;height:8px;border-radius:50%;background:var(--accent);margin-left:6px;vertical-align:middle}
+.acthelp{color:var(--muted);font-size:.9rem;margin:10px 0 0;min-height:2.6em}
+.actopts{display:flex;gap:18px;flex-wrap:wrap;margin:0 0 14px}
+.actopts label{display:inline-flex;gap:10px;align-items:center;min-height:40px}
+.toast{position:fixed;left:50%;top:calc(var(--hh) + 12px);transform:translateX(-50%);background:var(--panel2);border:1px solid var(--line);border-radius:10px;padding:10px 16px;z-index:9;opacity:0;pointer-events:none;transition:opacity .15s;max-width:calc(100% - 32px);text-align:center}
+.toast.show{opacity:1}
+
+@media (max-width:980px){
+  .grid{grid-template-columns:minmax(0,1fr)}
+  .pad{position:static}
+  .brand small{display:none}
+  .head{height:auto;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:10px}
+  nav.tabs{order:3;width:100%}
+  nav.tabs button{flex:1}
+}
+@media (max-width:640px){
+  :root{--sub:50px}
+  .wrap{padding:0 16px}
+  nav.sub{margin:0 -16px 16px;padding:0 16px}
+  .head{height:auto;flex-wrap:wrap;padding-top:10px;padding-bottom:10px;gap:10px}
+  nav.tabs{order:3;width:100%}
+  nav.tabs button{flex:1;min-height:40px;padding:6px 8px}
+  .long{display:none} .short{display:inline}
+  .ctl .t{font-size:22px} .ctl .t.sm{font-size:16px}
+  .now{grid-template-columns:52px 1fr;padding:10px 12px}
+  .now .art{width:52px;height:52px}
+  .now .acts{grid-column:1/-1;justify-content:flex-start}
+  .pbar{padding:10px}
+  .field{flex-basis:100%}
+  .pacts{width:100%;margin-left:0}
+  .pacts button{flex:1 1 auto;min-height:40px;padding:8px 10px}
+  .pstate{width:100%;padding:0 2px 2px}
+  .seg button{min-height:40px;padding:6px 11px}
+  .opt{padding:12px 14px}
+  .opt.sl{padding:12px 14px 10px}
+  .num{min-height:40px}
+  .rows{grid-template-columns:minmax(0,1fr)}
+  .glive{max-width:40%;font-size:.85rem}
+  .sheet{align-items:flex-end;padding:0}
+  .sheet .box{border-radius:18px 18px 0 0;padding-bottom:calc(20px + env(safe-area-inset-bottom));max-height:92vh}
+  .pick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .games{grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:12px}
+  .savebar .wrap{flex-wrap:wrap}
+  .savebar .btns{margin-left:auto}
+  .btns button{flex:1 1 auto}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}html{scroll-behavior:auto}}
+dialog.profile-guard{color:var(--text);background:var(--panel,#1c2030);border:1px solid var(--line,#383d56);border-radius:16px;padding:24px;max-width:min(440px,calc(100vw - 32px))}
+dialog.profile-guard::backdrop{background:#0009}
+.profile-guard .guard-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
+/* First-run enrollment uses the established dialog/card visual language. */
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap head">
+    <div class="brand">SteamController-PS5<small>Steam Controller for PS5</small></div>
+    <nav class="tabs" role="tablist" aria-label="Pages">
+      <button role="tab" aria-selected="true" data-tab="remap">Remap</button>
+      <button role="tab" aria-selected="false" data-tab="games">Games</button>
+      <button role="tab" aria-selected="false" data-tab="help"><span class="long">Settings &amp; help</span><span class="short">Settings</span></button>
+    </nav>
+    <span class="pill"><span class="dot" id="dot"></span><span id="conn">Connecting…</span><span id="batt" class="batt" hidden></span></span>
+  </div>
+</header>
+
+<div class="wrap">
+  <section class="now" aria-live="polite">
+    <div class="art" id="nowArt">–</div>
+    <div style="min-width:0">
+      <h1 id="nowTitle">No game running</h1>
+      <div class="sub" id="nowSub">Profiles switch automatically when a game starts.</div>
+    </div>
+    <div class="acts"><span id="nowBadge"></span> <button id="nowAction" hidden></button></div>
+  </section>
+
+  <!-- REMAP -->
+  <section id="tab-remap">
+    <div id="profileRecovery" class="card" hidden><b>Default profile cannot be read</b><p>Recover compiled defaults and preserve the damaged file as a backup. Other game profiles are kept.</p><button id="recoverDefault">Recover Default</button></div>
+
+    <div class="card pbar">
+      <label class="field"><span>Editing</span><select id="prof" aria-label="Profile to edit"></select></label>
+      <label class="field"><span>Use</span><select id="mode" aria-label="Which profile the controller uses"></select></label>
+      <div class="pacts">
+        <span class="pstate" id="pstate">Saved</span>
+        <button id="exp" class="ghost" title="Download this profile as a file">Export</button>
+        <button id="imp" class="ghost" title="Merge values from a profile file into this profile">Import</button>
+        <input type="file" id="impFile" accept=".ini,.txt,text/plain" hidden aria-label="Profile file to import">
+        <button id="del" class="ghost danger">Delete</button>
+      </div>
+    </div>
+    <nav class="sub" aria-label="Remap sections"><div class="subs">
+      <button data-sec="buttons">Buttons</button><button data-sec="sticks">Sticks &amp; trackpads</button><button data-sec="gyro">Gyro &amp; motion</button><button data-sec="flick">Flick stick</button><button data-sec="triggers">Trigger feedback</button><button data-sec="timing">Shift &amp; timing</button>
+    </div></nav>
+
+    <section class="sec" data-sec="buttons" id="sec-buttons">
+      <div class="sech"><h2>Buttons</h2><small>Press a button on the controller to find it, or select one here to change what it does.</small></div>
+      <div class="card controller-workspace">
+        <div class="controller-pair">
+          <section class="controller" aria-label="Steam Controller inputs">
+            <div class="controller-head"><div><small>INPUT</small><h3>Steam Controller</h3></div><div class="viewswitch" role="group" aria-label="Steam Controller view" data-controller="steam"><button data-view="front" aria-pressed="true">Front</button><button data-view="back" aria-pressed="false">Back / top</button></div></div>
+            <div class="controller-stage" id="steamStage"></div>
+            <p class="viewhint" id="steamHint">Select a button to edit its assignment.</p>
+          </section>
+          <section class="controller" aria-label="DualSense outputs">
+            <div class="controller-head"><div><small>OUTPUT</small><h3>DualSense</h3></div><div class="viewswitch" role="group" aria-label="DualSense view" data-controller="dual"><button data-view="front" aria-pressed="true">Front</button><button data-view="back" aria-pressed="false">Back / top</button></div></div>
+            <div class="controller-stage" id="dualStage"></div>
+            <p class="viewhint" id="dualHint">Highlighted buttons show the selected assignment.</p>
+          </section>
+        </div>
+        <div class="mapping-preview" aria-live="polite"><div class="caption" id="caption">Select a Steam Controller button to get started.</div><div class="mapping-badges" id="mappingBadges"></div></div>
+        <div class="legend"><span><i class="sw" style="border-color:var(--accent)"></i>Remapped input</span><span><i class="sw" style="border-color:var(--ok)"></i>Assigned output</span><span>Back view: physical L on the right, R on the left</span></div>
+      </div>
+      <details class="card assignment-list"><summary>All button assignments <small>24 inputs · advanced activators</small></summary><div class="list" id="list"></div></details>
+    </section>
+
+    <section class="sec" data-sec="sticks" id="sec-sticks">
+      <div class="sech"><h2>Sticks &amp; trackpads</h2><small>What the trackpads do, and how the sticks feel.</small></div>
+      <div class="card"><div class="rows">
+        <div class="opt"><span class="lbl">Left trackpad</span><div class="seg" data-k="LPAD" role="group" aria-label="Left trackpad mode"></div></div>
+        <div class="opt"><span class="lbl">Right trackpad</span><div class="seg" data-k="RPAD" role="group" aria-label="Right trackpad mode"></div></div>
+        <label class="opt"><span class="lbl">Invert left stick up/down</span><input type="checkbox" data-k="INVERT_LY"></label>
+        <label class="opt"><span class="lbl">Invert right stick up/down</span><input type="checkbox" data-k="INVERT_RY"></label>
+        <label class="opt"><span class="lbl">Swap left and right sticks</span><input type="checkbox" data-k="SWAP_STICKS"></label>
+        <div data-sl="DEADZONE"><b>Stick deadzone</b><small>Raise it if a stick drifts when you let go</small></div>
+      </div></div>
+    </section>
+
+    <section class="sec" data-sec="gyro" id="sec-gyro">
+      <div class="sech"><h2>Gyro &amp; motion</h2><small>Aim by moving the controller.</small></div>
+      <div class="card" style="margin-bottom:14px">
+        <div class="ch"><div><h3>Gyro aiming</h3><p>Turn and tilt the controller to aim. The gyro moves the right stick, so it works in any game, on top of the stick itself.</p></div>
+          <span class="glive"><span id="gyroLive">…</span><span class="gmeter" id="gyroMeter"><i></i></span></span></div>
+        <div class="rows" id="gyroOpts">
+          <label class="opt keep full"><span class="lbl">Gyro aims</span><select data-g="GYRO">
+            <option value="OFF">Off</option>
+            <option value="GRIP">While holding either grip</option>
+            <option value="GRIPS">While holding both grips</option>
+            <option value="RPAD">While touching the right trackpad</option>
+            <option value="RSTICK">While touching the right stick</option>
+            <option value="ALWAYS">Always</option></select></label>
+          <div class="opt"><span class="lbl">Left/right aim from<small>Turning the controller like a steering wheel is "Tilting"</small></span><div class="seg" data-g="GYRO_AXIS" role="group" aria-label="Left/right aim axis"></div></div>
+          <label class="opt"><span class="lbl">Invert gyro left/right</span><input type="checkbox" data-k="GYRO_INVERT_X"></label>
+          <div data-sl="GYRO_SENS_X"><b>Left/right sensitivity</b></div>
+          <div data-sl="GYRO_SENS_Y"><b>Up/down sensitivity</b></div>
+          <details class="adv" id="gyroAdv"><summary>Fine-tuning</summary><div class="rows">
+            <div data-sl="GYRO_ANTI_DEADZONE"><b>Anti-deadzone</b><small>Raise it if small movements don't move the camera</small></div>
+            <div data-sl="GYRO_STEADINESS"><b>Fine-aim steadiness</b><small>Filters hand shake from tiny movements. Lower it if aiming feels stiff; raise it if the aim jitters</small></div>
+            <div data-sl="GYRO_CURVE"><b>Game stick curve</b><small>If the aim doesn't come back to where it started after looking away and back, raise this until it does</small></div>
+            <label class="opt"><span class="lbl">Invert gyro up/down</span><input type="checkbox" data-k="GYRO_INVERT_Y"></label>
+          </div></details>
+        </div>
+      </div>
+      <div class="card"><div class="rows">
+        <label class="opt full"><span class="lbl"><b>Motion controls for games</b><small>Games that use the DualSense's motion (tilting, turning, shaking) get the Steam Controller's. Works with gyro aiming on or off.</small></span><input type="checkbox" data-k="MOTION"></label>
+      </div></div>
+    </section>
+
+    <section class="sec" data-sec="flick" id="sec-flick">
+      <div class="sech"><h2>Flick stick</h2><small>Turn with the right stick, aim with the gyro.</small></div>
+      <div class="card">
+        <div class="ch"><div><h3>Right stick as flick stick</h3><p>Point the right stick where you want to face: pushing it to the edge turns you that way, and rotating it around the edge keeps turning. Up and down are left to the gyro, so pair it with gyro aiming.</p></div></div>
+        <div class="rows" id="flickOpts">
+          <div class="opt keep"><span class="lbl">Right stick</span><div class="seg" data-g="RSTICK" role="group" aria-label="Right stick mode"></div></div>
+          <div data-sl="FLICK_SPEED"><b>Game's turn speed</b><small>How fast the game turns at full stick. Flick right: if you turn less than 90°, lower it; if more, raise it</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" data-sec="triggers" id="sec-triggers">
+      <div class="sech"><h2>Adaptive trigger feedback</h2><small>Adjust the strength of game-requested clicks and buzzes. Full Pull button actions for L2/R2 are configured in Buttons.</small></div>
+      <div class="card tfx">
+        <div class="ch"><div><h3>Trigger effects</h3><p>When a game sets an adaptive trigger effect, you feel it as clicks and buzzes on that side as you pull the trigger. How strong is up to you.</p></div></div>
+        <div class="rows">
+          <div class="opt"><span class="lbl">Strength</span><div class="seg" id="tfxPre" role="group" aria-label="Trigger effect strength preset"></div></div>
+          <div data-sl="TRIGGER_FX"><b>Fine-tune</b><small>100% is the strength the game asked for</small></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="sec" data-sec="timing" id="sec-timing">
+      <div class="sech"><h2>Shift &amp; timing</h2><small>For the long press, double press, shift and turbo activators.</small></div>
+      <div class="card"><div class="rows">
+        <label class="opt full"><span class="lbl">Shift button<small>While held, buttons use their Shift binding. The Shift input has no button output, including trigger Full pull.</small></span><select id="shiftSel" data-k="SHIFT"></select></label>
+        <div data-sl="LONG_MS"><b>Long press time</b><small>Hold a button this long to trigger its long-press binding</small></div>
+        <div data-sl="DOUBLE_MS"><b>Double press window</b><small>Two presses within this time count as a double press</small></div>
+        <div data-sl="TURBO_MS" class="full"><b>Turbo speed</b><small>Time between repeats while a turbo button is held</small></div>
+      </div></div>
+    </section>
+  </section>
+
+  <!-- GAMES -->
+  <section id="tab-games" hidden>
+    <div class="games-head">
+      <input type="search" id="gsearch" placeholder="Search installed games" aria-label="Search installed games">
+      <span class="pill" id="gcount">…</span>
+    </div>
+    <div class="games" id="games"></div>
+  </section>
+
+  <!-- SETTINGS & HELP -->
+  <section id="tab-help" hidden>
+    <nav class="sub" aria-label="Settings sections"><div class="subs">
+      <button data-sec="setup">Quick setup</button><button data-sec="diagnostics">Diagnostics</button><button data-sec="tile">PS5 tile</button><button data-sec="pause">Pause</button><button data-sec="handoff">DualSense hand-off</button><button data-sec="ingame">In games</button><button data-sec="vibration">Vibration test</button><button data-sec="menu">On-console menu</button><button data-sec="bridge">Game bridge check</button><button data-sec="log">Troubleshooting log</button>
+    </div></nav>
+    <div class="help">
+      <section class="sec wide card" data-sec="setup" id="sec-setup">
+        <div class="ch"><div><h3>Quick setup</h3><p>Recommended: play with the Steam Controller as your main controller, with game rumble sent to it. Turn the Steam Controller off at any time and your DualSense takes over; wake the Steam Controller with its <b>Steam</b> button to switch back.</p></div></div>
+        <div class="body"><div class="btns"><button class="primary" id="ghRec">Use recommended settings</button></div></div>
+      </section>
+      <section class="sec card" data-sec="diagnostics" id="sec-diagnostics">
+        <div class="ch"><div><h3>Diagnostics</h3><p>Download a bounded report of startup, USB input, virtual controller recovery, profiles and recent application logs. It is useful even when no controller is connected.</p></div></div>
+        <div class="body"><div class="btns"><button id="diagnosticsDownload">Download Diagnostic Report</button></div><p class="hint">Review the report before sharing it publicly. Credentials and serials are excluded, but profile names and USB paths may identify your setup. Console behavior remains unverified.</p><p id="diagnosticsStatus" role="status" aria-live="polite"></p></div>
+      </section>
+      <section class="sec card" data-sec="tile" id="sec-tile">
+        <div class="ch"><div><h3>Settings on your PS5</h3><p>Create a Steam Controller Settings tile in Media using the included controller icon. It opens this interface on the console while the payload is running. Experimental: FW 13.60 console behavior has not been tested.</p></div></div>
+        <div class="body"><div class="btns"><button id="tileInstall">Create tile on PS5</button></div><p class="status" id="tileStatus" role="status" aria-live="polite">Registration is attempted automatically on first launch. If registration failed, retry here. Delete it using the console's normal Delete action.</p></div>
+      </section>
+      <section class="sec card" data-sec="pause" id="sec-pause">
+        <div class="ch"><div><h3>Pause SteamController-PS5</h3><p>Hold the Steam Controller's <kbd>…</kbd> button for 5 seconds, anywhere (in a game or on the home screen), to pause SteamController-PS5: the Steam Controller stops sending input and your DualSense works exactly as normal. Hold it for 5 seconds again to resume. The controller gives a long buzz when pausing and a short one when resuming.</p></div></div>
+        <div class="body"><div class="btns"><button id="pauseBtn">Pause now</button></div></div>
+      </section>
+      <section class="sec card" data-sec="handoff" id="sec-handoff">
+        <div class="ch"><div><h3>DualSense hand-off</h3><p>Hand the game to whichever controller you pick up. Experimental.</p></div></div>
+        <div class="rows">
+          <label class="opt full"><span class="lbl"><b>Turn the DualSense off while the Steam Controller is in control</b><small>When you start using the Steam Controller, the DualSense is disconnected, so it can't rumble, light up or play sound. Press its PS button to switch back: the DualSense takes over and the Steam Controller steps aside until you press its Steam button.</small></span><input type="checkbox" id="dsOff"></label>
+        </div>
+        <div class="body"><p class="status" id="dsStatus">&nbsp;</p></div>
+      </section>
+      <section class="sec card" data-sec="ingame" id="sec-ingame">
+        <div class="ch"><div><h3>In games</h3><p>How the Steam Controller joins the game next to the DualSense.</p></div></div>
+        <div class="rows">
+          <label class="opt full"><span class="lbl"><b>Use the Steam Controller in games</b><small>Merges it into your player's controller, so it works alongside the DualSense.</small></span><input type="checkbox" id="ghIn"></label>
+          <label class="opt full"><span class="lbl"><b>Send game vibration to the Steam Controller</b><small>Goes to whichever controller is in control.</small></span><input type="checkbox" id="ghVib"></label>
+          <label class="opt full"><span class="lbl"><b>Move DualSense haptics and speaker</b><small>PS5 games: haptics become Steam Controller rumble, and the DualSense speaker is muted while the Steam Controller is in control. Hooks attach as the game starts, so restart the game after changing this.</small></span><input type="checkbox" id="ghAud"></label>
+          <label class="opt full"><span class="lbl"><b>When the DualSense is also on</b></span><select id="ghMode" style="flex:1 1 100%;margin-left:0"><option value="1">The one you touched last controls the game</option><option value="2">Only the Steam Controller</option><option value="0">Both at once</option></select></label>
+        </div>
+        <div class="body"><p class="status" id="ghStatus">&nbsp;</p></div>
+      </section>
+      <section class="sec card" data-sec="vibration" id="sec-vibration">
+        <div class="ch"><div><h3>Vibration test</h3><p id="hapNote">Checks the controller's haptics. If nothing happens, try each method and then send the log.</p></div></div>
+        <div class="body">
+          <div class="btns" style="margin-bottom:10px"><select id="hapVia" aria-label="Send method" style="flex:1 1 100%"><option value="0">Method: automatic</option><option value="1">Method 1: interrupt OUT</option><option value="2">Method 2: output report</option><option value="3">Method 3: feature report</option><option value="4">Method 4: every Puck output</option></select></div>
+          <div class="btns"><button data-hap="left">Buzz left</button><button data-hap="right">Buzz right</button><button data-hap="rumble">Rumble</button></div>
+          <p class="status" id="hapDiag" style="margin-top:12px"></p>
+        </div>
+      </section>
+      <section class="sec card" data-sec="menu" id="sec-menu">
+        <div class="ch"><div><h3>Menu on the console</h3><p>Switch profiles or remap a button without leaving the game. Messages appear as PS5 notifications.</p></div></div>
+        <div class="body"><ol>
+          <li>Bind <b>SteamController-PS5 menu</b> to any button or activator (for example View → Long press). Press it to open or close.</li>
+          <li><b>D-pad up/down</b> chooses, <b>left/right</b> changes profile, <b>A</b> selects, <b>B</b> closes.</li>
+          <li>To remap: pick <b>Remap a button</b>, press the button to change, then press the button it should act as. It saves to the current game's profile.</li>
+        </ol></div>
+      </section>
+      <section class="sec wide card" data-sec="bridge" id="sec-bridge">
+        <div class="ch"><div><h3>Game bridge check</h3><p>Game vibration and DualSense-free input need to hook into the game's controller code (the PoorDS4 method). This check runs automatically about 8 seconds after a game starts. It only reads; nothing in the game is changed.</p></div></div>
+        <div id="bridgeOut" class="rows kv"></div>
+        <div class="body"><div class="btns"><button id="bridgeRun">Check the running game now</button></div></div>
+      </section>
+      <section class="sec wide card" data-sec="log" id="sec-log">
+        <div class="ch"><div><h3>Troubleshooting log</h3><p>Include this when reporting a problem.</p></div></div>
+        <div class="body"><div class="btns"><button id="logShow">Show log</button><button id="logCopy">Copy log</button><button id="logPrev">Copy previous run's log</button></div>
+        <pre class="log" id="log" hidden></pre></div>
+      </section>
+    </div>
+  </section>
+</div>
+
+<div class="savebar" id="savebar"><div class="wrap"><span class="msg">Unsaved changes to <b id="saveName"></b></span><span class="btns"><button id="revert" class="ghost">Undo</button><button class="primary" id="save">Save changes</button></span></div></div>
+
+<div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
+  <div class="box">
+    <h3 id="sheetT"></h3>
+    <div class="editor-label">WHEN THIS INPUT ACTIVATES</div>
+    <div class="acts-tabs" role="tablist" id="actTabs"></div>
+    <p class="acthelp" id="actHelp"></p>
+    <div class="sheetpreview"><div class="controller-stage" id="sheetDual"></div><div><div class="viewswitch" role="group" aria-label="Assignment preview view" data-controller="sheet"><button data-view="front" aria-pressed="true">Front</button><button data-view="back" aria-pressed="false">Back / top</button></div><div class="mapping-badges" id="draftBadges" aria-live="polite"></div></div></div>
+    <div class="editor-label">OUTPUT ACTIONS</div>
+    <div class="pick" id="pick"></div>
+    <div class="actopts" id="actOpts">
+      <label><input type="checkbox" class="box" id="optTurbo"> Turbo (repeats while held)</label>
+      <label><input type="checkbox" class="box" id="optToggle"> Toggle (qualifying press on/off)</label>
+    </div>
+    <div class="foot"><small class="scrollhint" id="sheetScrollHint">Scroll for all output actions ↓</small><button id="clear" class="ghost">Clear this tab</button><span class="btns"><button id="cancel" class="ghost">Cancel</button><button class="primary" id="done">Done</button></span></div>
+  </div>
+</div>
+<div class="toast" id="toast" role="status"></div>
+
+<dialog id="profileGuard" class="profile-guard" aria-labelledby="profileGuardTitle">
+  <h3 id="profileGuardTitle">Unsaved profile changes</h3>
+  <p>Save and confirm your changes before continuing, or discard this draft.</p>
+  <div class="guard-actions"><button id="guardSave">Save</button><button id="guardDiscard">Discard</button><button id="guardCancel" autofocus>Cancel</button></div>
+</dialog>
+<script>
+/* ── data ── */
+const LABEL={A:"A",B:"B",X:"X",Y:"Y",LB:"Left bumper",RB:"Right bumper",LT:"Left trigger",RT:"Right trigger",
+ L3:"Left stick click",R3:"Right stick click",DUP:"D-pad up",DDOWN:"D-pad down",DLEFT:"D-pad left",DRIGHT:"D-pad right",
+ VIEW:"View",MENU:"Menu",STEAM:"Steam",QAM:"Quick access (…)",L4:"L4 (left top grip)",L5:"L5 (left bottom grip)",
+ R4:"R4 (right top grip)",R5:"R5 (right bottom grip)",LPAD_CLICK:"Left trackpad click",RPAD_CLICK:"Right trackpad click"};
+const GROUPS=[["Face buttons",["A","B","X","Y"]],["Shoulders and triggers",["LB","RB","LT","RT"]],
+ ["Sticks and d-pad",["L3","R3","DUP","DDOWN","DLEFT","DRIGHT"]],["System",["VIEW","MENU","STEAM","QAM"]],
+ ["Back grips",["L4","L5","R4","R5"]],["Trackpad clicks",["LPAD_CLICK","RPAD_CLICK"]]];
+const BITS=["A","B","X","Y","LB","RB","LT","RT","L3","R3","DUP","DDOWN","DLEFT","DRIGHT","VIEW","MENU","STEAM","QAM","L4","L5","R4","R5","LPAD_CLICK","RPAD_CLICK"];
+const OUTS=[["CROSS","Cross"],["CIRCLE","Circle"],["SQUARE","Square"],["TRIANGLE","Triangle"],["L1","L1"],["R1","R1"],["L2","L2"],["R2","R2"],["L3","L3"],["R3","R3"],["UP","Up"],["DOWN","Down"],["LEFT","Left"],["RIGHT","Right"],["OPTIONS","Options"],["CREATE","Create"],["PS","PS"],["TOUCHPAD","Touchpad"],["PB_MENU","SteamController-PS5 menu"],["PB_GYRO_ON","Gyro on (hold)"],["PB_GYRO_OFF","Gyro off (hold)"],["PB_GYRO_TOGGLE","Gyro on/off"]];
+const OUTNAME=Object.fromEntries(OUTS);
+const OUTPUT_GROUPS=[["Face buttons",["CROSS","CIRCLE","SQUARE","TRIANGLE"]],["D-pad",["UP","DOWN","LEFT","RIGHT"]],["Shoulders & triggers",["L1","R1","L2","R2"]],["Sticks",["L3","R3"]],["System",["CREATE","OPTIONS","PS"]],["Touchpad",["TOUCHPAD"]],["SteamController-PS5 actions",["PB_MENU","PB_GYRO_ON","PB_GYRO_OFF","PB_GYRO_TOGGLE"]]];
+/* button icons: inlined by gen_html.py from web/icons (CC0, see web/icons/LICENSE.txt) */
+const ICON=/*__ICONS__*/{};
+function ic(key,cls){const u=ICON[key];return u?`<img class="${cls||"ic"}" src="${u}" alt="" aria-hidden="true">`:""}
+const DEFAULTS={A:"CROSS",B:"CIRCLE",X:"SQUARE",Y:"TRIANGLE",LB:"L1",RB:"R1",LT:"L2",RT:"R2",L3:"L3",R3:"R3",DUP:"UP",DDOWN:"DOWN",DLEFT:"LEFT",DRIGHT:"RIGHT",VIEW:"CREATE",MENU:"OPTIONS",STEAM:"PS",QAM:"NONE",L4:"L3",L5:"L1+R1",R4:"R3",R5:"L3+R3",LPAD_CLICK:"TOUCHPAD",RPAD_CLICK:"TOUCHPAD"};
+const RESERVED="QAM", RESERVED_TXT="Reserved: hold 5 s to pause or resume SteamController-PS5";
+const PADS=[["OFF","Off"],["TOUCH","Touchpad"],["STICK","Stick"],["DPAD","D-pad"]];
+const GAXES=[["YAW","Turning"],["ROLL","Tilting"]];
+const RSTICKS=[["NORMAL","Normal"],["FLICK","Flick stick"]];
+const TFX_PRESETS=[[0,"Off"],[50,"Light"],[100,"Normal"],[150,"Strong"]];
+const GDEF={RSTICK:"NORMAL",GYRO:"OFF",GYRO_AXIS:"YAW"};
+/* sliders: stored value range/step; scale = stored units per displayed unit; pre = unit shown before the number */
+const sensHint=v=>`Full stick at ${Math.round(2000/v)} °/s`;
+const SL={
+ DEADZONE:{min:0,max:40,def:9,unit:"%"},
+ GYRO_SENS_X:{min:1,max:100,def:20,hint:sensHint},
+ GYRO_SENS_Y:{min:1,max:100,def:16,hint:sensHint},
+ GYRO_ANTI_DEADZONE:{min:0,max:40,def:10,unit:"%"},
+ GYRO_STEADINESS:{min:0,max:30,def:5,scale:10,unit:"°/s",hint:v=>v?"":"Off: no filtering"},
+ GYRO_CURVE:{min:10,max:30,def:10,scale:10,unit:"×",pre:1,hint:v=>v>10?"":"Linear: stick moves exactly with the gyro"},
+ FLICK_SPEED:{min:90,max:1440,step:10,def:360,unit:"°/s"},
+ TRIGGER_FX:{min:0,max:200,step:5,def:100,unit:"%",after:()=>renderTfxPresets()},
+ LONG_MS:{min:150,max:2000,step:50,def:400,unit:"ms"},
+ DOUBLE_MS:{min:100,max:800,step:25,def:250,unit:"ms"},
+ TURBO_MS:{min:20,max:500,step:10,def:60,unit:"ms"}};
+
+/* Images and reference geometry are embedded by gen_html.py. Logical image
+   dimensions deliberately differ from decoded WebP pixels; do not replace them. */
+const SHAPES=/*__CONTROLLERS__*/{};
+const SOURCE_KEYS={a:"A",b:"B",x:"X",y:"Y",l1:"LB",r1:"RB",l2:"LT",r2:"RT",l3:"L3",r3:"R3",dpu:"DUP",dpd:"DDOWN",dpl:"DLEFT",dpr:"DRIGHT",view:"VIEW",menu:"MENU",steam:"STEAM",qam:"QAM",l4:"L4",l5:"L5",r4:"R4",r5:"R5",tpl:"LPAD_CLICK",tpr:"RPAD_CLICK"};
+const OUTPUT_KEYS={cr:"CROSS",ci:"CIRCLE",sq:"SQUARE",tri:"TRIANGLE",l1:"L1",r1:"R1",l2:"L2",r2:"R2",l3:"L3",r3:"R3",dpu:"UP",dpd:"DOWN",dpl:"LEFT",dpr:"RIGHT",create:"CREATE",options:"OPTIONS",ps:"PS",tp:"TOUCHPAD"};
+const INFO_NAMES={grl:"Left Grip Sense · capacitive sensor; configure in Gyro & motion",grr:"Right Grip Sense · capacitive sensor; configure in Gyro & motion",usbc:"USB-C · charging and wired connection",puck:"Magnetic Puck connector · charging dock",mute:"Mute · microphone control; no digital output available"};
+const PS_SYMBOLS={CROSS:"✕",CIRCLE:"○",SQUARE:"□",TRIANGLE:"△"};
+const VIEW_STATE={steam:"front",dual:"front",sheet:"front"};
+let selectedKey=null, sheetReturnFocus=null;
+function outputIcon(k){return PS_SYMBOLS[k]?`<span class="ps-symbol ps-${k}" aria-hidden="true">${PS_SYMBOLS[k]}</span>`:ic("o_"+k,"ic sm")}
+function outputLabel(k){return PS_SYMBOLS[k]|| (k==="TOUCHPAD"?"Touchpad click":k==="L3"?"L3 click":k==="R3"?"R3 click":OUTNAME[k]||k)}
+function outputAccessibleLabel(k){return PS_SYMBOLS[k]?`${OUTNAME[k]} (${PS_SYMBOLS[k]})`:outputLabel(k)}
+function outputChoice(k){return PS_SYMBOLS[k]?esc(outputLabel(k)):`${outputIcon(k)}${esc(outputLabel(k))}`}
+
+let cur={}, saved="", editing="default", profiles=[], status={}, games=[], sheetKey=null,saveUnconfirmed=false;
+let navigationGeneration=0,editorGeneration=0,listGeneration=0,guardPromise=null,savePromise=null;
+const $=s=>document.querySelector(s), $$=s=>document.querySelectorAll(s);
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+function parse(t){const p=Object.create(null);t.split("\n").forEach(l=>{const i=l.indexOf("=");if(i>0)p[l.slice(0,i).trim()]=l.slice(i+1).trim()});return p}
+function fmt(p){return Object.entries(p).map(([k,v])=>k+"="+v).join("\n")+"\n"}
+function combo(v){return typeof v!=="string"?[]:[...new Set(v.split("+").filter(k=>Object.hasOwn(OUTNAME,k)))]}
+function normalizeBindingFlags(p){
+  BITS.forEach(k=>{if(p[k+".toggle"]==="1")delete p[k+".turbo"]});return p;
+}
+const PROFILE_ENUMS={SHIFT:["NONE",...BITS.filter(k=>k!==RESERVED)],LPAD:PADS.map(v=>v[0]),RPAD:PADS.map(v=>v[0]),GYRO:["OFF","GRIP","GRIPS","RPAD","RSTICK","ALWAYS"],GYRO_AXIS:GAXES.map(v=>v[0]),RSTICK:RSTICKS.map(v=>v[0])};
+const PROFILE_FLAGS=["INVERT_LY","INVERT_RY","SWAP_STICKS","MOTION","GYRO_INVERT_X","GYRO_INVERT_Y"];
+function validatedProfile(p){
+  const next=Object.create(null);
+  Object.entries(p).forEach(([key,value])=>{
+    const [input,suffix,...rest]=key.split("."),binding=BITS.includes(input)&&!rest.length&&(key===input||!!suffix);
+    if(binding&&(!suffix||["long","double","shift","full"].includes(suffix))){
+      if(suffix==="full"&&input!=="LT"&&input!=="RT")throw new Error("Full pull is only valid for LT/RT");
+      const parts=value===""||value==="NONE"?[]:value.split("+");
+      if(parts.some(v=>!Object.hasOwn(OUTNAME,v)))throw new Error("Unknown output for "+key);
+      if(input===RESERVED&&parts.length)throw new Error("QAM is reserved");
+      const canonical=OUTS.map(v=>v[0]).filter(v=>parts.includes(v)).join("+");
+      next[key]=canonical||"NONE";
+    }else if((binding&&["turbo","toggle"].includes(suffix))||PROFILE_FLAGS.includes(key)){
+      if(value!=="0"&&value!=="1")throw new Error("Expected 0 or 1 for "+key);
+      if(input===RESERVED&&value==="1")throw new Error("QAM is reserved");next[key]=value;
+    }else if(Object.hasOwn(PROFILE_ENUMS,key)){
+      if(!PROFILE_ENUMS[key].includes(value))throw new Error("Invalid setting for "+key);next[key]=value;
+    }else if(Object.hasOwn(SL,key)){
+      if(!/^-?\d+$/.test(value)||!Number.isSafeInteger(Number(value)))throw new Error("Invalid number for "+key);
+      // The server remains authoritative for numeric range normalization.
+      next[key]=value;
+    }else if(key==="name"){
+      if(/[\r\n\0]/.test(value))throw new Error("Invalid profile name");
+      if(new TextEncoder().encode(value).length>=48)throw new Error("Profile name must fit in 47 UTF-8 bytes");next.name=value;
+    }
+    else throw new Error("Unknown profile key: "+key);
+  });
+  return normalizeBindingFlags(next);
+}
+function serverProfile(text){
+  const p=validatedProfile(parse(text));
+  const required=["name",...BITS,...Object.keys(PROFILE_ENUMS),...PROFILE_FLAGS,...Object.keys(SL)];
+  if(!text.endsWith("\n")||!required.every(k=>Object.hasOwn(p,k)))throw new Error("Incomplete profile readback");
+  return p;
+}
+function profileWrite(p){
+  // The existing C POST route merges keys. A full editor save must therefore
+  // explicitly clear omitted optional activators and flags in that protocol.
+  const full={...p};
+  BITS.forEach(k=>{
+    ["long","double","shift"].forEach(a=>{full[k+"."+a]=p[k+"."+a]||"NONE"});
+    ["turbo","toggle"].forEach(a=>{full[k+"."+a]=p[k+"."+a]||"0"});
+  });
+  ["LT","RT"].forEach(k=>{full[k+".full"]=p[k+".full"]||"NONE"});
+  return fmt(full);
+}
+function comboText(v){const c=combo(v);return c.length?c.map(outputLabel).join(" + "):"Nothing"}
+function norm(v){return combo(v).sort().join("+")}
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2400)}
+async function authorizedFetch(path,opt={}){
+  return await fetch(path,opt);
+}
+async function api(path,opt={}){
+  const r=await authorizedFetch(path,opt),t=await r.text();
+  if(!r.ok){const error=new Error(t);error.status=r.status;throw error}return t;
+}
+function isDirty(){return saveUnconfirmed||(saved!==""&&fmt(cur)!==saved)}
+function dirty(){const d=isDirty();$("#savebar").classList.toggle("show",d);$("#saveName").textContent=pname(editing);
+  const s=$("#pstate");s.textContent=saveUnconfirmed?"Save not confirmed":d?"Unsaved changes":"Saved";s.classList.toggle("dirty",d)}
+
+/* ── storage (optional: the page works without it) ── */
+const store=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}, recall=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
+const sstore=(k,v)=>{try{sessionStorage.setItem(k,v)}catch(e){}}, srecall=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}};
+
+/* ── location: #tab[/profile=ID][/section], mirrored to localStorage; scroll per tab in sessionStorage ── */
+const TABS=["remap","games","help"];
+let tab="remap", sec={}, scrolls={};
+try{scrolls=JSON.parse(srecall("pb.scroll")||"{}")}catch(e){scrolls={}}
+function parseHash(h){const o={tab:null,prof:null,sec:null};(h||"").replace(/^#/,"").split("/").filter(Boolean).forEach((p,i)=>{
+  if(i===0)o.tab=p;else if(p.startsWith("profile="))o.prof=decodeURIComponent(p.slice(8));else o.sec=p});return o}
+function hashOf(){let h="#"+tab;if(tab==="remap")h+="/profile="+encodeURIComponent(editing);if(sec[tab])h+="/"+sec[tab];return h}
+function syncHash(push){const h=hashOf();store("pb.loc",h);if(location.hash===h)return;
+  try{history[push?"pushState":"replaceState"](push?null:history.state,"",h)}catch(e){location.hash=h}}
+const hh=()=>$("header").offsetHeight;
+function measure(){document.documentElement.style.setProperty("--hh",hh()+"px")}
+addEventListener("resize",measure);
+function showTab(t,push){if(!TABS.includes(t))t="remap";
+  if(t!==tab)saveScroll();tab=t;
+  $$("nav.tabs button").forEach(x=>x.setAttribute("aria-selected",x.dataset.tab===t));
+  TABS.forEach(x=>$("#tab-"+x).hidden=x!==t);
+  if(t==="games")refreshGames();if(t==="help"){paintHooks();paintDs();paintBridge()}
+  syncHash(push);restoreScroll();paintSub()}
+$$("nav.tabs button").forEach(b=>b.onclick=()=>{if(b.dataset.tab!==tab)showTab(b.dataset.tab,true);else scrollTo({top:0,behavior:"auto"})});
+function switchTab(t){showTab(t,true)}
+function secTop(el){return el.getBoundingClientRect().top+scrollY-hh()-parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sub"))-10}
+let pinT=0; /* after a programmatic scroll, keep the chosen section until the user scrolls */
+function goSec(id,instant){const el=$(`#tab-${tab} [data-sec="${id}"]`);if(!el)return;sec[tab]=id;paintSub();syncHash(false);
+  const reduce=matchMedia("(prefers-reduced-motion: reduce)").matches;pinT=Date.now()+(instant||reduce?1200:2500);scrollTo({top:Math.max(0,secTop(el)),behavior:instant||reduce?"auto":"smooth"})}
+function paintSub(){$$(`#tab-${tab} nav.sub button`).forEach(b=>{const on=b.dataset.sec===sec[tab];b.setAttribute("aria-current",on?"true":"false");
+  if(on){const c=b.parentElement;c.scrollLeft=b.offsetLeft-(c.clientWidth-b.offsetWidth)/2}})}
+$$("nav.sub button").forEach(b=>b.onclick=()=>goSec(b.dataset.sec));
+let rafS=0,tScroll=0;
+addEventListener("scroll",()=>{if(rafS)return;rafS=requestAnimationFrame(()=>{rafS=0;if(Date.now()>=pinT)trackSec();clearTimeout(tScroll);tScroll=setTimeout(saveScroll,150)})},{passive:true});
+function trackSec(){const secs=[...$$(`#tab-${tab} [data-sec]`)];if(!secs.length)return;
+  const th=hh()+parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sub"))+40;let a=secs[0];
+  if(scrollY+innerHeight>=document.documentElement.scrollHeight-2)a=secs[secs.length-1];
+  else secs.forEach(s=>{if(s.getBoundingClientRect().top<=th)a=s});
+  if(sec[tab]!==a.dataset.sec){sec[tab]=a.dataset.sec;paintSub();syncHash(false)}}
+function saveScroll(){scrolls[tab]=scrollY;sstore("pb.scroll",JSON.stringify(scrolls))}
+function restoreScroll(){const y=scrolls[tab];pinT=Date.now()+1200;
+  if(y!=null){scrollTo({top:y,behavior:"auto"});setTimeout(()=>{if(Date.now()<pinT&&Math.abs(scrollY-y)>2)scrollTo({top:y,behavior:"auto"})},400);if(!sec[tab]){pinT=0;trackSec()}}
+  else if(sec[tab])goSec(sec[tab],true);else{scrollTo({top:0,behavior:"auto"});pinT=0;trackSec()}}
+addEventListener("popstate",()=>applyLoc(parseHash(history.state?.profileLocation||location.hash),false));
+async function applyLoc(l,push){
+  if(!l.tab)return;
+  if(l.tab==="remap"&&l.prof&&l.prof!==editing&&profiles.some(p=>p.id===l.prof)){
+    // Keep a pending history destination so Back can cancel it and Forward
+    // can retry it even while the visible hash reflects the committed editor.
+    if(!push)history.replaceState({profileLocation:"#"+l.tab+"/profile="+encodeURIComponent(l.prof)+(l.sec?"/"+l.sec:"")},"",location.hash);
+    if(!await load(l.prof,false,push))return;
+  }else{++navigationGeneration;selectionCommitted()}
+  if(l.sec)sec[l.tab]=l.sec;
+  if(l.tab!==tab){if(l.sec)delete scrolls[l.tab];showTab(l.tab,push)}else if(l.sec)goSec(l.sec,true)}
+
+/* ── diagram ── */
+function svgEl(name,attrs,parent){const e=document.createElementNS("http://www.w3.org/2000/svg",name);Object.entries(attrs).forEach(([k,v])=>e.setAttribute(k,v));if(parent)parent.appendChild(e);return e}
+function hotspot(s,parent){
+  let e,cx=s.cx,cy=s.cy;
+  if(s.t==="c")e=svgEl("circle",{cx:s.cx,cy:s.cy,r:s.r},parent);
+  else if(s.t==="r"){e=svgEl("rect",{x:s.x,y:s.y,width:s.w,height:s.h,rx:s.rx},parent);cx=s.x+s.w/2;cy=s.y+s.h/2}
+  else if(s.t==="e")e=svgEl("ellipse",{cx:s.cx,cy:s.cy,rx:s.rx,ry:s.ry},parent);
+  else e=svgEl("polygon",{points:s.pts.map(p=>p.join(",")).join(" ")},parent);
+  e.setAttribute("class","s");if(s.rot)e.setAttribute("transform",`rotate(${s.rot} ${cx} ${cy})`);
+}
+function outputHit(svg,x,y){
+  const point=new DOMPoint(x,y),candidates=[];
+  svg.querySelectorAll(".destination").forEach(g=>{
+    const shape=g.querySelector(".s"),matrix=shape.getScreenCTM();if(!matrix)return;
+    const rect=shape.getBoundingClientRect();
+    if(Math.hypot(Math.max(rect.left-x,0,x-rect.right),Math.max(rect.top-y,0,y-rect.bottom))>16)return;
+    const local=point.matrixTransform(matrix.inverse()),inside=shape.isPointInFill(local),box=shape.getBBox();
+    const center=new DOMPoint(box.x+box.width/2,box.y+box.height/2).matrixTransform(matrix);
+    let distance=0;
+    if(!inside){
+      // Sample curved boundaries with <= 1 CSS px segments, then measure
+      // distance to each segment. getPointAtLength uses the actual SVG shape.
+      const length=shape.getTotalLength(),scale=Math.max(Math.hypot(matrix.a,matrix.b),Math.hypot(matrix.c,matrix.d));
+      const steps=Math.max(32,Math.ceil(length*scale)),segment=(a,b)=>{
+        const dx=b.x-a.x,dy=b.y-a.y,t=clamp(((x-a.x)*dx+(y-a.y)*dy)/(dx*dx+dy*dy||1),0,1);
+        return Math.hypot(x-a.x-t*dx,y-a.y-t*dy);
+      };
+      distance=Infinity;let previous=shape.getPointAtLength(0).matrixTransform(matrix);
+      for(let i=1;i<=steps;i++){const next=shape.getPointAtLength(length*i/steps).matrixTransform(matrix);distance=Math.min(distance,segment(previous,next));previous=next}
+    }
+    if(distance<=16)candidates.push({g,inside,distance,center:Math.hypot(x-center.x,y-center.y)});
+  });
+  candidates.sort((a,b)=>Number(b.inside)-Number(a.inside)||a.distance-b.distance||a.center-b.center);
+  return candidates[0]?.g.dataset.out||null;
+}
+function buildController(device,host,preview=false){
+  const source=device==="steam",map=source?SOURCE_KEYS:OUTPUT_KEYS;
+  ["front","back"].forEach(view=>{
+    const v=SHAPES[device][view],svg=svgEl("svg",{viewBox:v.vb,role:"group","aria-label":`${source?"Steam Controller":"DualSense"} ${view} buttons`},host);
+    svg.dataset.view=view;svg.toggleAttribute("hidden",view!=="front");
+    svgEl("image",{href:v.img,x:0,y:0,width:v.iw,height:v.ih,preserveAspectRatio:"none"},svg);
+    v.shapes.forEach(s=>{
+      const k=map[s.id],info=INFO_NAMES[s.id],g=svgEl("g",{class:k?(source?"ctl":"destination"):"informational",tabindex:0,role:k?"button":"img"},svg);
+      if(k){g.dataset[source?"k":"out"]=k;if(k===RESERVED){g.classList.add("reserved");g.setAttribute("aria-disabled","true")}}
+      else g.setAttribute("aria-label",info);
+      hotspot(s,g);svgEl("title",{},g).textContent=k?(source?LABEL[k]:outputAccessibleLabel(k)):info;
+      if(!source&&PS_SYMBOLS[k])svgEl("text",{x:s.cx,y:s.cy,class:"face-symbol face-"+k,"aria-hidden":"true"},g).textContent=PS_SYMBOLS[k];
+      const describe=()=>{if(source&&k)showCaption(k);else if(!preview)$(source?"#steamHint":"#dualHint").textContent=k?outputAccessibleLabel(k):info};
+      const activate=()=>{if(!k){describe();return}if(source)openSheet(k);else if(preview)toggleOutput(k);else if(selectedKey&&selectedKey!==RESERVED)openSheet(selectedKey,{addOutput:k});else toast("Select a Steam Controller input first, then tap a DualSense output.")};
+      g.onmouseenter=g.onfocus=describe;g.onclick=activate;g.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();activate()}};
+    });
+    if(!source&&window.matchMedia("(pointer: coarse)").matches)svg.addEventListener("click",e=>{
+      if(!e.detail)return;
+      const key=outputHit(svg,e.clientX,e.clientY);if(!key)return;
+      e.preventDefault();e.stopImmediatePropagation();
+      if(preview)toggleOutput(key);
+      else if(selectedKey&&selectedKey!==RESERVED)openSheet(selectedKey,{addOutput:key});
+      else toast("Select a Steam Controller input first, then tap a DualSense output.");
+    },true);
+  });
+}
+function switchController(name,view){
+  VIEW_STATE[name]=view;const host=$(name==="steam"?"#steamStage":name==="dual"?"#dualStage":"#sheetDual");
+  host.querySelectorAll("svg").forEach(svg=>svg.toggleAttribute("hidden",svg.dataset.view!==view));
+  $$(`.viewswitch[data-controller="${name}"] button`).forEach(b=>b.setAttribute("aria-pressed",b.dataset.view===view));
+  if(name!=="sheet")$(name==="steam"?"#steamHint":"#dualHint").textContent=name==="steam"?(view==="back"?"Physical L is on the right; R is on the left.":"Select a button to edit its assignment."):view==="back"?"Physical L is on the right; R is on the left.":selectedKey&&selectedKey!==RESERVED?`${LABEL[selectedKey]} selected · tap an output to stage it, then confirm Done.`:"Select a Steam Controller input first, then tap a DualSense output.";
+}
+function buildPad(){
+  buildController("steam",$("#steamStage"));buildController("dual",$("#dualStage"));buildController("dual",$("#sheetDual"),true);
+  $$(".viewswitch button").forEach(b=>b.onclick=()=>switchController(b.parentElement.dataset.controller,b.dataset.view));
+}
+function assignmentBadges(values){values=values.filter(k=>Object.hasOwn(OUTNAME,k));return values.length?values.map(k=>`<span class="chip c-${k}" aria-label="${esc(outputAccessibleLabel(k))}">${outputChoice(k)}</span>`).join(""):'<span class="chip none">Nothing</span>'}
+function paintDestinations(){
+  const inSheet=$("#sheet").classList.contains("show"),values=inSheet?[...draft[act]]:selectedKey&&selectedKey!==RESERVED&&cur.SHIFT!==selectedKey?combo(cur[selectedKey]):[];
+  $$(".destination").forEach(g=>{const on=values.includes(g.dataset.out);g.classList.toggle("assigned",on);g.setAttribute("aria-pressed",on);g.setAttribute("aria-label",`${outputAccessibleLabel(g.dataset.out)}${on?", assigned":""}`)});
+  $("#mappingBadges").innerHTML=selectedKey===RESERVED?'<span class="tag">Reserved system action</span>':selectedKey===cur.SHIFT?'<span class="tag">Shift modifier</span>':selectedKey?assignmentBadges(values):"";
+  $("#draftBadges").innerHTML=assignmentBadges(values);
+}
+function showCaption(k){
+  const isShift=k!==RESERVED&&cur.SHIFT===k;
+  const text=k===RESERVED?RESERVED_TXT:isShift?"Shift modifier · all button outputs disabled":comboText(cur[k]);
+  if(selectedKey===k){
+    const backHint=VIEW_STATE.dual==="back"?" · physical L is on the right; R is on the left":"";
+    $("#dualHint").textContent=(isShift?LABEL[k]+" is the Shift modifier; all its button outputs are disabled":LABEL[k]+" selected · tap an output to stage it, then confirm Done")+backHint;
+  }
+  if(selectedKey&&selectedKey!==k){$("#steamHint").textContent=`${LABEL[k]} → ${text}`;return}
+  const x=k===RESERVED||isShift?[]:extras(k);$("#caption").innerHTML=`<b>${esc(LABEL[k])}</b> → ${esc(text)}${x.length?` <span>· ${esc(x.join(" · "))}</span>`:""}`;
+}
+function paintPad(){
+  $$(".ctl").forEach(g=>{const k=g.dataset.k,reserved=k===RESERVED,isShift=!reserved&&cur.SHIFT===k;g.classList.toggle("sel",k===selectedKey);g.classList.toggle("changed",!reserved&&!isShift&&(norm(cur[k])!==norm(DEFAULTS[k])||extras(k).length>0));
+    const label=reserved?`${LABEL[k]}: ${RESERVED_TXT}`:isShift?`${LABEL[k]}: Shift modifier; all button outputs disabled`:`${LABEL[k]} → ${comboText(cur[k])}`;g.querySelector("title").textContent=label;g.setAttribute("aria-label",label)});
+  if(selectedKey)showCaption(selectedKey);paintDestinations();
+}
+function toggleOutput(k){if(!sheetKey||!$("#sheet").classList.contains("show"))return;const set=draft[act];set.has(k)?set.delete(k):set.add(k);renderActTabs();renderPick()}
+
+/* ── bindings list ── */
+function renderList(){
+  const list=$("#list");list.replaceChildren();
+  GROUPS.forEach(([title,keys])=>{
+    const group=document.createElement("div");group.className="group";
+    const heading=document.createElement("h3");heading.textContent=title;group.appendChild(heading);
+    keys.forEach(k=>{
+      const row=document.createElement("div"),reserved=k===RESERVED,isShift=cur.SHIFT===k;
+      row.className=reserved?"row reserved":"row";row.dataset.k=k;
+      const phys=document.createElement("span");phys.className="phys";phys.innerHTML=ic("s_"+k);phys.append(LABEL[k]);row.appendChild(phys);
+      const chips=document.createElement("span");chips.className="chips";row.appendChild(chips);
+      const tag=text=>{const span=document.createElement("span");span.className="tag";span.textContent=text;chips.appendChild(span)};
+      if(reserved)tag(RESERVED_TXT);
+      else if(isShift)tag("Shift modifier · all button outputs disabled");
+      else{
+        const outputs=combo(cur[k]);
+        if(!outputs.length){const span=document.createElement("span");span.className="chip none";span.textContent="Nothing";chips.appendChild(span)}
+        outputs.forEach(o=>{const span=document.createElement("span");span.classList.add("chip","c-"+o);span.setAttribute("aria-label",outputAccessibleLabel(o));span.innerHTML=outputChoice(o);chips.appendChild(span)});
+        extras(k).forEach(tag);
+      }
+      if(reserved)row.onmouseenter=()=>showCaption(k);
+      else{row.tabIndex=0;row.setAttribute("role","button");row.onclick=()=>openSheet(k);row.onkeydown=e=>{if(e.key==="Enter"||e.key===" "){e.preventDefault();openSheet(k)}};row.onmouseenter=()=>showCaption(k)}
+      group.appendChild(row);
+    });list.appendChild(group);
+  });
+}
+
+/* ── slider component: range + editable number box, both live ── */
+function buildSliders(){$$("[data-sl]").forEach(el=>{const k=el.dataset.sl,s=SL[k],sc=s.scale||1,st=s.step||1,lab=el.querySelector("b").textContent;
+  const unit=s.unit?`<span class="unit">${esc(s.unit)}</span>`:"";
+  el.className="opt sl "+el.className;el.innerHTML=`<div class="slh"><span class="lbl">${el.innerHTML}</span><span class="numbox">${s.pre?unit:""}<input type="number" id="n_${k}" class="num" min="${s.min/sc}" max="${s.max/sc}" step="${st/sc}" inputmode="decimal" aria-label="${esc(lab)}">${s.pre?"":unit}</span></div><input type="range" id="r_${k}" min="${s.min}" max="${s.max}" step="${st}" aria-label="${esc(lab)} slider"><small class="hint" id="h_${k}"></small>`;
+  const r=$("#r_"+k),n=$("#n_"+k);
+  r.oninput=()=>setSl(k,+r.value,"r");
+  n.oninput=()=>{const v=+n.value*sc;if(n.value!==""&&isFinite(v)&&v>=s.min&&v<=s.max)setSl(k,v,"n")};
+  n.onchange=()=>{let v=+n.value*sc;if(n.value===""||!isFinite(v))v=slVal(k);setSl(k,v)};
+  n.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();n.blur()}}})}
+function slVal(k){const s=SL[k],v=parseInt(cur[k]??s.def,10);return clamp(isFinite(v)?v:s.def,s.min,s.max)}
+function setSl(k,v,src){const s=SL[k],st=s.step||1;v=clamp(Math.round(v/st)*st,s.min,s.max);cur[k]=String(v);paintSl(k,src);if(s.after)s.after();dirty()}
+function paintSl(k,src){const s=SL[k],sc=s.scale||1,v=slVal(k),r=$("#r_"+k),n=$("#n_"+k),h=$("#h_"+k);
+  if(src!=="r")r.value=v;r.style.setProperty("--p",(v-s.min)/(s.max-s.min)*100+"%");
+  if(src!=="n")n.value=sc>1?(v/sc).toFixed(1):String(v);
+  h.textContent=s.hint?s.hint(v):"";h.hidden=!h.textContent}
+
+/* ── options ── */
+function segRender(seg,items,val,on){seg.innerHTML="";items.forEach(([v,l])=>{const b=document.createElement("button");b.type="button";b.textContent=l;b.setAttribute("aria-pressed",val===v);b.onclick=()=>on(v);seg.appendChild(b)})}
+function renderOpts(){
+  $$(".seg[data-k]").forEach(seg=>{const k=seg.dataset.k;segRender(seg,PADS,cur[k],v=>{cur[k]=v;renderOpts();dirty()})});
+  $$("input[type=checkbox][data-k]").forEach(i=>{i.checked=cur[i.dataset.k]==="1";i.onchange=()=>{cur[i.dataset.k]=i.checked?"1":"0";dirty()}});
+  Object.keys(SL).forEach(k=>paintSl(k));
+  const ss=$("#shiftSel");ss.innerHTML='<option value="NONE">None</option>'+BITS.filter(k=>k!==RESERVED).map(k=>`<option value="${k}">${esc(LABEL[k])}</option>`).join("");
+  ss.value=cur.SHIFT||"NONE";ss.onchange=()=>{cur.SHIFT=ss.value;render()};
+  renderGyro();
+}
+function renderGyro(){
+  const gs=$("select[data-g=GYRO]");gs.value=cur.GYRO||GDEF.GYRO;gs.onchange=()=>{cur.GYRO=gs.value;renderGyro();dirty()};
+  segRender($(".seg[data-g=GYRO_AXIS]"),GAXES,cur.GYRO_AXIS||GDEF.GYRO_AXIS,v=>{cur.GYRO_AXIS=v;renderGyro();dirty()});
+  segRender($(".seg[data-g=RSTICK]"),RSTICKS,cur.RSTICK||GDEF.RSTICK,v=>{cur.RSTICK=v;renderGyro();dirty()});
+  $("#flickOpts").classList.toggle("dim",(cur.RSTICK||GDEF.RSTICK)!=="FLICK");
+  $("#gyroOpts").classList.toggle("dim",(cur.GYRO||GDEF.GYRO)==="OFF");
+  renderTfx();
+}
+function render(){renderList();renderOpts();paintPad();dirty()}
+
+/* ── trigger effects strength ── */
+function renderTfx(){const v=slVal("TRIGGER_FX");
+  segRender($("#tfxPre"),TFX_PRESETS,v,n=>{cur.TRIGGER_FX=String(n);renderTfx();dirty()});paintSl("TRIGGER_FX")}
+function renderTfxPresets(){const v=+cur.TRIGGER_FX;$$("#tfxPre button").forEach((b,i)=>b.setAttribute("aria-pressed",TFX_PRESETS[i][0]===v))}
+
+/* ── binding editor (Steam Input-style activators) ── */
+const ACTS=[["","Press","Sends these while held. Pick several for a combo."],
+ [".long","Long press","Hold past the long-press time to send these. Turbo repeats Long after the threshold; Toggle latches Long once per qualifying hold. A quick tap still pulses Press. Double takes precedence for the second press; Shift uses its effective Press binding."],
+ [".double","Double press","Press twice quickly: the second press sends these."],
+ [".shift","Shift layer","Sent instead of Press while the Shift button is held."],
+ [".full","Full pull","Extra output when the trigger clicks at the end of its travel."]];
+let draft={},act="",sheetAddOutput=null;
+function actsFor(k){return ACTS.filter(a=>a[0]!==".full"||k==="LT"||k==="RT").filter(a=>a[0]!==".shift"||cur.SHIFT&&cur.SHIFT!=="NONE"&&cur.SHIFT!==k)}
+function openSheet(k,options={}){
+  if(k===RESERVED){showCaption(k);toast("… is reserved: hold it for 5 seconds to pause or resume SteamController-PS5");return}
+  selectedKey=k;
+  if(cur.SHIFT===k){sheetKey=null;paintPad();showCaption(k);toast(LABEL[k]+" is the Shift modifier; choose another Shift button before editing its output.");return}
+  sheetReturnFocus=document.activeElement;sheetKey=k;sheetAddOutput=options.addOutput||null;$("#sheetT").innerHTML=ic("s_"+k)+esc(LABEL[k]);
+  draft={};ACTS.forEach(([a])=>draft[a]=new Set(combo(cur[k+a])));
+  if(options.addOutput)draft[""].add(options.addOutput);
+  draft.turbo=cur[k+".turbo"]==="1";draft.toggle=cur[k+".toggle"]==="1";
+  $$(".ctl").forEach(g=>g.classList.toggle("sel",g.dataset.k===k));
+  act="";renderActTabs();renderPick();
+  $("#sheet").classList.add("show");paintPad();$("#pick button").focus();requestAnimationFrame(updateSheetScroll);
+}
+function updateSheetScroll(){
+  const box=$("#sheet > .box");
+  $("#sheetScrollHint").textContent=box.scrollHeight-box.scrollTop-box.clientHeight>24?"More output actions below ↓":"All output actions shown";
+}
+$("#sheet > .box").onscroll=updateSheetScroll;
+function renderActTabs(){
+  $("#actTabs").innerHTML=actsFor(sheetKey).map(([a,l])=>`<button role="tab" data-a="${a}" aria-selected="${a===act}">${l}${a&&draft[a].size?'<span class="n"></span>':""}</button>`).join("");
+  $$("#actTabs button").forEach(b=>b.onclick=()=>{act=b.dataset.a;renderActTabs();renderPick()});
+  $("#actHelp").textContent=ACTS.find(a=>a[0]===act)[2]+(act===""&&sheetAddOutput?" "+outputAccessibleLabel(sheetAddOutput)+" staged; choose Done to apply or Cancel to discard.":"");
+  $("#actOpts").hidden=act!=="";
+  $("#optTurbo").checked=draft.turbo;$("#optToggle").checked=draft.toggle;
+}
+$("#optTurbo").onchange=e=>{draft.turbo=e.target.checked;if(draft.turbo){draft.toggle=false;$("#optToggle").checked=false}};
+$("#optToggle").onchange=e=>{draft.toggle=e.target.checked;if(draft.toggle){draft.turbo=false;$("#optTurbo").checked=false}};
+function renderPick(){
+  const set=draft[act],p=$("#pick");p.innerHTML="";
+  OUTPUT_GROUPS.forEach(([label,keys])=>{
+    const section=document.createElement("section");section.className="pick-group";
+    const heading=document.createElement("h4");heading.textContent=label;section.appendChild(heading);
+    const grid=document.createElement("div");grid.className="pick-grid";
+    keys.forEach(v=>{const b=document.createElement("button");b.type="button";b.className="g-"+v;b.innerHTML=outputChoice(v);b.setAttribute("aria-label",outputAccessibleLabel(v));b.setAttribute("aria-pressed",set.has(v));
+      b.onclick=()=>toggleOutput(v);grid.appendChild(b)});
+    section.appendChild(grid);p.appendChild(section);
+  });
+  paintDestinations();requestAnimationFrame(updateSheetScroll);
+}
+function closeSheet(apply){
+  if(apply){
+    const k=sheetKey,ord=s=>OUTS.map(o=>o[0]).filter(o=>s.has(o)).join("+");
+    ACTS.forEach(([a])=>{const v=ord(draft[a]);if(a==="")cur[k]=v||"NONE";else if(v)cur[k+a]=v;else delete cur[k+a]});
+    if(draft.turbo)cur[k+".turbo"]="1";else delete cur[k+".turbo"];
+    if(draft.toggle)cur[k+".toggle"]="1";else delete cur[k+".toggle"];
+    normalizeBindingFlags(cur);render();showCaption(k);
+  }
+  $("#sheet").classList.remove("show");sheetKey=null;sheetAddOutput=null;paintPad();
+  const returnTo=sheetReturnFocus&&sheetReturnFocus.isConnected?sheetReturnFocus:$("#steamStage svg:not([hidden]) .ctl[data-k='"+selectedKey+"']");if(returnTo)returnTo.focus();
+}
+function extras(k){const t=[];
+  if(combo(cur[k+".long"]).length)t.push("Long: "+comboText(cur[k+".long"]));
+  if(combo(cur[k+".double"]).length)t.push("Double: "+comboText(cur[k+".double"]));
+  if(combo(cur[k+".shift"]).length)t.push("Shift: "+comboText(cur[k+".shift"]));
+  if(combo(cur[k+".full"]).length)t.push("Full pull: "+comboText(cur[k+".full"]));
+  if(cur[k+".turbo"]==="1")t.push("Turbo");if(cur[k+".toggle"]==="1")t.push("Toggle");
+  if(cur.SHIFT===k)t.push("Shift button");return t}
+$("#done").onclick=()=>closeSheet(true);
+$("#cancel").onclick=()=>closeSheet(false);
+$("#clear").onclick=()=>{draft[act].clear();if(act===""){draft.turbo=draft.toggle=false}renderActTabs();renderPick()};
+$("#sheet").onclick=e=>{if(e.target.id==="sheet")closeSheet(false)};
+document.addEventListener("keydown",e=>{
+  if(!$("#sheet").classList.contains("show"))return;
+  if(e.key==="Escape"){e.preventDefault();closeSheet(false)}
+  if(e.key==="Tab"){const items=[...$$("#sheet button, #sheet input, #sheet [tabindex='0']")].filter(x=>!x.disabled&&x.getClientRects().length),first=items[0],last=items[items.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus()}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus()}}
+});
+
+/* ── profiles ── */
+const pname=id=>{const p=profiles.find(p=>p.id===id);return p?p.name:id};
+const plabel=p=>p.id==="default"?"Default (every game without its own)":`${p.name}${p.id!==p.name?" · "+p.id:""}`;
+function selectionCommitted(){ $("#prof").value=editing;syncHash(false) }
+function draftStamp(){return editing+"\0"+fmt(cur)}
+async function canLeaveProfile(){
+  if($("#sheet").classList.contains("show")){toast("Finish or cancel the button edit before switching profiles");return false}
+  if(!isDirty())return true;
+  if(!guardPromise){
+    const dialog=$("#profileGuard");
+    guardPromise=new Promise(resolve=>{
+      const finish=choice=>{dialog.close();resolve(choice)};
+      $("#guardSave").onclick=()=>finish("save");
+      $("#guardDiscard").onclick=()=>finish("discard");
+      $("#guardCancel").onclick=()=>finish("cancel");
+      dialog.oncancel=e=>{e.preventDefault();finish("cancel")};
+      dialog.showModal();
+    }).then(async choice=>choice==="discard"|| (choice==="save"&&await saveCurrent()&&!isDirty()))
+      .finally(()=>{guardPromise=null});
+  }
+  return guardPromise;
+}
+function operationCurrent(ticket,stamp){return ticket===navigationGeneration&&stamp===draftStamp()&&!$("#sheet").classList.contains("show")}
+async function loadAuthorized(id,ticket,stamp,push=true){
+  try{
+    const loaded=serverProfile(await api("/api/profile?id="+encodeURIComponent(id),{cache:"no-store"}));
+    if(!operationCurrent(ticket,stamp))return false;
+    ++editorGeneration;editing=id;cur=loaded;saved=fmt(cur);saveUnconfirmed=false;
+    $("#profileRecovery").hidden=true;$("#prof").value=id;$("#del").disabled=id==="default";render();
+    if(history.state?.profileLocation)history.replaceState(null,"",location.hash);
+    syncHash(push);return true;
+  }catch(e){if(ticket===navigationGeneration){selectionCommitted();if(id==="default"&&e.status===500)$("#profileRecovery").hidden=false;toast("Profile load failed: "+e.message)}return false}
+}
+$("#recoverDefault").onclick=async()=>{
+  if(!confirm("Recover Default? The damaged file will be preserved. Unsaved edits will be discarded after successful recovery."))return;
+  const ticket=++navigationGeneration,stamp=draftStamp();
+  try{await api("/api/recover-default",{method:"POST"});await refreshList();
+    if(operationCurrent(ticket,stamp))await loadAuthorized("default",ticket,stamp);
+    toast("Default recovered; previous file retained in profiles/default.ini.recovery.*");
+  }catch(e){toast("Recovery failed: "+e.message)}
+};
+async function load(id,force=false,push=true){
+  const ticket=++navigationGeneration;selectionCommitted();
+  if(!force&&!await canLeaveProfile()){if(ticket===navigationGeneration)selectionCommitted();return false}
+  if(ticket!==navigationGeneration)return false;
+  return loadAuthorized(id,ticket,draftStamp(),push);
+}
+async function refreshList(){
+  const ticket=++listGeneration,loaded=JSON.parse(await api("/api/profiles"));
+  if(ticket!==listGeneration)return;
+  profiles=loaded;
+  profiles.sort((a,b)=>a.id==="default"?-1:b.id==="default"?1:a.name.localeCompare(b.name));
+  $("#prof").innerHTML=profiles.map(p=>`<option value="${esc(p.id)}">${esc(plabel(p))}</option>`).join("");
+  // A deleted profile may still have a newer draft. Keep it selectable so the
+  // user can save/recreate it instead of falsely selecting a different editor.
+  if(!profiles.some(p=>p.id===editing))$("#prof").add(new Option(cur.name||editing,editing));
+  $("#prof").value=editing;
+  $("#mode").innerHTML=`<option value="">Automatic per game</option>`+profiles.map(p=>`<option value="${esc(p.id)}">Always ${esc(p.name)}</option>`).join("");
+  $("#mode").value=status.override||"";
+}
+async function createFor(tid,name){
+  if(profiles.some(p=>p.id===tid)){if(await load(tid))switchTab("remap");return}
+  const ticket=++navigationGeneration;
+  if(!await canLeaveProfile()||ticket!==navigationGeneration)return;
+  const nm=prompt("Name this profile",name||tid);if(nm===null)return;
+  const stamp=draftStamp();
+  try{
+    const p={...serverProfile(await api("/api/profile?id=default",{cache:"no-store"})),name:nm||tid};
+    if(!operationCurrent(ticket,stamp))return;
+    await api("/api/profile?id="+encodeURIComponent(tid),{method:"POST",body:profileWrite(validatedProfile(p))});
+    await refreshList();
+    if(!operationCurrent(ticket,stamp))return;
+    if(await loadAuthorized(tid,ticket,stamp)){switchTab("remap");toast("Profile created from Default")}
+  }catch(e){if(ticket===navigationGeneration)toast("Profile creation failed: "+e.message)}
+}
+$("#prof").onchange=e=>load(e.target.value);
+$("#mode").onchange=async e=>{await api("/api/override?id="+encodeURIComponent(e.target.value),{method:"POST"});toast(e.target.value?"Locked to "+pname(e.target.value):"Switching automatically per game")};
+let saving=false;
+function saveCurrent(){
+  if(savePromise)return savePromise;
+  const id=editing,ticket=editorGeneration;
+  saving=true;$("#save").disabled=true;
+  savePromise=Promise.resolve().then(async()=>{
+    try{
+      cur=validatedProfile(cur);const submitted=fmt(cur),path="/api/profile?id="+encodeURIComponent(id);
+      saveUnconfirmed=true;dirty();
+      await api(path,{method:"POST",body:profileWrite(cur)});
+      const canonical=serverProfile(await api(path,{cache:"no-store"})),applied=fmt(canonical);
+      if(editing===id&&ticket===editorGeneration){
+        if(fmt(cur)===submitted)cur=canonical;
+        saved=applied;saveUnconfirmed=false;render();
+      }
+      await refreshList();toast(editing===id&&isDirty()?"Saved earlier changes; newer edits are unsaved":"Saved and confirmed");
+      return true;
+    }catch(e){if(editing===id&&ticket===editorGeneration){dirty();toast("Save not confirmed: "+e.message)}return false}
+    finally{saving=false;$("#save").disabled=false;savePromise=null}
+  });
+  return savePromise;
+}
+$("#save").onclick=()=>saveCurrent();
+$("#revert").onclick=()=>{cur=parse(saved);render();toast("Changes undone")};
+/* ── export / import ── */
+$("#exp").onclick=()=>{
+  const name=(cur.name||editing).replace(/[^\w .()-]+/g,"_").trim()||"profile";
+  const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([fmt(cur)],{type:"text/plain"}));
+  a.download=`SteamController-PS5 - ${name}.ini`;document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+  toast(isDirty()?"Exported, including unsaved changes":"Exported");
+};
+$("#imp").onclick=()=>{$("#impFile").value="";$("#impFile").click()};
+function mergeImportedProfile(current,incoming){
+  const checked=validatedProfile(incoming),next={...current};
+  Object.entries(checked).forEach(([key,value])=>{
+    if(/\.(long|double|shift|full)$/.test(key)&&!combo(value).length)delete next[key];
+    else next[key]=value;
+  });
+  // Keep an explicit incoming toggle's precedence even after normalization
+  // omitted its turbo key; current state may already have turbo enabled.
+  next.name=current.name;return validatedProfile(next);
+}
+$("#impFile").onchange=async e=>{
+  const f=e.target.files[0];if(!f)return;
+  if(f.size>32768){toast("That file is too big to be a profile");return}
+  try{
+    const p=parse(await f.text()),next=mergeImportedProfile(cur,p);
+    if(!BITS.some(k=>Object.hasOwn(p,k))){toast("That doesn't look like a SteamController-PS5 profile");return}
+    if(!confirm("Merge settings from "+f.name+" into \""+pname(editing)+"\"? Values present in the file replace current values; omitted settings stay unchanged. An empty or NONE activator clears only that activator. Review, then Save."))return;
+    cur=next;render();dirty();toast("Merged. Check the profile, then Save");
+  }catch(error){toast("Import rejected: "+error.message)}
+};
+$("#del").onclick=async()=>{
+  if(editing==="default"||!confirm(`Delete "${pname(editing)}"?`))return;
+  const ticket=++navigationGeneration,id=editing;
+  if(!await canLeaveProfile()||ticket!==navigationGeneration)return;
+  const stamp=draftStamp();
+  try{
+    await api("/api/delete?id="+encodeURIComponent(id),{method:"POST"});
+    await refreshList();
+    if(operationCurrent(ticket,stamp))await loadAuthorized("default",ticket,stamp);
+    toast("Deleted");
+  }catch(e){if(ticket===navigationGeneration){selectionCommitted();toast("Delete failed: "+e.message)}}
+};
+window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()){e.preventDefault();e.returnValue=""}});
+
+/* ── games ── */
+const iconUrls=new Map(),iconRequests=new Map();
+function clearIconUrls(){for(const url of iconUrls.values())URL.revokeObjectURL(url);iconUrls.clear()}
+window.addEventListener("pagehide",clearIconUrls);
+function art(g){return g&&g.icon?`<img data-game-icon="${esc(g.id)}" alt="" loading="lazy">`:esc((g&&g.name||"?").trim().slice(0,1).toUpperCase())}
+async function authenticatedIcon(id){
+  if(iconUrls.has(id))return iconUrls.get(id);
+  if(iconRequests.has(id))return iconRequests.get(id);
+  const pending=(async()=>{
+    const response=await authorizedFetch("/api/icon?id="+encodeURIComponent(id));
+    if(!response.ok)throw new Error("Icon unavailable");
+    const blob=await response.blob();
+    if(!blob.type.startsWith("image/")||blob.size>2097152||!blob.size)throw new Error("Invalid icon");
+    if(iconUrls.size>=128){const first=iconUrls.keys().next().value;URL.revokeObjectURL(iconUrls.get(first));iconUrls.delete(first)}
+    const url=URL.createObjectURL(blob);iconUrls.set(id,url);return url;
+  })();
+  iconRequests.set(id,pending);
+  try{return await pending}finally{if(iconRequests.get(id)===pending)iconRequests.delete(id)}
+}
+function hydrateIcons(root){root.querySelectorAll("img[data-game-icon]").forEach(async img=>{
+  try{const url=await authenticatedIcon(img.dataset.gameIcon);if(img.isConnected)img.src=url}
+  catch(e){if(img.isConnected)img.replaceWith(document.createTextNode("?"))}
+})}
+async function refreshGames(){
+  try{games=JSON.parse(await api("/api/games"))}catch(e){games=[]}
+  games.sort((a,b)=>a.name.localeCompare(b.name));renderGames();
+}
+function renderGames(){
+  const q=$("#gsearch").value.trim().toLowerCase();
+  const list=games.filter(g=>!q||g.name.toLowerCase().includes(q)||g.id.toLowerCase().includes(q));
+  $("#gcount").textContent=`${games.length} installed`;
+  if(!games.length){$("#games").innerHTML='<div class="empty"><b>No installed games found</b>Games appear here once the PS5 has finished listing them.</div>';return}
+  $("#games").innerHTML=list.map(g=>{const has=profiles.some(p=>p.id===g.id),playing=status.title===g.id;
+    return `<div class="card game${playing?" playing":""}"><div class="art">${art(g)}</div><div class="name">${esc(g.name)}</div>
+    <div class="meta"><span>${esc(g.id)}</span>${playing?'<span class="badge ok">Playing</span>':has?'<span class="badge lock">Profile</span>':""}</div>
+    <button data-id="${esc(g.id)}" class="${has?"":"primary"}">${has?"Edit profile":"Create profile"}</button></div>`}).join("")||`<div class="empty"><b>No matches</b>No installed game is called "${esc(q)}".</div>`;
+  hydrateIcons($("#games"));
+  $$("#games button[data-id]").forEach(b=>b.onclick=()=>{const g=games.find(g=>g.id===b.dataset.id);createFor(g.id,g.name)});
+}
+$("#gsearch").oninput=renderGames;
+
+/* ── now playing ── */
+let lastNow="";
+function renderNow(){
+  const key=[status.title,status.active,status.override,status.title_name,status.active_name,status.menu].join("|");
+  if(key===lastNow)return;lastNow=key;
+  const g=games.find(g=>g.id===status.title);
+  $("#nowArt").innerHTML=status.title?art(g||{id:status.title,name:status.title_name||status.title,icon:true}):"–";
+  hydrateIcons($("#nowArt"));
+  const img=$("#nowArt img");if(img)img.onerror=()=>{$("#nowArt").textContent=(status.title_name||"?").slice(0,1)};
+  $("#nowTitle").textContent=status.title?(status.title_name||status.title):"No game running";
+  const b=$("#nowBadge"),a=$("#nowAction");a.hidden=true;
+  if(status.menu){b.innerHTML='<span class="badge lock">Console menu open</span>'}
+  else if(status.override){b.innerHTML=`<span class="badge lock">Locked: ${esc(status.active_name)}</span>`}
+  else if(status.title&&status.active!=="default"){b.innerHTML=`<span class="badge ok">Profile attached: ${esc(status.active_name)}</span>`}
+  else if(status.title){b.innerHTML='<span class="badge warn">Using Default</span>';a.hidden=false;a.className="primary";a.textContent="Create profile for this game";
+    a.onclick=()=>createFor(status.title,status.title_name)}
+  else b.innerHTML=`<span class="badge ok">${esc(status.active_name||"Default")}</span>`;
+  $("#nowSub").textContent=status.title?`${status.title} · profiles switch automatically`:"Profiles switch automatically when a game starts.";
+}
+
+/* ── live input (no scrolling, no layout shift) ── */
+let lastLive=-1;
+function paintLive(live){
+  if(live===lastLive)return;
+  const fresh=live&~(lastLive<0?0:lastLive);lastLive=live;
+  $$(".ctl").forEach(g=>g.classList.toggle("live",!!(live&(1<<BITS.indexOf(g.dataset.k)))));
+  $$(".row").forEach(r=>r.classList.toggle("live",!!(live&(1<<BITS.indexOf(r.dataset.k)))));
+  if(fresh){const i=BITS.findIndex((_,i)=>fresh&(1<<i));if(i>=0)showCaption(BITS[i])}
+}
+let lastConn="";
+async function poll(){
+  try{
+    status=JSON.parse(await api("/api/status"));
+    const ck=[status.connected,status.paused].join();
+    if(ck!==lastConn){lastConn=ck;
+      $("#dot").classList.toggle("on",!!status.connected&&!status.paused);
+      $("#dot").classList.toggle("paused",!!status.paused);
+      $("#conn").textContent=status.paused?"Paused · hold … 5 s to resume":status.connected?"Controller connected":"Controller not connected";
+      $("#pauseBtn").textContent=status.paused?"Resume now":"Pause now";$("#pauseBtn").className=status.paused?"primary":""}
+    paintBattery();
+    renderNow();paintLive(status.inputs>>>0);paintHap();paintGyro();
+    if($("#mode").value!==(status.override||""))$("#mode").value=status.override||"";
+  }catch(e){lastConn="";$("#dot").classList.remove("on");$("#conn").textContent="Backend offline"}
+  setTimeout(poll,150);
+}
+
+$("#pauseBtn").onclick=async()=>{try{await api("/api/pause?on="+(status.paused?0:1),{method:"POST"});toast(status.paused?"Resumed":"Paused")}catch(e){toast(e.message)}};
+
+/* ── battery ── */
+let lastBatt="";
+function paintBattery(){
+  const el=$("#batt"),lvl=status.battery,key=[status.connected,lvl,status.charging].join();
+  if(key===lastBatt)return;lastBatt=key;
+  if(!status.connected||lvl==null||lvl<0){el.hidden=true;return}
+  el.hidden=false;el.classList.toggle("low",lvl<=15&&!status.charging);
+  el.innerHTML=`<i><b style="width:${Math.max(1,Math.round(lvl*14/100))}px"></b></i>${lvl}%${status.charging===1?" ⚡":""}`;
+  el.title=status.charging===1?"Charging":status.charging===2?"Charged":"Steam Controller battery";
+}
+
+/* ── gyro live readout ── */
+function paintGyro(){
+  const g=status.gyro,t=$("#gyroLive"),m=$("#gyroMeter");
+  let txt;
+  if(!status.connected||!g)txt="Controller not connected";
+  else if(!g.wanted)txt=status.active===editing?"Off in this profile":`Off in ${status.active_name||"the active profile"}`;
+  else if(!g.imu)txt="Starting gyro…";
+  else{const gr=["no grip","left grip","right grip","both grips"][g.grips&3];
+    txt=(g.active?"Aiming":"Not aiming")+" · "+(g.button===1?"gyro button held":g.button===2?"held off with the gyro button":g.button===3?"turned off with the gyro button":gr)+(g.cal?"":" · put it down for a second to calibrate")}
+  if(t.textContent!==txt)t.textContent=txt;
+  const on=!!(g&&g.imu&&g.active);m.classList.toggle("on",on);
+  const ax=g?((cur.GYRO_AXIS||"YAW")==="ROLL"?-g.roll:-g.yaw)*(cur.GYRO_INVERT_X==="1"?-1:1):0;
+  const ay=g?g.pitch*(cur.GYRO_INVERT_Y==="1"?-1:1):0;
+  const c=v=>Math.max(-20,Math.min(20,v/3));
+  m.querySelector("i").style.transform=g&&g.imu?`translate(${c(ax)}px,${c(-ay)}px)`:"none";
+  if(!m.title)m.title="Turn right: the dot should move right. Tilt up: it should move up. If not, use Invert.";
+}
+
+/* ── help ── */
+$$("[data-hap]").forEach(b=>b.onclick=async()=>{try{await api("/api/haptic?kind="+b.dataset.hap+"&via="+$("#hapVia").value,{method:"POST"});toast("Sent to controller")}catch(e){toast(e.message||"Request failed")}});
+function paintHap(){const h=status.hap,el=$("#hapDiag");if(!h){el.textContent="";return}
+  const via=["–","interrupt OUT","output report","feature report","every Puck output"][h.via]||"–";
+  const txt=!status.haptics?"Controller not connected to the payload.":
+   `Queued ${h.q}, sent ${h.sent}, failed ${h.fail}. Last: ${h.q?(h.err?"error "+h.err:"OK")+" via "+via:"none yet"}. OUT endpoint: ${h.out>=0?"0x"+h.out.toString(16).padStart(2,"0"):"not available"}.`;
+  if(el.textContent!==txt)el.textContent=txt}
+const APPLICATION_VERSION=/*__VERSION__*/"";
+$("#diagnosticsDownload").onclick=async()=>{
+  const button=$("#diagnosticsDownload");button.disabled=true;$("#diagnosticsStatus").textContent="Preparing diagnostic report…";
+  let objectUrl;
+  try{
+    const response=await authorizedFetch("/api/diagnostics",{cache:"no-store"});
+    if(!response.ok)throw new Error(await response.text());
+    const report=await response.text();
+    if(new TextEncoder().encode(report).length>24576)throw new Error("Diagnostic report exceeds the size limit");
+    objectUrl=URL.createObjectURL(new Blob([report],{type:"text/plain;charset=utf-8"}));
+    const link=document.createElement("a");link.href=objectUrl;link.download="SteamController-PS5-Diagnostics-"+APPLICATION_VERSION+".txt";
+    document.body.appendChild(link);link.click();link.remove();
+    $("#diagnosticsStatus").textContent="Downloaded. Review the report before sharing.";
+  }catch(error){$("#diagnosticsStatus").textContent="Diagnostic download failed: "+error.message}
+  finally{if(objectUrl)URL.revokeObjectURL(objectUrl);button.disabled=false}
+};
+$("#tileInstall").onclick=async()=>{
+  if(!confirm("Create the Steam Controller Settings tile in PS5 Media? This writes its own app metadata and icon. FW 13.60 behavior is unverified. The payload must be running to open settings."))return;
+  const button=$("#tileInstall");button.disabled=true;$("#tileStatus").textContent="Requesting tile registration…";
+  try{$("#tileStatus").textContent=await api("/api/settings-tile",{method:"POST",body:"INSTALL SCPS50001"})}
+  catch(error){$("#tileStatus").textContent="Tile request failed: "+error.message}
+  finally{button.disabled=false}
+};
+$("#logShow").onclick=async()=>{const p=$("#log");if(!p.hidden){p.hidden=true;$("#logShow").textContent="Show log";return}p.textContent=await api("/api/log");p.hidden=false;$("#logShow").textContent="Hide log";p.scrollTop=p.scrollHeight};
+$("#logPrev").onclick=async()=>{const t=await api("/api/log?prev=1");try{await navigator.clipboard.writeText(t);toast("Previous run's log copied")}catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}};
+$("#logCopy").onclick=async()=>{const t=await api("/api/log");try{await navigator.clipboard.writeText(t);toast("Log copied")}catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}};
+
+/* ── in-game hooks ── */
+async function paintHooks(){
+  let v;try{v=JSON.parse(await api("/api/gamehooks"))}catch(e){return}
+  $("#ghIn").checked=!!v.input;$("#ghVib").checked=!!v.vibration;$("#ghAud").checked=!!v.audio;
+  if(document.activeElement!==$("#ghMode"))$("#ghMode").value=String(v.mode);
+  const who=v.mode===0?"Both controllers are active.":(v.owner?"Steam Controller in control.":"DualSense in control.");
+  const g=games.find(g=>g.id===v.title),name=g?g.name:v.title;
+  $("#ghStatus").textContent=(!v.input&&!v.vibration)?"Off.":!v.title?"Start a game. Hooks attach about 10 seconds after it launches.":
+    v.state===2?`Active in ${name}. ${who} Vibration updates: ${v.vcalls}. `+
+      (v.audio?(v.hap_ports||v.spk_ports?`Haptics ports: ${v.hap_ports}, speaker ports: ${v.spk_ports}, audio blocks: ${v.a_calls} (muted ${v.a_muted}). Haptics level: ${v.hap_l}/${v.hap_r}.`
+        :"No DualSense haptics/speaker ports seen yet. If the game was already running when the payload loaded, restart the game."):""):
+    v.state===3?`Couldn't hook ${name}: ${v.why}.`:`Waiting for ${name}… ${v.why||""}`;
+}
+async function setHooks(q){try{await api("/api/gamehooks?"+q,{method:"POST"});paintHooks()}catch(e){toast(e.message)}}
+$("#ghIn").onchange=e=>setHooks("input="+(e.target.checked?1:0));
+$("#ghVib").onchange=e=>setHooks("vibration="+(e.target.checked?1:0));
+$("#ghMode").onchange=e=>setHooks("mode="+e.target.value);
+$("#ghAud").onchange=e=>{setHooks("audio="+(e.target.checked?1:0));toast("Restart the game for this to take effect")};
+$("#ghRec").onclick=()=>{setHooks("input=0&vibration=1&audio=1&mode=2");toast("Recommended settings applied — restart the game")};
+setInterval(()=>{if(!$("#tab-help").hidden){paintHooks();paintDs()}},1000);
+
+/* ── DualSense hand-off ── */
+async function paintDs(){
+  let d;try{d=JSON.parse(await api("/api/dualsense"))}catch(e){return}
+  $("#dsOff").checked=!!d.enabled;
+  const seen=d.pads?"":" The DualSense hasn't been identified yet: start a game, or turn the DualSense off and on once.";
+  $("#dsStatus").textContent=!d.enabled?"Off.":({
+    idle:"Ready. The DualSense turns off the first time you use the Steam Controller after it turns on."+seen,
+    no_id:"Waiting: the DualSense hasn't been identified yet. Starting a game identifies it, and it turns off as soon as it is.",
+    working:"Turning the DualSense off…",
+    off:"DualSense is off. Press its PS button to bring it back.",
+    back:"DualSense in control. Press the Steam Controller's Steam button to switch back.",
+    failed:`Couldn't turn the DualSense off (error ${d.ret}). Please send the log.`}[d.state]||"");
+}
+$("#dsOff").onchange=async e=>{try{await api("/api/dualsense?on="+(e.target.checked?1:0),{method:"POST"});paintDs()}catch(err){toast(err.message)}};
+
+/* ── game bridge check ── */
+let lastBridge="";
+async function paintBridge(){
+  let b,raw;try{raw=await api("/api/bridge");b=JSON.parse(raw)}catch(e){return}
+  if(raw===lastBridge)return;lastBridge=raw;
+  const g=games.find(g=>g.id===b.title),name=g?g.name:(b.title||"");
+  const row=(k,v,ok)=>`<div class="opt full"><span class="lbl">${esc(k)}</span><span class="badge ${ok===true?"ok":ok===false?"warn":""}">${esc(v)}</span></div>`;
+  if(!b.title||b.state===0){$("#bridgeOut").innerHTML=row("Status","Start a game to run the check",null);return}
+  if(b.state<3){$("#bridgeOut").innerHTML=row(name,b.state===1?"Waiting for the game to finish loading…":"Checking…",null);return}
+  const pass=b.result===2&&b.scan===0;
+  const why=b.result===-4?"Couldn't pick a player slot (PoorDS4 only takes over DS4 slots; doesn't block vibration)":
+            b.result===-2?"No game running":b.result===-3?"More than one game process":("Not compatible: "+b.reason);
+  $("#bridgeOut").innerHTML=
+    row(name+" · "+b.title, pass?"Compatible":why, pass)+
+    row("Check result code", String(b.result), pass)+
+    row("Controller input hooks", b.read_hooks>0?`${b.read_hooks} found`:"none found", b.read_hooks>0)+
+    row("Vibration hook", b.vibration_hooks>0?"found":"not found", b.vibration_hooks>0)+
+    row("Adaptive trigger hook", b.trigger_hooks>0?"found":"not found", b.trigger_hooks>0)+
+    row("Kernel helper (kstuff remote calls)", b.remote_syscalls===1?"available":b.remote_syscalls===0?"missing":"unknown", b.remote_syscalls===1)+
+    row("Firmware", b.fw||"unknown", null);
+}
+$("#bridgeRun").onclick=async()=>{try{await api("/api/bridge",{method:"POST"});toast("Checking the running game…")}catch(e){toast(e.message)}};
+setInterval(()=>{if(!$("#tab-help").hidden)paintBridge()},1500);
+
+/* ── start ── */
+(async()=>{
+  if("scrollRestoration" in history)history.scrollRestoration="manual";
+  measure();buildPad();buildSliders();
+  const adv=$("#gyroAdv");adv.open=recall("pb.gyroAdv")==="1";adv.ontoggle=()=>store("pb.gyroAdv",adv.open?"1":"0");
+  const loc=parseHash(location.hash||recall("pb.loc")||"");
+  if(loc.tab&&TABS.includes(loc.tab)){tab=loc.tab;if(loc.sec)sec[loc.tab]=loc.sec}
+  try{status=JSON.parse(await api("/api/status"))}catch(e){}
+  try{await refreshList();editing=loc.prof&&profiles.some(p=>p.id===loc.prof)?loc.prof:(status.active||"default");await load(editing,true,false)}catch(e){$("#conn").textContent="Backend offline"}
+  showTab(tab,false);
+  refreshGames().then(()=>{lastNow="";renderNow()});
+  poll();
+})();
+</script>
+</body>
+</html>

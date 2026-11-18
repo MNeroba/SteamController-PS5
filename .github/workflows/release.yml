@@ -1,0 +1,112 @@
+name: Release
+
+# Tags always produce a tested build artifact. A GitHub Release is published
+# only after host, PS5 cross-build, and documented hardware release gates pass.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  host-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Run portable host and sanitizer suite
+        run: |
+          make -C tests clean test
+          make -C tests sanitize
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - name: Install pinned Chromium browser tools
+        run: |
+          npm install --global @playwright/cli@0.1.22
+          playwright-cli install-browser chromium --with-deps
+      - name: Run Chromium and controller asset gates
+        run: |
+          bash scripts/run_webui_browser.sh
+          python3 tests/test_webui_controllers.py
+
+  cross-build:
+    runs-on: ubuntu-24.04
+    env:
+      SDK_VERSION: v0.43
+      SDK_SHA256: a9cc9929f21b2b2c5d5b309f3bab4997067c45281c0622cf4838b1aecba66fcb
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Install LLVM 18
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y clang-18 lld-18 llvm-18 unzip
+
+      - name: Install ps5-payload-sdk
+        run: |
+          curl -fsSL -o sdk.zip \
+            "https://github.com/ps5-payload-dev/sdk/releases/download/${SDK_VERSION}/ps5-payload-sdk.zip"
+          printf '%s  %s\n' "$SDK_SHA256" sdk.zip | sha256sum --check
+          unzip -q sdk.zip -d "$RUNNER_TEMP"
+          echo "PS5_PAYLOAD_SDK=$RUNNER_TEMP/ps5-payload-sdk" >> "$GITHUB_ENV"
+
+      - name: Build payload
+        working-directory: payload
+        run: |
+          python3 gen_html.py
+          make clean
+          make
+          sha256sum ghost-control-ps5.elf | tee ghost-control-ps5.elf.sha256
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v7
+        with:
+          archive: true
+          name: ghost-control-ps5
+          path: |
+            payload/ghost-control-ps5.elf
+            payload/ghost-control-ps5.elf.sha256
+
+  hardware-gate:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - name: Require first-release hardware evidence
+        run: |
+          python3 scripts/check_release_gate.py
+          python3 scripts/check_changelog.py --version "$GITHUB_REF_NAME"
+
+  publish:
+    if: startsWith(github.ref, 'refs/tags/v')
+    needs: [host-tests, cross-build, hardware-gate]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v7
+      - name: Download tested payload artifact
+        uses: actions/download-artifact@v8
+        with:
+          digest-mismatch: error
+          name: ghost-control-ps5
+          path: release-assets
+      - name: Verify downloaded ELF checksum
+        working-directory: release-assets
+        run: sha256sum --check ghost-control-ps5.elf.sha256
+      - name: Prepare versioned release notes
+        run: |
+          python3 scripts/check_changelog.py --version "$GITHUB_REF_NAME" --output release-assets/RELEASE_NOTES.md
+          printf '\nSource SHA: `%s`\nSDK: v0.43\nStable publication requires the recorded hardware gate.\n' "$GITHUB_SHA" >> release-assets/RELEASE_NOTES.md
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          body_path: release-assets/RELEASE_NOTES.md
+          files: |
+            release-assets/ghost-control-ps5.elf
+            release-assets/ghost-control-ps5.elf.sha256

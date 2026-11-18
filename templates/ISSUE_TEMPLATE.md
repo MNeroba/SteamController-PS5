@@ -1,0 +1,11 @@
+## ISSUE-XXXX — title
+- Priority: P0 | P1 | P2 | BLOCKER
+- State: OPEN | INVESTIGATING | BLOCKED_HARDWARE | FIXED_HOST | VERIFIED_HARDWARE | CLOSED
+- Environment / commit / source:
+- Expected and observed behavior:
+- Reproduction steps and input fixture:
+- Root cause / evidence:
+- Scope and compatibility risk:
+- Corrective change / commit:
+- Regression test / result link:
+- Next action / owner:

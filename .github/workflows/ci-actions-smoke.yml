@@ -1,0 +1,81 @@
+name: CI Actions smoke
+
+# Exercise the release-only Actions without publishing a tag/release or ELF.
+on:
+  push:
+    paths:
+      - '.github/workflows/**'
+  pull_request:
+    paths:
+      - '.github/workflows/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: read
+
+concurrency:
+  group: ci-actions-smoke-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  upload:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - name: Exercise the API methods used by DEV source/tag gates
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const repo = context.repo;
+            const {data: mainRef} = await github.rest.git.getRef({...repo, ref: 'heads/main'});
+            if (!/^[0-9a-f]{40}$/.test(mainRef.object.sha)) throw new Error('Invalid main SHA');
+            const {data: comparison} = await github.rest.repos.compareCommits({
+              ...repo, base: mainRef.object.sha, head: context.sha
+            });
+            if (!['identical', 'ahead', 'behind', 'diverged'].includes(comparison.status)) {
+              throw new Error('Unexpected comparison result');
+            }
+            const {data: runs} = await github.rest.actions.listWorkflowRunsForRepo({
+              ...repo, head_sha: mainRef.object.sha, event: 'push', per_page: 10
+            });
+            if (!Array.isArray(runs.workflow_runs)) throw new Error('Invalid workflow response');
+            core.info('Read-only source/ref/comparison/workflow API compatibility passed');
+      - name: Create a multi-file transfer fixture and checksum manifest
+        run: |
+          mkdir artifact-fixture
+          cp LICENSE artifact-fixture/LICENSE
+          printf 'source=%s\n' "$GITHUB_SHA" > artifact-fixture/source.txt
+          cd artifact-fixture
+          sha256sum LICENSE source.txt > SHA256SUMS
+      - uses: actions/upload-artifact@v7
+        with:
+          name: ci-actions-${{ github.run_id }}
+          path: artifact-fixture/*
+          archive: true
+          if-no-files-found: error
+          retention-days: 1
+
+  download:
+    needs: upload
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v8
+        with:
+          name: ci-actions-${{ github.run_id }}
+          path: artifact-received
+          digest-mismatch: error
+      - name: Verify downloaded layout, source identity and every file
+        run: |
+          cd artifact-received
+          sha256sum --check SHA256SUMS
+          cmp LICENSE ../LICENSE
+          grep --fixed-strings --line-regexp "source=$GITHUB_SHA" source.txt
+          test "$(find . -type f | wc -l)" -eq 3
