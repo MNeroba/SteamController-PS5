@@ -39,7 +39,7 @@ Evidence labels: `VERIFIED_CODE` (source read here), `VERIFIED_HOST_TEST` (execu
 | ID | Resolution |
 | --- | --- |
 | AUD-01 | FIXED: NID-first resolution for initialize/terminate/install, retry-safe probe, success-with-warning, atomic `.partial` first install and crash recovery; host tests cover NID-only and fallback paths. |
-| AUD-02 | PARTIALLY FIXED (v1.5.1): classic PS4-style rumble is now read from `scePadVirtualDeviceGetRemoteSetting` and forwarded without hooks; PS5-native haptics still require `ENABLE_GAME_HOOKS=1`, and the docs/WebUI state this precisely. |
+| AUD-02 | PARTIALLY FIXED (v1.5.1/v1.5.2): classic PS4-style rumble is read from `scePadVirtualDeviceGetRemoteSetting` and forwarded without hooks; PS5-native haptics require the Experimental game-hook checkbox, which now persists the policy and starts/stops the worker from the WebUI with confirmation and conflict checks. |
 | AUD-03 | FIXED: a skipped pre-Add creation aborts the reservation without the lifetime latch; host regression covers retry in the same session. |
 | AUD-04 | FIXED: any retired endpoint restarts the owned session; the portal exposes dropped pulses. |
 | AUD-05 | FIXED: stale private temp recovery plus directory fsync, with symlink/foreign-file refusal regressions. |

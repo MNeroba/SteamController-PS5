@@ -2,6 +2,21 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
 
+## v1.5.2-experimental
+
+Experimental follow-up to 1.5.1. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.
+
+### Bug Fixes
+
+- The "In games" section now has an explicit **Enable game hooks (Experimental)** checkbox. It persists `ENABLE_GAME_HOOKS` through the existing private policy writer, starts or stops the game-hook worker immediately, requires a confirmation dialog, refuses to combine hooks with `ENABLE_DIRECT_HID`, reverts the policy if the worker cannot start, and reports a retained rollback. This removes the manual runtime-policy file step for PS5 vibration/haptics while keeping the default off.
+- A disabled or failed toggle shows an accurate status instead of implying hooks will attach; the previous "runtime policy only" message is gone.
+
+### New Features / Improvements
+
+- Version `v1.5.2-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
+- ADR-070 records the owner-authorized local UI toggle, its confirmation/persistence/conflict rules and the unchanged trusted-loopback limitation.
+- README/LOADING/SECURITY/ARCHITECTURE explain that PS5-native haptics still require this experimental path and that classic PS4-style rumble remains automatic (v1.5.1).
+
 ## v1.5.1-experimental
 
 Experimental follow-up to 1.5.0. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.

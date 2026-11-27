@@ -150,6 +150,24 @@ static void test_file_loader_fails_closed(void)
     assert(rmdir(directory) == 0);
 }
 
+static void test_serialize_roundtrip(void)
+{
+    runtime_policy_t p, q;
+    char text[256];
+    int length;
+    runtime_policy_defaults(&p);
+    p.enable_game_hooks = 1;
+    length = runtime_policy_serialize(&p, text, sizeof(text));
+    assert(length > 0 && (size_t)length < sizeof(text));
+    memset(&q, 0xff, sizeof(q));
+    assert(runtime_policy_parse(text, (size_t)length, &q) == 0);
+    assert(q.enable_game_hooks == 1 && q.enable_webui == 1);
+    assert(q.enable_bridge_probe == 0 && q.enable_ds_handoff == 0 &&
+           q.enable_direct_hid == 0);
+    assert(runtime_policy_serialize(&p, text, 4) == -1);
+    assert(runtime_policy_serialize(NULL, text, sizeof(text)) == -1);
+}
+
 int main(void)
 {
     test_defaults_are_safe();
@@ -158,6 +176,7 @@ int main(void)
     test_invalid_policy_fails_closed();
     test_empty_and_oversize();
     test_file_loader_fails_closed();
+    test_serialize_roundtrip();
     puts("runtime safe-mode policy checks passed");
     return 0;
 }

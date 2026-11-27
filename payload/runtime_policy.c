@@ -8,6 +8,7 @@
 #include "runtime_policy.h"
 
 #include <errno.h>
+#include <stdio.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -28,6 +29,23 @@ runtime_policy_defaults(runtime_policy_t *policy)
         memset(policy, 0, sizeof(*policy));
         policy->enable_webui = 1;
     }
+}
+
+int
+runtime_policy_serialize(const runtime_policy_t *policy, char *out, size_t capacity)
+{
+    if (!policy || !out || !capacity)
+        return -1;
+    int length = snprintf(out, capacity,
+        "ENABLE_BRIDGE_PROBE=%d\nENABLE_GAME_HOOKS=%d\n"
+        "ENABLE_DUALSENSE_HANDOFF=%d\nENABLE_WEBUI=%d\n"
+        "ENABLE_DIRECT_HID=%d\n",
+        policy->enable_bridge_probe ? 1 : 0,
+        policy->enable_game_hooks ? 1 : 0,
+        policy->enable_ds_handoff ? 1 : 0,
+        policy->enable_webui ? 1 : 0,
+        policy->enable_direct_hid ? 1 : 0);
+    return length > 0 && (size_t)length < capacity ? length : -1;
 }
 
 static char *

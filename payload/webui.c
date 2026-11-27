@@ -416,18 +416,28 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     }
     if (route.id == WEBUI_ROUTE_GAMEHOOKS) {
         if (is_post) {
-            char input[8], vibration[8], audio[8], mode[8];
+            char input[8], vibration[8], audio[8], mode[8], hooks[8];
             int hi = webui_route_param(&route, "input", input, sizeof(input));
             int hv = webui_route_param(&route, "vibration", vibration, sizeof(vibration));
             int ha = webui_route_param(&route, "audio", audio, sizeof(audio));
             int hm = webui_route_param(&route, "mode", mode, sizeof(mode));
+            int hh = webui_route_param(&route, "hooks", hooks, sizeof(hooks));
             int i = -1, v = -1, a = -1, m = -1;
-            if (hi < 0 || hv < 0 || ha < 0 || hm < 0 ||
+            if (hi < 0 || hv < 0 || ha < 0 || hm < 0 || hh < 0 ||
                 (hi == 1 && strcmp(input, "0") && strcmp(input, "1")) ||
                 (hv == 1 && strcmp(vibration, "0") && strcmp(vibration, "1")) ||
                 (ha == 1 && strcmp(audio, "0") && strcmp(audio, "1")) ||
-                (hm == 1 && (strlen(mode) != 1 || mode[0] < '0' || mode[0] > '2'))) {
+                (hm == 1 && (strlen(mode) != 1 || mode[0] < '0' || mode[0] > '2')) ||
+                (hh == 1 && strcmp(hooks, "0") && strcmp(hooks, "1"))) {
                 REPLY_TXT(fd, 400, "invalid game-hook parameters"); return;
+            }
+            if (hh == 1) {
+                char toggle_message[192];
+                int toggle = game_hooks_set_runtime_enabled(hooks[0] == '1',
+                                                            toggle_message,
+                                                            sizeof(toggle_message));
+                REPLY_TXT(fd, toggle ? 500 : 200, toggle_message);
+                return;
             }
             if (hi == 1) i = input[0] - '0';
             if (hv == 1) v = vibration[0] - '0';

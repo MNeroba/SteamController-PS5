@@ -19,6 +19,7 @@ This is a solo-maintained project. No response deadline, bug bounty or coordinat
 
 ## Runtime boundaries
 
+- Game hooks are off by default. The loopback WebUI can enable them at runtime in the "In games" section after an explicit confirmation; this writes the protected policy and starts a worker that patches the running game's controller code. Any local console process that can reach loopback can request the same toggle, so keep untrusted software off the console and turn the toggle off if a game becomes unstable.
 - The payload holds elevated kernel credentials (an elevated authid and the maximum capability mask) for its whole lifetime because the SDK's kernel/MBus/hook calls need them; they are restored on shutdown. The loopback WebUI and all input parsers therefore run in that privileged process. There is no sandbox between them; keep untrusted software off the console and review this code before loading it.
 - The current WebUI binds only PS5 IPv4 loopback. It has no pairing code or user authentication. Host/Origin checks, no-sniff and frame denial reduce browser attacks; local console processes can access it.
 - Older releases used pairing codes and bearer tokens; never share those credentials.

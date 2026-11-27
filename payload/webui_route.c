@@ -41,7 +41,7 @@ static const char *const no_params[] = {NULL};
 static const char *const icon_params[] = {"id", NULL};
 static const char *const haptic_params[] = {"kind", "via", NULL};
 static const char *const id_params[] = {"id", NULL};
-static const char *const gamehook_params[] = {"input", "vibration", "audio", "mode", NULL};
+static const char *const gamehook_params[] = {"input", "vibration", "audio", "mode", "hooks", NULL};
 static const char *const on_params[] = {"on", NULL};
 static const char *const log_params[] = {"prev", NULL};
 

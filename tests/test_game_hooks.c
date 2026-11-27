@@ -3,6 +3,7 @@
 #include "bridge/wireless_ds4.h"
 #include "game_hook_safety.h"
 #include "sc2_profile.h"
+#include "runtime_policy.h"
 
 #include <pthread.h>
 #include <stdatomic.h>
@@ -130,6 +131,35 @@ int main(void) {
     char too_small[3];
 
     mkdir("build/game-hooks-settings", 0700);
+    /* Local-UI toggle: direct HID conflicts, disable persists, invalid policy
+     * fails closed. Worker start/stop is exercised by the existing flow. */
+    {
+        char message[192];
+        runtime_policy_t policy;
+        FILE *file = fopen(RUNTIME_POLICY_PATH, "w");
+        if (!file) return 1;
+        fputs("ENABLE_WEBUI=1\nENABLE_DIRECT_HID=1\n", file);
+        if (fclose(file) != 0) return 1;
+        if (game_hooks_set_runtime_enabled(1, message, sizeof(message)) != -1 ||
+            !strstr(message, "ENABLE_DIRECT_HID")) return 1;
+        file = fopen(RUNTIME_POLICY_PATH, "w");
+        if (!file) return 1;
+        fputs("ENABLE_WEBUI=1\n", file);
+        if (fclose(file) != 0) return 1;
+        if (game_hooks_set_runtime_enabled(0, message, sizeof(message)) != 0 ||
+            runtime_policy_load_file(RUNTIME_POLICY_PATH, &policy) != 0 ||
+            policy.enable_game_hooks != 0) return 1;
+        file = fopen(RUNTIME_POLICY_PATH, "w");
+        if (!file) return 1;
+        fputs("BOGUS=1\n", file);
+        if (fclose(file) != 0) return 1;
+        if (game_hooks_set_runtime_enabled(1, message, sizeof(message)) != -1) return 1;
+        file = fopen(RUNTIME_POLICY_PATH, "w");
+        if (!file) return 1;
+        fputs("ENABLE_WEBUI=1\n", file);
+        if (fclose(file) != 0) return 1;
+        atomic_fetch_add_explicit(&checks, 8, memory_order_relaxed);
+    }
     if (write_malformed_settings() != 0) return 1;
     if (game_hooks_json(NULL, sizeof(too_small)) != -1 ||
         game_hooks_json(too_small, sizeof(too_small)) != -1)

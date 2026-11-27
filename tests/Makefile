@@ -179,8 +179,8 @@ $(BUILD)/test_ds_handoff: test_ds_handoff.c ../payload/ds_handoff.c ../payload/r
 $(BUILD)/test_sc2_status: test_sc2_status.c ../payload/sc2_status.c | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload $(filter %.c,$^) -pthread -o $@
 
-$(BUILD)/test_game_hooks: test_game_hooks.c ../payload/game_hooks.c ../payload/runtime_control.c | $(BUILD)
-	$(CC) $(CFLAGS) -D_DEFAULT_SOURCE -DGAME_HOOKS_TEST -DGAME_HOOKS_SETTINGS_PATH=\"build/game-hooks-settings/settings.ini\" -Ihost_stubs -I../payload $(filter %.c,$^) -pthread -o $@
+$(BUILD)/test_game_hooks: test_game_hooks.c ../payload/game_hooks.c ../payload/runtime_policy.c ../payload/runtime_control.c | $(BUILD)
+	$(CC) $(CFLAGS) -D_DEFAULT_SOURCE -DGAME_HOOKS_TEST -DGAME_HOOKS_SETTINGS_PATH=\"build/game-hooks-settings/settings.ini\" -DRUNTIME_POLICY_PATH=\"build/game-hooks-settings/runtime-policy.ini\" -Ihost_stubs -I../payload $(filter %.c,$^) -pthread -o $@
 
 $(BUILD)/test_sc2_gyro_state: test_sc2_gyro_state.c ../payload/sc2_gyro.c ../payload/steam_motion.c ../payload/runtime_control.c | $(BUILD)
 	$(CC) $(CFLAGS) -DSC2_GYRO_TEST -Ihost_stubs -I../payload $(filter %.c,$^) -pthread -lm -o $@

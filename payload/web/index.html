@@ -507,6 +507,7 @@ dialog.profile-guard::backdrop{background:#0009}
       <section class="sec card" data-sec="ingame" id="sec-ingame">
         <div class="ch"><div><h3>In games</h3><p>How the Steam Controller joins the game next to the DualSense.</p></div></div>
         <div class="rows">
+          <label class="opt full"><span class="lbl"><b>Enable game hooks (Experimental)</b><small>Patches the running game's controller code so PS5 vibration and haptics reach the Steam Controller. Off by default; may affect game stability and stays enabled until you turn it off or restart the payload.</small></span><input type="checkbox" id="ghOn"></label>
           <label class="opt full"><span class="lbl"><b>Use the Steam Controller in games</b><small>Merges it into your player's controller, so it works alongside the DualSense.</small></span><input type="checkbox" id="ghIn"></label>
           <label class="opt full"><span class="lbl"><b>Send game vibration to the Steam Controller</b><small>Goes to whichever controller is in control.</small></span><input type="checkbox" id="ghVib"></label>
           <label class="opt full"><span class="lbl"><b>Move DualSense haptics and speaker</b><small>PS5 games: haptics become Steam Controller rumble, and the DualSense speaker is muted while the Steam Controller is in control. Hooks attach as the game starts, so restart the game after changing this.</small></span><input type="checkbox" id="ghAud"></label>
@@ -1294,7 +1295,8 @@ async function paintHooks(){
   if(document.activeElement!==$("#ghMode"))$("#ghMode").value=String(v.mode);
   const who=v.mode===0?"Both controllers are active.":(v.owner?"Steam Controller in control.":"DualSense in control.");
   const g=games.find(g=>g.id===v.title),name=g?g.name:v.title;
-  if(!v.policy){$("#ghStatus").textContent="Unavailable: game hooks are disabled by the protected runtime policy. In-game vibration needs ENABLE_GAME_HOOKS=1 in /data/ghostpad/runtime-policy.ini and a payload restart; the switches below only store preferences.";return}
+  $("#ghOn").checked=!!v.policy;
+  if(!v.policy){$("#ghStatus").textContent="Game hooks are off. Enable the experimental switch above to capture PS5 vibration and haptics; the switches below only store preferences until then.";return}
   $("#ghStatus").textContent=(!v.input&&!v.vibration)?"Off.":!v.title?"Start a game. Hooks attach about 10 seconds after it launches.":
     v.state===2?`Active in ${name}. ${who} Vibration updates: ${v.vcalls}. `+
       (v.audio?(v.hap_ports||v.spk_ports?`Haptics ports: ${v.hap_ports}, speaker ports: ${v.spk_ports}, audio blocks: ${v.a_calls} (muted ${v.a_muted}). Haptics level: ${v.hap_l}/${v.hap_r}.`
@@ -1302,6 +1304,12 @@ async function paintHooks(){
     v.state===3?`Couldn't hook ${name}: ${v.why}.`:`Waiting for ${name}… ${v.why||""}`;
 }
 async function setHooks(q){try{await api("/api/gamehooks?"+q,{method:"POST"});paintHooks()}catch(e){toast(e.message)}}
+$("#ghOn").onchange=async e=>{
+  const on=e.target.checked;
+  if(on&&!confirm("Enable experimental game hooks? This patches the running game's controller code so PS5 vibration and haptics reach the Steam Controller. Leave it off if a game becomes unstable.")){e.target.checked=false;return}
+  try{const message=await api("/api/gamehooks?hooks="+(on?1:0),{method:"POST"});toast(message);paintHooks()}
+  catch(error){toast(error.message||"Game-hook toggle failed");e.target.checked=!on;paintHooks()}
+};
 $("#ghIn").onchange=e=>setHooks("input="+(e.target.checked?1:0));
 $("#ghVib").onchange=e=>setHooks("vibration="+(e.target.checked?1:0));
 $("#ghMode").onchange=e=>setHooks("mode="+e.target.value);

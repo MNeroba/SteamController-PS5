@@ -20,6 +20,11 @@ int  game_hooks_json(char *out, size_t n);
 /* 1 only when the runtime policy started the worker; settings alone are inert. */
 int  game_hooks_worker_active(void);
 int game_hooks_set_audio(int on);
+/* Local-UI toggle (owner-authorized experimental): persist ENABLE_GAME_HOOKS
+ * in the protected runtime policy and start or stop the worker immediately.
+ * Returns 0 when the requested state is applied and persisted; writes a short
+ * human-readable message for the portal. */
+int game_hooks_set_runtime_enabled(int enable, char *message, size_t capacity);
 
 /* Persist the complete candidate atomically before applying to RAM. */
 int game_hooks_configure(int input_on, int vibe_on, int mode, int audio_on);

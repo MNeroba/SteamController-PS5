@@ -68,6 +68,12 @@ int game_hooks_set(int a,int b,int c) { (void)a;(void)b;(void)c; return 0; }
 int game_hooks_set_audio(int a) { (void)a; return 0; }
 int game_hooks_configure(int a,int b,int c,int d) { (void)a;(void)b;(void)c;(void)d; return 0; }
 int game_hooks_json(char *o,size_t n) { return snprintf(o,n,"{}"); }
+static int hooks_toggle_calls, hooks_toggle_value, hooks_toggle_result;
+int game_hooks_set_runtime_enabled(int enable, char *message, size_t capacity) {
+    hooks_toggle_calls++; hooks_toggle_value = enable;
+    snprintf(message, capacity, "toggle=%d", enable);
+    return hooks_toggle_result;
+}
 int ds_handoff_set_enabled(int on) { return on?-1:0; }
 int ds_handoff_json(char *o,size_t n) { return snprintf(o,n,"{}"); }
 void bridge_probe_request(void) {}
@@ -110,6 +116,14 @@ int main(void) {
     }
     assert(pthread_join(g_tile_thread,NULL)==0);g_tile_thread_started=0;
     assert(tile_requests==1);
+    assert(request("POST /api/gamehooks?hooks=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(hooks_toggle_calls == 1 && hooks_toggle_value == 1);
+    assert(strstr(out,"toggle=1"));
+    hooks_toggle_result = 1;
+    assert(request("POST /api/gamehooks?hooks=0 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==500);
+    assert(hooks_toggle_calls == 2 && hooks_toggle_value == 0);
+    hooks_toggle_result = 0;
+    assert(request("POST /api/gamehooks?hooks=2 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==400);
     assert(request("GET /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
     assert(strstr(out,"X-Content-Type-Options: nosniff"));
     assert(request("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);

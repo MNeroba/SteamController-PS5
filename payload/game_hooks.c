@@ -17,6 +17,7 @@
 #include "sc2_trigfx.h"
 #include "runtime_control.h"
 #include "game_hook_safety.h"
+#include "runtime_policy.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -38,8 +39,12 @@ void ghostpad_status_log(const char *fmt, ...);
 
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_mutex_t g_settings_io_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_toggle_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t g_hooks_thread;
 static int g_hooks_thread_started;
+/* Set by game_hooks_stop so a runtime toggle can join the worker without
+ * setting the process-wide stop request used at shutdown. */
+static int g_stop_requested;
 /* Written by the worker and observed only after pthread_join synchronizes. */
 static int g_shutdown_rollback_pending;
 typedef struct {
@@ -199,7 +204,8 @@ static void *hooks_thread(void *arg) {
     int last_in = -1, last_vib = -1, rollback_pending = 0;
 
     for (;;) {
-        if (runtime_is_stopping()) break;
+        if (runtime_is_stopping() ||
+            __atomic_load_n(&g_stop_requested, __ATOMIC_ACQUIRE)) break;
 #ifdef GAME_HOOKS_TEST
         if (atomic_load_explicit(&g_test_stop, memory_order_relaxed)) break;
 #endif
@@ -404,6 +410,7 @@ void game_hooks_start(void) {
 #ifdef GAME_HOOKS_TEST
     atomic_store_explicit(&g_test_stop, 0, memory_order_relaxed);
 #endif
+    __atomic_store_n(&g_stop_requested, 0, __ATOMIC_RELEASE);
     load_settings();
     g.pid = -1;
     g_shutdown_rollback_pending = 0;
@@ -415,6 +422,7 @@ void game_hooks_start(void) {
 }
 
 int game_hooks_stop(void) {
+    __atomic_store_n(&g_stop_requested, 1, __ATOMIC_RELEASE);
 #ifdef GAME_HOOKS_TEST
     atomic_store_explicit(&g_test_stop, 1, memory_order_relaxed);
 #endif
@@ -459,6 +467,91 @@ int game_hooks_configure(int input_on, int vibe_on, int mode, int audio_on) {
 int game_hooks_set_audio(int on) { return game_hooks_configure(-1, -1, -1, on); }
 int game_hooks_set(int input_on, int vibe_on, int mode) {
     return game_hooks_configure(input_on, vibe_on, mode, -1);
+}
+
+/* Persist the complete policy so the toggle also survives a payload restart.
+ * The file remains the single source of truth read by main at startup. */
+static int persist_hooks_policy(const runtime_policy_t *policy) {
+    char text[256];
+    int length = runtime_policy_serialize(policy, text, sizeof(text));
+    if (length <= 0) return -1;
+    return private_text_replace(RUNTIME_POLICY_PATH, text, (size_t)length);
+}
+
+int game_hooks_set_runtime_enabled(int enable, char *message, size_t capacity) {
+    if (!message || !capacity) return -1;
+    message[0] = 0;
+    pthread_mutex_lock(&g_toggle_lock);
+    runtime_policy_t policy;
+    int loaded = runtime_policy_load_file(RUNTIME_POLICY_PATH, &policy);
+    if (loaded < 0) {
+        if (!enable) {
+            (void)game_hooks_stop();
+            snprintf(message, capacity,
+                     "Game hooks stopped for this run, but the runtime policy is invalid and was not changed");
+            pthread_mutex_unlock(&g_toggle_lock);
+            return -1;
+        }
+        snprintf(message, capacity,
+                 "Runtime policy is invalid or inaccessible; refusing to enable game hooks");
+        pthread_mutex_unlock(&g_toggle_lock);
+        return -1;
+    }
+    if (enable) {
+        if (runtime_is_stopping()) {
+            snprintf(message, capacity, "Payload is stopping; game hooks were not enabled");
+            pthread_mutex_unlock(&g_toggle_lock);
+            return -1;
+        }
+        if (policy.enable_direct_hid) {
+            snprintf(message, capacity,
+                     "Disable ENABLE_DIRECT_HID before enabling game hooks");
+            pthread_mutex_unlock(&g_toggle_lock);
+            return -1;
+        }
+        if (game_hooks_worker_active()) {
+            snprintf(message, capacity, "Game hooks are already enabled");
+            pthread_mutex_unlock(&g_toggle_lock);
+            return 0;
+        }
+        policy.enable_game_hooks = 1;
+        if (persist_hooks_policy(&policy) != 0) {
+            snprintf(message, capacity, "Could not persist the runtime policy; game hooks were not enabled");
+            pthread_mutex_unlock(&g_toggle_lock);
+            return -1;
+        }
+        game_hooks_start();
+        if (!game_hooks_worker_active()) {
+            policy.enable_game_hooks = 0;
+            (void)persist_hooks_policy(&policy);
+            snprintf(message, capacity,
+                     "Game-hook worker could not start; policy reverted. Restart the payload and retry");
+            pthread_mutex_unlock(&g_toggle_lock);
+            return -1;
+        }
+        snprintf(message, capacity,
+                 "Game hooks enabled (experimental). Start or restart the game; it attaches a few seconds after launch");
+        pthread_mutex_unlock(&g_toggle_lock);
+        return 0;
+    }
+    policy.enable_game_hooks = 0;
+    (void)persist_hooks_policy(&policy);
+    int stopped = game_hooks_stop();
+    if (stopped < 0) {
+        snprintf(message, capacity,
+                 "Game hooks disabled in the policy, but the worker could not be joined; restart the payload");
+        pthread_mutex_unlock(&g_toggle_lock);
+        return -1;
+    }
+    if (stopped == GAME_HOOKS_STOP_ROLLBACK_PENDING) {
+        snprintf(message, capacity,
+                 "Game hooks disabled; a target hook could not be fully rolled back and will be released when the game exits or the payload restarts");
+        pthread_mutex_unlock(&g_toggle_lock);
+        return 0;
+    }
+    snprintf(message, capacity, "Game hooks disabled");
+    pthread_mutex_unlock(&g_toggle_lock);
+    return 0;
 }
 
 int game_hooks_worker_active(void) {

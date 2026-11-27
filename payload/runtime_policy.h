@@ -5,7 +5,9 @@
 #include <stddef.h>
 
 #define RUNTIME_POLICY_MAX_BYTES 1024
+#ifndef RUNTIME_POLICY_PATH
 #define RUNTIME_POLICY_PATH "/data/ghostpad/runtime-policy.ini"
+#endif
 
 typedef struct runtime_policy {
     int enable_bridge_probe;
@@ -21,6 +23,11 @@ void runtime_policy_defaults(runtime_policy_t *policy);
 /* Strict parser. Invalid or ambiguous input resets every option to safe-off. */
 int runtime_policy_parse(const char *text, size_t length,
                          runtime_policy_t *policy);
+
+/* Canonical key order for an atomic policy rewrite by the local UI. Returns the
+ * byte count, or -1 when the buffer is too small. */
+int runtime_policy_serialize(const runtime_policy_t *policy, char *out,
+                             size_t capacity);
 
 #define RUNTIME_POLICY_MISSING 1
 /* 0: valid file, 1: missing file with first-launch defaults, -1: invalid,
