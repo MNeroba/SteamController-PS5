@@ -1,4 +1,13 @@
-# Current — 1.0.0 Experimental (2026-11-18)
+# Current — 1.6.0 Experimental (2026-11-28)
+
+## M1-264 — v1.6.0-experimental WebUI quality release (2026-11-28)
+
+Published **v1.6.0-experimental** from [`731138df0a94a9e434d422a165d346d4b9f7684e`](https://github.com/MNeroba/SteamController-PS5/tree/731138df0a94a9e434d422a165d346d4b9f7684e) by [DEV workflow 46076758638](https://github.com/MNeroba/SteamController-PS5/actions/runs/46076758638) at 2026-11-27T22:30:24Z. Release [dev/v1.6.0-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.0-experimental) has seven assets and one ELF, `SteamController-PS5-v1.6.0-experimental.elf`, 2,119,208 bytes, SHA-256 `588e415204cf023b7bfccf504f2857a3e1738cbddb2cee6c9f411b9c5a64a267`. The downloaded sidecar matched the ELF.
+
+Scope was the 2026-11-28 four-way WebUI audit. Fixes: load-gated inert save bar; save/readback and Undo/Discard state; visible errors and control rollback for profile lock, pause, log, hand-off, hooks and recommended settings; 1.2 s offline backoff, hidden-page pause and immediate resume; sequential icon hydration; remap-sheet focus retention, background `inert` and draft-aware unload guard; honest hand-off/bridge policy states; five-key `/api/gamehooks`; 2048-byte finite status JSON; `O_NOFOLLOW` log/icon reads; tab `aria-controls`/`tabpanel` and arrow navigation; game-list error/retry; settings-only import; malformed-hash tolerance.
+
+Verification: local normal and sanitizer suites pass; exact-source push gates Host 46076463781, PS5 46076463853, secret scan 46076463783 and CI Actions smoke 46076463820 succeeded; the DEV workflow repeated normal/ASan/UBSan/Chromium/SDK v0.43/deterministic-asset/package/checksum gates. Physical PS5, FW13.60, native DualSense coexistence and all hardware rows remain `NOT_RUN`; no radio, firmware or virtual-pad ABI change. The stable `v*` gate is unchanged.
+
 
 ## M1-263 — passive BLE / identity / platform research (2026-11-28)
 

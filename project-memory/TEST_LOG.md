@@ -1564,3 +1564,11 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Downloaded v1.5.2 ELF and sidecar: `shasum -c` OK; 2,099,840 bytes; SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`; embedded source/version and metadata checksum verified.
 - Host tests and sanitizer suite pass locally, including new policy serializer, toggle conflict/persistence and portal `hooks` route regressions.
 - Physical PS5/FW13.60, game-hook attach, rollback and rumble behavior: NOT_RUN.
+
+## 2026-11-28 — v1.6.0-experimental WebUI release
+
+- Source `731138df0a94a9e434d422a165d346d4b9f7684e`; push gates Host 46076463781, PS5 46076463853, secret scan 46076463783 and CI Actions smoke 46076463820 succeeded.
+- DEV workflow 46076758638 passed select-source, Host, ASan/UBSan, Chromium, deterministic assets, SDK v0.43/LLVM 18, package and checksum jobs; published `dev/v1.6.0-experimental` at 2026-11-27T22:30:24Z.
+- Seven assets, one ELF `SteamController-PS5-v1.6.0-experimental.elf`, 2,119,208 bytes, SHA-256 `588e415204cf023b7bfccf504f2857a3e1738cbddb2cee6c9f411b9c5a64a267`; downloaded ELF and sidecar matched.
+- Local normal and sanitizer suites passed before dispatch. Browser, SDK and package gates are CI-only here.
+- Physical PS5/FW13.60, native DualSense coexistence, hand-off/bridge policy behavior and all hardware rows: NOT_RUN.

@@ -1579,3 +1579,9 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - No code, build, radio, pairing, console, tag or release was created. Every hardware gate remains `NOT_RUN`.
 - Pushed the docs commit `74c7124`; Host 46072301189, PS5 46072300763 and secret scan 46072300781 succeeded. No tag or release was created.
 - Owner asked for the Puck-free option and a roadmap link. Added research section 1.1 (no ready safe/stable option; bridge is the only realistic path) and linked the full research title from README `Progress and roadmap → Research`.
+
+## 2026-11-28 — v1.6.0-experimental WebUI quality release
+
+- Ran four read-only WebUI audits (frontend, backend/HTTP, completeness, tests); found a load-gated save path that could clear activators, request fan-out against the four-client server, silent mutation failures, a broken sheet focus trap, dishonest policy-gated controls and thin mutation-endpoint tests.
+- Fixed the confident findings in `payload/web/index.html`, `payload/webui.c`, `payload/webui_route.c`, `payload/bridge_probe.*` and `payload/ds_handoff.c`; added a five-key route regression. Local normal and sanitizer suites passed.
+- Published `v1.6.0-experimental` from `731138d` by DEV workflow 46076758638; seven assets, ELF 2,119,208 bytes, SHA-256 588e4152…. Push gates Host 46076463781, PS5 46076463853, secret 46076463783 and Actions smoke 46076463820 succeeded. Physical gates remain NOT_RUN.

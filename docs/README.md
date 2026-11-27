@@ -1,9 +1,9 @@
 # Documentation
 
-Published **v1.5.2-experimental**: [loading and first-run tile](development/LOADING.md), [mechanism audit and fixes](development/MECHANISM_AUDIT_2026-11-27.md), [raw-HID contract and safety policy](development/RAW_HID_REPORT.md). The previous 1.0.0 receipt remains historical.
+Published **v1.6.0-experimental**: [loading and first-run tile](development/LOADING.md), [mechanism audit and fixes](development/MECHANISM_AUDIT_2026-11-27.md), [raw-HID contract and safety policy](development/RAW_HID_REPORT.md). The previous 1.0.0 receipt remains historical.
 
 
-Start with the [project overview](../README.md) and [current status](../project-memory/CURRENT_STATUS.md). Current published prerelease: [v1.5.2-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.2-experimental). [Loading](development/LOADING.md), [build](BUILDING.md), [tile](development/SETTINGS_TILE.md) and [VDA/storage checklist](development/VDA_PENDING.md) describe the current version. Dated reviews and archived specifications retain the versions and results they actually reviewed.
+Start with the [project overview](../README.md) and [current status](../project-memory/CURRENT_STATUS.md). Current published prerelease: [v1.6.0-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.0-experimental). [Loading](development/LOADING.md), [build](BUILDING.md), [tile](development/SETTINGS_TILE.md) and [VDA/storage checklist](development/VDA_PENDING.md) describe the current version. Dated reviews and archived specifications retain the versions and results they actually reviewed.
 
 | Area | Read |
 | --- | --- |

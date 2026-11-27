@@ -1,5 +1,18 @@
 # Issues and blockers — project register
 
+## 2026-11-28 — WebUI audit findings: fixed in v1.6.0-experimental
+
+Four read-only audits (frontend, backend/HTTP, completeness, tests) produced these fixes:
+
+- **WEBUI-01 FIXED:** the save bar is `inert`/hidden until a profile loads; Save refuses an empty draft, so an off-screen Enter can no longer clear activators.
+- **WEBUI-02 FIXED:** profile-lock, pause, log, hand-off, hook and recommended-settings failures are surfaced and the control reverts; the save/Undo/Discard state no longer lies after a failed list refresh.
+- **WEBUI-03 FIXED:** polling backs off to 1.2 s offline, stops while hidden, resumes immediately, and icon hydration is sequential instead of one request per game.
+- **WEBUI-04 FIXED:** the remap sheet keeps focus after re-renders, marks the background inert, restores focus on close, and the unload guard covers a staged draft.
+- **WEBUI-05 FIXED:** hand-off and bridge-probe controls disable and explain when their runtime-policy flags are off; `/api/dualsense` and `/api/bridge` expose availability.
+- **WEBUI-06 FIXED:** the five-key `/api/gamehooks` query is accepted; status JSON has headroom and finite gyro values; log/icon reads use `O_NOFOLLOW`.
+- **WEBUI-07 FIXED:** tab semantics/arrow navigation, game-list error/retry, settings-only import and malformed-hash tolerance.
+- **WEBUI-08 NOT_RUN:** browser mutation-endpoint coverage (pause/hooks/dualsense/log/mode), real concurrency and PS5 browser behavior still need tests/hardware. The audit findings remain in this session record.
+
 ## 2026-11-28 — BLE / identity / platform research findings
 
 Research report: [docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md](../docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md). No hardware was run.
