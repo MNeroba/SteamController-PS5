@@ -1554,3 +1554,5 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Release `dev/v1.5.0-experimental`: seven assets, one ELF, `SteamController-PS5-v1.5.0-experimental.elf`, 2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`; downloaded sidecar `shasum -c` OK; embedded source SHA and version found in the ELF; Payload Manager checksum matches.
 - Tags: `dev/v1.5.0-experimental` points to the selected source; the previous `dev/v1.0.0-experimental` tag/asset set is unchanged.
 - Physical PS5/FW13.60, native DualSense coexistence, game feedback, motion/haptics, tile visibility and rest/wake: NOT_RUN.
+
+- Publication receipt docs commit `c923653`; push gates on that commit: Host 46065131468, PS5 46065131405 and secret scan 46065131430 (Host result recorded separately in the session; secret scan and SDK succeeded at the time of writing).

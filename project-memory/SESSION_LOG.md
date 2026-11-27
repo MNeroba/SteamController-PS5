@@ -1559,3 +1559,5 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Dispatched DEV workflow 46064596992 for `v1.5.0-experimental`; select-source/validate-build/publish-prerelease succeeded and published seven assets with one ELF (2,096,232 bytes, SHA-256 49bbd70d…).
 - Downloaded and verified the sidecar, embedded source/version and metadata; updated README, LOADING, docs index, feature page, DEV receipt, changelog, provenance and project memory.
 - Verified issue #10 against its attached FW13.60 log and prepared the post-upgrade instructions; physical acceptance remains NOT_RUN.
+
+- Posted the issue #10 diagnosis and post-upgrade steps (including the opt-in game-feedback policy) at https://github.com/MNeroba/SteamController-PS5/issues/10#issuecomment-7227721020, and recorded the publication receipt in docs commit `c923653`.
