@@ -362,3 +362,11 @@ Owner selected no pairing code and PS5-only access, then requested automatic Med
 Exact-source push Host43702935960, SDK43702935974 and secret scan43702935930 succeeded. The release workflow repeated normal Host, ASan/UBSan, Chromium, deterministic assets, SDKv0.43/LLVM18, package/dependency and checksum gates. The earlier DEV workflow43702614078 was deliberately cancelled before creating a tag to correct misleading tile-status wording. Historical releases and the stable hardware gate remain unchanged.
 
 Downloaded assets and GitHub metadata are retained in output/dev9-published. Release digest is from the published Linux artifact and differs from local SDK builds. Next: controlled physical test with exact release SHA, console firmware/loader, native DualSense and USB/Puck status; do not claim compatibility or post to others without an explicit request. Previous dev.8 and earlier tags/assets are unchanged.
+
+## M1-263 — passive BLE / identity / platform research (2026-11-28)
+
+After v1.5.2, the owner requested research on passive native BLE, stable cross-transport identity and advanced platform integration. Five desk-research workstreams produced [docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md](../docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md).
+
+Verdicts: native passive BLE is **not available** on the public PS5 surface (HID-only `libSceBluetoothHid`, no SDK stub, raw HCI is active takeover); the Steam Controller 2026 BLE link **is** usable by external centrals (ESP32/Android/macOS, Just Works); identity continuity requires preserving the virtual-pad Add handle (design D: bounded neutral hold); motion/touch are publishable, while lightbar/LED/speaker/trigger resistance are not reachable through the virtual pad. The repo still decodes each frame twice and keeps transport logic inside a 530-line USB reader, so the first host-only step is a single-decode split.
+
+Plan phases: R1 host-only foundations (single decode, `transport_ops_t`, identity keep-alive, fake bridge); R2 external ESP32-S3 BLE-to-USB bridge; R3 separately approved console validation (passive inventory, identity handover, bridge); R4 active HCI not requested; R5 platform motion/touch/haptics. ADR-071 and ADR-072 record the identity and BLE decisions. No code, radio or hardware work was performed; all physical gates remain `NOT_RUN`.

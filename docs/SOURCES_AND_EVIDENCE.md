@@ -95,3 +95,16 @@ Actual Puck78460113/Omnib7682ef/Libre28a3bfe HEADs remain unchanged. LibrePad co
 ## M1-246 — 2026-10-16
 
 LibrePad main remains28a3bfefe19cbcdbacb94a9ba911cb01ebc6e0fc (connected API checked); virtual_controller.c:43/338/519–590/878–891 provides event correlation, ID-low32 and local MBus/native-read API references. The owner now explicitly accepts the analogous approach temporarily. Implemented independently in the existing registry/lifecycle with a bounded observer and conservative native gating. This supersedes the earlier no-correlation policy, not the evidence limitation: true Add/VDI/MBus ABI and physical coexistence remain HYPOTHESIS/NOT_RUN. No source establishes zero risk or exclusive attribution across unrelated payloads. See development/VDA_PENDING.md; no implementation or new asset copied.
+
+## 2026-11-28 — passive BLE / identity / platform research pins
+
+Desk research only; no console, radio or pairing operation. Full analysis and plan: [research/BLE_IDENTITY_PLATFORM_2026-11-28.md](research/BLE_IDENTITY_PLATFORM_2026-11-28.md).
+
+| ID | Source | Pin | Verified source observation | Limit |
+|---|---|---|---|---|
+| S13 | [inonomori/steamcontroller32](https://github.com/inonomori/steamcontroller32) (MIT) | `2b20075265d8c5736d64c5754583edb889726b8f` | ESP32-S3/NimBLE BLE-to-USB adapter for Steam Controller 2026: `100F6C32…` service, `7C`→0x47 / `7A`→0x45 input, `B5`→0x80 9-byte rumble, Just Works bonding, MTU 67. One-unit hardware validation 2026-11-15. | One controller/board; no touch/motion/back-paddle scope; not PS5 evidence. |
+| S14 | [mwdmwd/sc26re](https://github.com/mwdmwd/sc26re) (AGPL-3.0) | `89d4d00410774d34908038f2c34c327b4884e359` | CFW reproduction documents the stock GAP name `Steam Ctrl (BT) <id>`, PnP `28DE:1303`, and mutually exclusive BLE/ESB/USB personalities. | Behaviour reference only; AGPL code must not be copied into the GPL payload. |
+| S15 | [reo101/SteamlessLink](https://github.com/reo101/SteamlessLink) | `1e66096d41820baff6600c468d67dbba6f177ced` | Android GATT behaviour, same Valve service/characteristics, report-ID derivation. | Supersedes the earlier `85d7c4f` observation for this research; repository has no licence file, so do not copy code. |
+| B10 | [DNNDHH/PS5-3.20_Libs](https://github.com/DNNDHH/PS5-3.20_Libs/blob/main/libSceBluetoothHid.c) | `b2a77c09cd71c01f34c790cfbe98c751a13262ad` | 17 `libSceBluetoothHid` NIDs; no scan/connect/pair/GATT export. | Historical 3.20 stubs; 13.60 runtime unverified. |
+| B11 | [ps5-payload-sdk](https://github.com/ps5-payload-dev/sdk/tree/d9c9519116944a7f1c22d262012c53b80b3520b7) | `d9c9519116944a7f1c22d262012c53b80b3520b7` | No `libSceBluetoothHid` stub; no PS5 pad/BT header; only FreeBSD netgraph Bluetooth headers. | Headers do not prove kernel availability or privilege. |
+| B12 | [btstack-dev BLE keyboard report](https://groups.google.com/g/btstack-dev/c/N7oIyyh2Fi4) | thread 2025-03-09 | BLE-only Logitech Craft rejected with `CE-109524-1`; Classic HID worked. | Single external report; does not prove LE silicon absent. |

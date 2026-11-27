@@ -40,3 +40,10 @@ Do not copy the noncommercial-licensed BTstack into GPL distribution without com
 Create `docs/BLE_DECISION.md` with: `target`, `hardware`, `fw`, `source pins`, `system API evidence`, `device ownership`, `B0...B6 gate statuses`, `commands/log hashes`, `stock DualSense coexistence`, `risk`, `next safe step`. Each experiment enters `project-memory/TEST_LOG.md` and negative results remain visible.
 
 Target update M1-231/232: owner reports FW13.60, unmeasured. Earlier FW12.00 plans/results remain historical in project-memory logs; no new radio access or native BLE compatibility evidence exists.
+
+## 2026-11-28 research checkpoint
+
+The public-evidence portion of B0 is complete-negative; see [BLE_DECISION.md](BLE_DECISION.md#2026-11-28-research-update--b0-closed-negative-bridge-path-recommended) and the full [research report](research/BLE_IDENTITY_PLATFORM_2026-11-28.md). No B1–B6 gate was executed. Two clarifications for future readers:
+
+- A "passive" LE observer does not exist in the public PS5 surface. Even a scan is an HCI command; metadata-only probes (symbol resolution, `stat` of device nodes, USB descriptors) are the only zero-command steps, and they are still unmeasured on 13.60.
+- The controller's BLE link is not the unknown: independent ESP32/Android/macOS centrals connect with Just Works bonding. The open question is whether ProsperoOS offers any central/GATT access at all. The recommended wireless route is therefore an external BLE-to-USB bridge, not stock-radio takeover.

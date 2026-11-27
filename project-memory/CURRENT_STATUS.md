@@ -1,5 +1,20 @@
 # Current — 1.0.0 Experimental (2026-11-18)
 
+## M1-263 — passive BLE / identity / platform research (2026-11-28)
+
+Five desk-research workstreams produced [docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md](../docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md). No console, radio, pairing, USB or firmware experiment was run; every hardware row remains `NOT_RUN`.
+
+Findings:
+- **Native passive BLE is not available on the public surface.** `libSceBluetoothHid` is HID-device plumbing (17 exports, all keyed by an existing handle; `RegisterDevice(ushort,ushort)` cannot carry an address or keys). SDK v0.43 ships no Bluetooth stub/header. The only public native attempt (OmniPad `bt_hci_usb.c`) seizes `/dev/ugen` with raw HCI and is not built; that is active takeover. A retail PS5 rejected a BLE-only keyboard (`CE-109524-1`) while Classic HID worked. B0's public portion is complete-negative; B1–B6 remain unrun.
+- **The controller's BLE link is usable by non-Steam centrals.** ESP32-S3/NimBLE (`inonomori/steamcontroller32` @ `2b20075`, MIT), Android and macOS implementations connect with Just Works bonding, Valve service `100F6C32…`, `7C`→0x47 / `7A`→0x45 input and `B5`→0x80 rumble. The blocker is PS5-side BLE, not the controller.
+- **Identity is handle identity.** `scePadVirtualDeviceAddDevice` takes a 32-byte opaque block with no name/MAC/serial; today a slot is keyed by the ephemeral `/dev/ugen*` path, so a transport change deletes and re-adds the pad. Recommended design D: keep the handle for the logical controller, inject neutral frames while unbound, cap the hold, force release on logout/power/stop.
+- **Advanced features are partly reachable.** Motion and two touch contacts are already in the ABI but unpublished; haptics work with hook/haptic-audio limits; trigger effects are haptic only; lightbar, player LEDs, speaker audio and physical trigger resistance have no virtual-pad setter.
+- **Repo gap:** `usb_hid_thread()` is a 530-line function mixing discovery/stream/mapping/injection, and frames are decoded twice (`gc_main.c:1505`, `controller_sc2.c:375`). The first host-only PR should split decode from decision before any transport abstraction.
+
+Plan: Phase 1 host-only (single decode, `transport_ops_t`, identity keep-alive, fake bridge), Phase 2 external ESP32-S3 BLE-to-USB bridge, Phase 3 separately approved console validation of the passive inventory and identity handover, Phase 4 active HCI **not requested** (no positive evidence). Motion/touch publication is a parallel platform quick win.
+
+Next safe step: implement Phase 1 R1.1 (`sc2_handle_report` split) with host tests, or wait for owner direction on the bridge. Physical gates unchanged.
+
 ## M1-262 — v1.5.1 / v1.5.2 experimental published (2026-11-27)
 
 Current published source is **v1.5.2-experimental**: `ef6e2ae0af87b393a090ec477ddc6668cddbeeb7`, [release](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.2-experimental), [DEV workflow 46069613276](https://github.com/MNeroba/SteamController-PS5/actions/runs/46069613276), published 2026-11-27T21:23:12Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.2-experimental.elf`, 2,099,840 bytes, SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`; sidecar, embedded source/version and metadata verified. Push gates Host 46069328761, PS5 46069328676 and secret scan 46069328700 succeeded.

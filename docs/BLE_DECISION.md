@@ -42,3 +42,16 @@ Native PS5 BLE remains an evidence-gated research track and is not a release dep
 ## Risk and distribution boundary
 
 No firmware compatibility claim is made. Linux Bluetooth patches, Android GATT behavior, emulator stubs, and PS5 Bluetooth settings do not prove native PS5 LE Central/GATT. BTstack is reference-only because its current source terms have noncommercial restrictions and are not cleared for this GPL payload. Any later experiment must be logged in `project-memory/TEST_LOG.md`, with negative results preserved.
+
+## 2026-11-28 research update — B0 closed negative, bridge path recommended
+
+Desk research (five parallel workstreams, no console/radio experiment) is recorded in [research/BLE_IDENTITY_PLATFORM_2026-11-28.md](research/BLE_IDENTITY_PLATFORM_2026-11-28.md). It closes the public part of B0 with a negative result:
+
+- `libSceBluetoothHid` remains HID-device plumbing: 17 exports, all keyed by an existing handle/device ID, with no scan/connect/pair/bond/SMP/GATT verb. `RegisterDevice(ushort,ushort)` is a 4-byte ioctl and cannot carry a 48-bit address or pairing material. SDK v0.43 ships no `libSceBluetoothHid` stub or PS5 Bluetooth header.
+- The only public "native BLE" code (OmniPad `bt_host.c`/`bt_hci_usb.c`) seizes `/dev/ugen` with `O_RDWR` and sends raw HCI commands; it is not built into its release and is explicitly inactive. That is active radio ownership, not a passive path.
+- A BLE-only keyboard was rejected by a retail PS5 (`CE-109524-1`) while Classic HID worked; that test found no host-visible LE HID path.
+- The Steam Controller 2026 BLE link itself **is** usable by non-Steam centrals: ESP32-S3/NimBLE, Android and macOS implementations exist; Just Works bonding, `100F6C32…` service, `7C`→0x47 / `7A`→0x45 input and `B5`→0x80 rumble. The blocker is PS5-side BLE, not the controller.
+
+**Decision:** native passive BLE is not implementable on the public surface; B1–B6 remain `NOT_RUN` and no radio work is scheduled. Wireless is pursued through an **external BLE bridge** (Phase 2) that presents normal USB HID, with the payload's host-only transport/identity work (Phase 1) first. The full B0–B6 status table above is unchanged; B0's public portion is now complete-negative, while the 13.60 runtime probe (B1) still needs a separately approved console run. Active HCI takeover (Phase 4) is not requested and remains a hard stop.
+
+Cross-transport identity and platform findings are in the same report: the public AddDevice ABI exposes no caller-controlled identity, so continuity requires preserving the Add receipt/handle (recommended design D: bounded neutral keep-alive); motion/touch are publishable, while lightbar/LED/speaker/physical trigger resistance are not available through the virtual pad.

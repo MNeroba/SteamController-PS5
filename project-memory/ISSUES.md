@@ -1,5 +1,16 @@
 # Issues and blockers — project register
 
+## 2026-11-28 — BLE / identity / platform research findings
+
+Research report: [docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md](../docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md). No hardware was run.
+
+- **BLE-01 BLOCKED (public surface):** no passive native BLE Central exists in the public PS5 API. `libSceBluetoothHid` is HID-only, the SDK ships no stub/header, and the only raw-HCI code is an unbuilt active takeover. Do not schedule B2–B6 until B1 produces contrary evidence.
+- **BLE-02 HYPOTHESIS / needs console:** preserving one virtual pad across a transport change requires keeping the Add receipt handle and injecting neutral frames while unbound. Game pause/dialog behavior and the safe hold duration are unmeasured.
+- **BLE-03 UNVERIFIED:** an external ESP32-S3 bridge presenting a dedicated USB vendor HID interface has not been tested on a PS5; its VID/PID, driver binding, latency and rumble path are unknown.
+- **BLE-04 HOST_WORK_REQUIRED:** frames are decoded twice and the 530-line USB reader mixes transport with mapping. R1.1 (single decode) must land before any transport abstraction.
+- **BLE-05 NOT_RUN:** motion and two touch contacts exist in the repo-local `ScePadData` but are not published; lightbar/LED/speaker/resistance have no virtual-pad setter.
+- **BLE-06 ACTIVE GATE:** any HCI/radio experiment remains a hard stop requiring separate written approval, a sacrificial-console recovery plan and DualSense before/after observation. Not requested by this research.
+
 ## 2026-11-27 — mechanism audit findings: resolved in v1.5.0-experimental
 
 Full audit and evidence: [MECHANISM_AUDIT_2026-11-27](../docs/development/MECHANISM_AUDIT_2026-11-27.md). All host-fixable findings were implemented with regressions; hardware rows are unchanged.

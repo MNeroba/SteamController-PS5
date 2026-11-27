@@ -1568,3 +1568,12 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Implemented and published v1.5.1 (`d4b3a36`): 16 ms remote-setting poll, motor forwarding, stop-on-zero, hook-takeover handling and decoder tests.
 - Implemented and published v1.5.2 (`ef6e2ae`): Experimental game-hook checkbox, atomic policy persistence, direct-HID conflict refusal, worker start/stop with a dedicated stop flag, portal route and tests; ADR-070 documents the owner authorization.
 - Verified both releases and push gates; corrected README/LOADING/SECURITY/ARCHITECTURE and audit wording. Physical testing remains NOT_RUN.
+
+## 2026-11-28 — passive BLE / identity / platform research
+
+- Ran five parallel desk-research workstreams: PS5 Bluetooth surface, Steam Controller 2026 BLE protocol, cross-transport identity, platform feature reachability, and repo gap analysis. `web_search` returned provider HTTP 402, so every source was fetched from direct URLs / the GitHub REST API; this is a source review, not a literature sweep.
+- Confirmed no public GAP/GATT central export: `libSceBluetoothHid` is HID-only, SDK v0.43 has no Bluetooth stub/header, and OmniPad's raw-HCI code is unbuilt and inactive. Confirmed the controller's BLE link works with non-Steam centrals (ESP32-S3/NimBLE, Android, macOS; Just Works, `7C`/`7A` input, `B5` rumble).
+- Confirmed the virtual-pad ABI has no caller-controlled identity; recommended handle-preserving design D with a bounded neutral hold. Confirmed motion/touch are publishable while lightbar/LED/speaker/resistance are not.
+- Added `docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md` with verdict, evidence pins, phases R1–R5, interfaces, tests, risks and decisions requested.
+- Updated `docs/BLE_DECISION.md`, `docs/BLE_FEASIBILITY.md`, `docs/SOURCES_AND_EVIDENCE.md`, `docs/README.md`, `project-memory/CURRENT_STATUS.md`, `FINDINGS.md` (F102–F106), `ISSUES.md` (BLE-01–06), `DECISIONS.md` (ADR-071/072) and this log.
+- No code, build, radio, pairing, console, tag or release was created. Every hardware gate remains `NOT_RUN`.
