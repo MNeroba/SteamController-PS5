@@ -1578,3 +1578,4 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Updated `docs/BLE_DECISION.md`, `docs/BLE_FEASIBILITY.md`, `docs/SOURCES_AND_EVIDENCE.md`, `docs/README.md`, `project-memory/CURRENT_STATUS.md`, `FINDINGS.md` (F102–F106), `ISSUES.md` (BLE-01–06), `DECISIONS.md` (ADR-071/072) and this log.
 - No code, build, radio, pairing, console, tag or release was created. Every hardware gate remains `NOT_RUN`.
 - Pushed the docs commit `74c7124`; Host 46072301189, PS5 46072300763 and secret scan 46072300781 succeeded. No tag or release was created.
+- Owner asked for the Puck-free option and a roadmap link. Added research section 1.1 (no ready safe/stable option; bridge is the only realistic path) and linked the full research title from README `Progress and roadmap → Research`.

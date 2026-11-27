@@ -17,6 +17,20 @@
 
 **Bottom line:** "passive native BLE" is not implementable as worded. Wireless is still achievable without touching the stock radio by moving the BLE central into a **separate bridge** (ESP32-S3) that presents a normal USB HID device to the PS5. That path also gives the project something the native-radio path cannot: it keeps the console's Bluetooth stack, the stock DualSense and the existing USB architecture untouched.
 
+### 1.1 Wireless without the Puck or a cable
+
+"Is there a safe and stable way to connect the Steam Controller 2026 without the Puck or a cable?" — **not today.** There is no ready, hardware-verified option; the only realistic path is the external BLE-to-USB bridge, and its PS5 stability is still unproven.
+
+| Option | Console safety | Stability | Status |
+|---|---|---|---|
+| Native PS5 BLE (payload owns the radio) | Low — HCI takeover can drop the stock DualSense | Unknown; no public central API | **Rejected** (see 2.1) |
+| Generic USB Bluetooth dongle | — | — | No generic path: the PS5 exposes no Bluetooth host stack to the payload, and a dongle would still have to emulate an approved USB gamepad |
+| **External BLE-to-USB bridge (ESP32-S3)** | **High** — no radio operation on the PS5; ordinary USB HID | Controller link and rumble proven externally; PS5 binding, latency and hot-unplug **unproven** | **Only recommended path** (Phase 2) |
+| Custom ESB receiver dongle (OpenPuck-style) | Medium — different radio personality, pairing workflow | Unproven without Steam; more reverse engineering | Not planned |
+| Phone/PC network bridge | Medium — needs a third device and authentication | Poor for gameplay latency | Not planned |
+
+Two usability facts belong with the answer: BLE, ESB (Puck) and USB are **mutually exclusive controller personalities**, so switching to BLE drops the Puck link and returning requires re-pairing; and a bridge is still a dongle, just one the project controls. For a user who wants no Puck and no cable *and* no dongle, the honest answer is that the stock PS5 cannot do it. Keep the Puck for now; if an external bridge is acceptable, Phase 2 is the path, and Phase 1 can start immediately without hardware.
+
 ## 2. Evidence
 
 ### 2.1 PS5 Bluetooth surface (native, stock radio)
