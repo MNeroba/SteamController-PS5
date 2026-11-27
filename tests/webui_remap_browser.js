@@ -156,11 +156,11 @@ async (page) => {
     const front=Object.fromEntries(SHAPES.dual.front.shapes.map(s=>[s.id,s]));
     const back=Object.fromEntries(SHAPES.dual.back.shapes.map(s=>[s.id,s]));
     const cy=s=>s.pts.reduce((n,p)=>n+p[1],0)/s.pts.length;
-    return {frontL1:front.l1.cy,frontL2:front.l2.cy,frontR1:front.r1.cy,frontR2:front.r2.cy,
+    return {frontShoulders:[!!front.l1,!!front.r1,!!front.l2,!!front.r2],
       tri:[front.tri.cx,front.tri.cy],circle:[front.ci.cx,front.ci.cy],
       backL1:cy(back.l1),backL2:cy(back.l2),backR1:cy(back.r1),backR2:cy(back.r2)};
   });
-  check(calibrated.frontL1<calibrated.frontL2&&calibrated.frontR1<calibrated.frontR2,'front L1/R1 target upper bumper buttons');
+  check(calibrated.frontShoulders.every(v=>!v),'shoulder hotspots are not drawn on the front view');
   check(calibrated.backL1<calibrated.backL2&&calibrated.backR1<calibrated.backR2,'back L1/R1 target upper bumper buttons');
   check(calibrated.tri[0]===994&&calibrated.tri[1]===360&&calibrated.circle[0]===1078&&calibrated.circle[1]===440,'face-button overlays centered on source artwork');
   const decoded = await page.evaluate(async () => {

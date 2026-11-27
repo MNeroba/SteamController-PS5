@@ -249,78 +249,6 @@
           "h": 75,
           "rx": 37,
           "rot": 0
-        },
-        {
-          "id": "l1",
-          "name": "L1 (левый бампер)",
-          "desc": "Виден сверху корпуса; подробнее — на виде сзади",
-          "t": "p",
-          "pts": [
-            [
-              508,
-              242
-            ],
-            [
-              531,
-              197
-            ],
-            [
-              633,
-              157
-            ],
-            [
-              780,
-              152
-            ],
-            [
-              797,
-              180
-            ],
-            [
-              678,
-              220
-            ],
-            [
-              588,
-              271
-            ]
-          ]
-        },
-        {
-          "id": "r1",
-          "name": "R1 (правый бампер)",
-          "desc": "Виден сверху корпуса; подробнее — на виде сзади",
-          "t": "p",
-          "pts": [
-            [
-              2060,
-              242
-            ],
-            [
-              2037,
-              197
-            ],
-            [
-              1935,
-              157
-            ],
-            [
-              1788,
-              152
-            ],
-            [
-              1771,
-              180
-            ],
-            [
-              1890,
-              220
-            ],
-            [
-              1981,
-              271
-            ]
-          ]
         }
       ],
       "asset": "steam-front.webp"
@@ -771,50 +699,6 @@
           "h": 20,
           "rx": 10,
           "rot": 0
-        },
-        {
-          "id": "l1",
-          "name": "L1 (left bumper)",
-          "desc": "Visible from the front; more detail in back view",
-          "t": "e",
-          "cx": 262,
-          "cy": 262,
-          "rx": 80,
-          "ry": 20,
-          "rot": -5
-        },
-        {
-          "id": "r1",
-          "name": "R1 (right bumper)",
-          "desc": "Visible from the front; more detail in back view",
-          "t": "e",
-          "cx": 990,
-          "cy": 262,
-          "rx": 80,
-          "ry": 20,
-          "rot": 5
-        },
-        {
-          "id": "l2",
-          "name": "L2 (left trigger)",
-          "desc": "Visible from the front; more detail in back view",
-          "t": "e",
-          "cx": 260,
-          "cy": 302,
-          "rx": 72,
-          "ry": 16,
-          "rot": -4
-        },
-        {
-          "id": "r2",
-          "name": "R2 (right trigger)",
-          "desc": "Visible from the front; more detail in back view",
-          "t": "e",
-          "cx": 994,
-          "cy": 302,
-          "rx": 72,
-          "ry": 16,
-          "rot": 4
         }
       ],
       "asset": "dual-front.webp"
