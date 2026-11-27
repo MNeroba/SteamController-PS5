@@ -237,6 +237,18 @@ int main(void) {
     CHECK(replenished_reports == 4); /* Old-generation pulse was discarded. */
     sc2_haptic_session_abandon(session_b);
 
+    /* DS4-style remote setting: large motor byte 3, small motor byte 4. */
+    uint8_t remote[8] = {0};
+    uint16_t remote_left = 0, remote_right = 0;
+    remote[3] = 200; remote[4] = 50;
+    CHECK(sc2_haptic_remote_values(remote, sizeof(remote), &remote_left,
+                                   &remote_right) == 0);
+    CHECK(remote_left == (uint16_t)(200u << 8) &&
+          remote_right == (uint16_t)(50u << 8));
+    CHECK(sc2_haptic_remote_values(remote, 4, &remote_left, &remote_right) == -1);
+    CHECK(sc2_haptic_remote_values(NULL, sizeof(remote), &remote_left,
+                                   &remote_right) == -1);
+
     printf("sc2 haptic queue: %d checks passed, 4,000 concurrent service reports\n", checks);
     return 0;
 }

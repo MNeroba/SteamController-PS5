@@ -2,6 +2,20 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
 
+## v1.5.1-experimental
+
+Experimental follow-up to 1.5.0. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.
+
+### Bug Fixes
+
+- The payload now reads classic DualShock-4-style rumble back from the owned virtual pad with `scePadVirtualDeviceGetRemoteSetting` (large motor at byte 3, small motor at byte 4, polled every 16 ms) and forwards it to the Steam Controller when game hooks are not active. PS4 games fill these fields; PS5-native haptics are converted to DualSense haptic audio inside the system and leave them at zero, so this does not replace the opt-in game hooks for PS5 games. The previous "no reverse channel" statement was too broad and is corrected in the docs.
+- Rumble from this path stops when the motors return to zero, when the virtual pad is detached, when game hooks take over, and at session teardown.
+
+### New Features / Improvements
+
+- Version `v1.5.1-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
+- Corrected README, LOADING and ARCHITECTURE feedback descriptions and added the octet/padbridge reference for the remote-setting ABI facts.
+
 ## v1.5.0-experimental
 
 Source-release candidate for the mechanism-audit fixes. Not a stable release and not a hardware claim: physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.

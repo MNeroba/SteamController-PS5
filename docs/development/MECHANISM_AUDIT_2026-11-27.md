@@ -39,7 +39,7 @@ Evidence labels: `VERIFIED_CODE` (source read here), `VERIFIED_HOST_TEST` (execu
 | ID | Resolution |
 | --- | --- |
 | AUD-01 | FIXED: NID-first resolution for initialize/terminate/install, retry-safe probe, success-with-warning, atomic `.partial` first install and crash recovery; host tests cover NID-only and fallback paths. |
-| AUD-02 | DOCUMENTED (design limit): README/LOADING/ARCHITECTURE and the WebUI now state that in-game feedback requires `ENABLE_GAME_HOOKS=1`; no safe reverse channel exists for a plain virtual DualSense. |
+| AUD-02 | PARTIALLY FIXED (v1.5.1): classic PS4-style rumble is now read from `scePadVirtualDeviceGetRemoteSetting` and forwarded without hooks; PS5-native haptics still require `ENABLE_GAME_HOOKS=1`, and the docs/WebUI state this precisely. |
 | AUD-03 | FIXED: a skipped pre-Add creation aborts the reservation without the lifetime latch; host regression covers retry in the same session. |
 | AUD-04 | FIXED: any retired endpoint restarts the owned session; the portal exposes dropped pulses. |
 | AUD-05 | FIXED: stale private temp recovery plus directory fsync, with symlink/foreign-file refusal regressions. |
@@ -77,9 +77,12 @@ FW 13.60, published `v1.0.0-experimental` ELF, Puck and USB-C both affected, GTA
 | `tile: automatic first-run registration failed: Required tile installer API unavailable; ... cleanup failed` (10) | Reproduces AUD-01 exactly; fixed in v1.5 by NID resolution and retry-safe installer. |
 
 **Conclusion (VERIFIED against the attached log, EXTERNAL_HARDWARE for the release):** controller
-haptics are functional, but in-game vibration cannot work on the default policy because the virtual
-DualSense has no reverse feedback channel and `ENABLE_GAME_HOOKS` is 0. The issue is therefore a
-documentation/expectation defect plus a missing supported feedback path, not a broken haptic transport.
+haptics are functional, but the PS5-native GTA VI haptics cannot reach the default payload path:
+`ENABLE_GAME_HOOKS` was 0 and PS5 haptics are converted to DualSense haptic audio rather than exposed
+as virtual-pad motor values. The issue is a documentation/expectation defect plus a missing feedback
+path for PS5 haptics, not a broken haptic transport. A later comparison with the GPL-3.0 `octet`
+project found that the virtual pad does expose classic DS4-style remote settings (motors at bytes 3/4);
+v1.5.1 now polls them for PS4-style rumble, while confirming that PS5 games leave those values at zero.
 v1.5 documents the requirement, surfaces it in the WebUI, logs the disabled state at startup, and fixes
 the independent tile/installer defects visible in the same log.
 

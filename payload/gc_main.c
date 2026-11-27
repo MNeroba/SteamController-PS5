@@ -141,6 +141,7 @@ extern int32_t scePadSetProcessPrivilege(int32_t privilege);
 extern int32_t scePadVirtualDeviceAddDevice(void *param, int32_t deviceType);
 extern int32_t scePadVirtualDeviceDeleteDevice(int32_t handle);
 extern int32_t scePadVirtualDeviceInsertData(int32_t handle, const void *padData);
+extern int32_t scePadVirtualDeviceGetRemoteSetting(int32_t handle, void *setting);
 extern int32_t sceKernelSendNotificationRequest(int unk0, void *req, size_t size, int unk1);
 
 #define VIRTUAL_DEVICE_TYPE_DUALSENSE 3
@@ -309,6 +310,8 @@ typedef struct {
     slot_recovery_t recovery;
     uint64_t last_vda_attempt_ms;
     int vda_skipped_logged;
+    uint64_t remote_next_ms;
+    int remote_active;
 } usb_session_state_t;
 
 static int slot_virtual_ready(slot_registry_token_t token) {
@@ -440,6 +443,44 @@ static void inject_pad(slot_registry_token_t token, int slot,
         gp_log("slot[%d] VDI #%u ret=0x%08x\n", slot, n, (uint32_t)vr);
     if (vr != 0 && gc_diag_once_claim(&g_vdi_error_log))
         gp_log("VDI error 0x%08x direct-hid=%d errno=%d\n", (uint32_t)vr,g_runtime_policy.enable_direct_hid,g_runtime_policy.enable_direct_hid?errno:0);
+}
+
+/* PS4-style feedback read back from the owned virtual pad. PS5-native
+ * haptics are converted to DualSense haptic audio and leave the motors at 0,
+ * so this only restores classic vibration; game hooks remain the only path
+ * for PS5 haptics. Hooks own the rumble state while their worker is active. */
+static void poll_remote_rumble(slot_registry_token_t token,
+                               usb_session_state_t *session, int slot) {
+    (void)slot;
+    if (!session) return;
+    if (game_hooks_worker_active()) {
+        if (session->remote_active) {
+            sc2_haptic_rumble_set(0, 0);
+            session->remote_active = 0;
+        }
+        return;
+    }
+    slot_registry_entry_t entry;
+    if (slot_registry_snapshot(&g_slots, token, &entry) != SLOT_REGISTRY_OK ||
+        !entry.virtual_ready || entry.virtual_handle <= 0)
+        return;
+    uint64_t now = 0;
+    if (monotonic_ms(&now) != 0) return;
+    if (session->remote_next_ms && now < session->remote_next_ms) return;
+    session->remote_next_ms = now + 16;
+    uint8_t setting[256];
+    if (scePadVirtualDeviceGetRemoteSetting(entry.virtual_handle, setting) != 0)
+        return;
+    uint16_t left = 0, right = 0;
+    if (sc2_haptic_remote_values(setting, sizeof(setting), &left, &right) != 0)
+        return;
+    if (left || right) {
+        sc2_haptic_rumble_set(left, right);
+        session->remote_active = 1;
+    } else if (session->remote_active) {
+        sc2_haptic_rumble_set(0, 0);
+        session->remote_active = 0;
+    }
 }
 
 static int neutralize_vda_handle(int32_t handle) {
@@ -1397,6 +1438,8 @@ main_loop: ;
     usb_input_watchdog_init(&input_watchdog, (uint64_t)input_now.tv_sec * 1000u + (uint64_t)input_now.tv_nsec / 1000000u);
     while (!runtime_is_stopping() && !power_session_paused(&g_power)) {
         pending_vda_poll(sc2_link && !sc2_parked && !game_hooks_input_active());
+        if (sc2_link && !sc2_parked && !sc2_pause_is_active())
+            poll_remote_rumble(slot_token, &session, slot);
         if (clock_gettime(CLOCK_MONOTONIC, &input_now) != 0) goto reinit;
         uint64_t loop_ms = (uint64_t)input_now.tv_sec * 1000u +
                            (uint64_t)input_now.tv_nsec / 1000000u;
@@ -1644,6 +1687,7 @@ exit_slot:
     diagnostics_usb_snapshot(slot_token,&usb_resources,watchdog_expired);
     /* Clear shared Steam state only while this generation still owns it.
      * An idle scanner must never neutralize another active controller. */
+    session.remote_active = 0;
     if (owns_session && sc2_haptic_session_is_owner(slot_token)) {
         game_hooks_feed(NULL, 0);
         sc2_status_set_input(0, 0); sc2_status_set_haptics(0, -1);

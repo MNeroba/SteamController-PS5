@@ -53,7 +53,7 @@ The listener binds IPv4 loopback, checks literal loopback Host and browser Origi
 
 ## Safe defaults and in-game feedback
 
-Bridge probing, game hooks and DualSense handoff remain disabled. In-game vibration and trigger effects therefore do not reach the Steam Controller: the virtual DualSense is write-only, and the optional `ENABLE_GAME_HOOKS=1` policy plus the WebUI "In games" switches are the only shipped feedback path. Manual haptics from the WebUI test can work while a game is silent. USB scanning is restricted to known Steam Controller identities. `ENABLE_WEBUI=0` in the protected runtime policy disables WebUI startup and its automatic tile attempt. Existing profiles remain under `/data/ghostpad/profiles/`; a corrupt Default profile can be explicitly recovered with a backup.
+Bridge probing, game hooks and DualSense handoff remain disabled. Classic PS4-style rumble is read back from the virtual pad's remote setting and forwarded automatically (v1.5.1). PS5-native vibration and trigger effects are converted by the system into DualSense haptic audio and never appear as motor values, so they reach the Steam Controller only with the optional `ENABLE_GAME_HOOKS=1` policy plus the WebUI "In games" switches. Manual haptics from the WebUI test can work while a PS5 game is silent. USB scanning is restricted to known Steam Controller identities. `ENABLE_WEBUI=0` in the protected runtime policy disables WebUI startup and its automatic tile attempt. Existing profiles remain under `/data/ghostpad/profiles/`; a corrupt Default profile can be explicitly recovered with a backup.
 
 ## Stop, recover and report
 

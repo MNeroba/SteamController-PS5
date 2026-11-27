@@ -30,6 +30,13 @@ void sc2_haptic_session_abandon(slot_registry_token_t owner);
 #define SC2_HAP_MAX_OUT 6
 /* eps[1] = own interface's interrupt OUT (when out_opened);
  * eps[2 .. 2+n_extra-1] = other interfaces' OUTs (broadcast test, method 4). */
+/* Decode the DualShock-4-style remote setting returned by
+ * scePadVirtualDeviceGetRemoteSetting: [3] large motor, [4] small motor.
+ * PS4 games fill these; PS5-native haptics are delivered as DualSense haptic
+ * audio and leave them at zero. Returns 0 on a readable buffer. */
+int sc2_haptic_remote_values(const uint8_t *setting, size_t length,
+                             uint16_t *left, uint16_t *right);
+
 void sc2_haptic_service(slot_registry_token_t owner,
                         usb_resources_t *resources,
                         const usb_session_ops_t *ops,

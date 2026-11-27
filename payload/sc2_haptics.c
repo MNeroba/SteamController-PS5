@@ -237,6 +237,14 @@ int sc2_haptic_session_release(slot_registry_token_t owner,
                        (uint8_t)n) == 0;
 }
 
+int sc2_haptic_remote_values(const uint8_t *setting, size_t length,
+                             uint16_t *left, uint16_t *right) {
+    if (!setting || length < 5 || !left || !right) return -1;
+    *left = (uint16_t)setting[3] << 8;
+    *right = (uint16_t)setting[4] << 8;
+    return 0;
+}
+
 void sc2_haptic_service(slot_registry_token_t owner,
                         usb_resources_t *resources,
                         const usb_session_ops_t *ops,
