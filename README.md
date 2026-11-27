@@ -122,7 +122,7 @@ Transport owns I/O; the Steam decoder owns device details; mapping is independen
 - **Delivered:** audited foundation, host runtime hardening, reusable protocol/session/slot modules, mapping/profiles, embedded WebUI, the experimental release line through **1.0.0 Experimental**, and the published **v1.5.x-experimental** reliability fixes (tile NID install, VDA/haptics/profile/shutdown recovery, inline diagnostics, CI hardening, PS4 rumble and the experimental game-hook checkbox).
 - **Next:** controlled physical testing of v1.5 on FW 13.60 — USB-C/Puck, native DualSense coexistence, user recovery, game input, the opt-in game-feedback path, motion/touch, storage and shutdown.
 - **Stable release:** blocked until the required hardware evidence matches the tested source. A passing SDK build does not establish firmware compatibility.
-- **Research:** passive native BLE feasibility, stable cross-transport identity and advanced platform integration. Active stock-radio experiments require separate approval.
+- **Research:** passive native BLE feasibility, stable cross-transport identity and advanced platform integration. Active stock-radio experiments require separate approval. The 2026-11-28 [research plan](docs/research/BLE_IDENTITY_PLATFORM_2026-11-28.md) finds no public passive native BLE path and proposes an external BLE-to-USB bridge plus handle-preserving identity; active stock-radio work remains a separate approval gate.
 
 [Current status](project-memory/CURRENT_STATUS.md) · [Documentation index](docs/README.md) · [Changelog](CHANGELOG.md)
 

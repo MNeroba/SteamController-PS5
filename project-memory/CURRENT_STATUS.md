@@ -15,6 +15,8 @@ Plan: Phase 1 host-only (single decode, `transport_ops_t`, identity keep-alive, 
 
 Next safe step: implement Phase 1 R1.1 (`sc2_handle_report` split) with host tests, or wait for owner direction on the bridge. Physical gates unchanged.
 
+Research documentation is pushed as `74c7124`; exact-source gates Host 46072301189, PS5 46072300763 and secret scan 46072300781 succeeded. This is documentation evidence only — no code or hardware gate changed.
+
 ## M1-262 — v1.5.1 / v1.5.2 experimental published (2026-11-27)
 
 Current published source is **v1.5.2-experimental**: `ef6e2ae0af87b393a090ec477ddc6668cddbeeb7`, [release](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.2-experimental), [DEV workflow 46069613276](https://github.com/MNeroba/SteamController-PS5/actions/runs/46069613276), published 2026-11-27T21:23:12Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.2-experimental.elf`, 2,099,840 bytes, SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`; sidecar, embedded source/version and metadata verified. Push gates Host 46069328761, PS5 46069328676 and secret scan 46069328700 succeeded.
