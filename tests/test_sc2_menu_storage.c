@@ -43,11 +43,12 @@ static void capture_notification(const char *message) {
     snprintf(notification, sizeof(notification), "%s", message);
 }
 
-void sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count) {
+int sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count) {
     (void)pad; (void)on_us; (void)off_us; (void)count;
+    return 0;
 }
 
-void sc2_haptic_tick(void) {}
+int sc2_haptic_tick(void) { return 0; }
 
 void sc2_menu_test_do_remap(int from, int to);
 

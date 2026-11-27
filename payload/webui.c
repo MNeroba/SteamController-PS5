@@ -77,24 +77,40 @@ static int webui_stopping(void) {
 static void send_response_chunks(int fd, const webui_http_chunk_t *chunks,
                                  size_t chunk_count);
 
+static _Thread_local int g_head_response;
+static _Thread_local const char *g_allow_methods;
 static void reply(int fd, int code, const char *type, const char *body, size_t n) {
-    char h[512];
-    const char *reason = code == 200 ? "OK" : code == 401 ? "Unauthorized" :
+    char h[640];
+    const char *reason = code == 200 ? "OK" : code == 204 ? "No Content" :
+                         code == 401 ? "Unauthorized" :
                          code == 403 ? "Forbidden" :
                          code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" :
                          code == 413 ? "Payload Too Large" :
                          code == 408 ? "Request Timeout" :
                          code == 500 ? "Internal Server Error" : "Bad Request";
-    int hl = snprintf(h, sizeof(h),
+    int used = snprintf(h, sizeof(h),
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n"
         "Cache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n"
-        "X-Frame-Options: DENY\r\nContent-Security-Policy: frame-ancestors 'none'\r\n"
-        "%sConnection: close\r\n\r\n",
-        code, reason, type, n,
-        code == 401 ? "WWW-Authenticate: Bearer realm=\"SteamController-PS5\"\r\n" : "");
-    if (hl < 0 || (size_t)hl >= sizeof(h)) return;
-    webui_http_chunk_t chunks[] = {{h, (size_t)hl}, {body, n}};
-    send_response_chunks(fd, chunks, sizeof(chunks) / sizeof(chunks[0]));
+        "X-Frame-Options: DENY\r\nContent-Security-Policy: frame-ancestors 'none'\r\n",
+        code, reason, type, n);
+    if (used < 0 || (size_t)used >= sizeof(h)) return;
+    if (code == 401) {
+        int add = snprintf(h + used, sizeof(h) - (size_t)used,
+                           "WWW-Authenticate: Bearer realm=\"SteamController-PS5\"\r\n");
+        if (add < 0 || (size_t)(used + add) >= sizeof(h)) return;
+        used += add;
+    }
+    if (g_allow_methods) {
+        int add = snprintf(h + used, sizeof(h) - (size_t)used,
+                           "Allow: %s\r\n", g_allow_methods);
+        if (add < 0 || (size_t)(used + add) >= sizeof(h)) return;
+        used += add;
+    }
+    int add = snprintf(h + used, sizeof(h) - (size_t)used, "Connection: close\r\n\r\n");
+    if (add < 0 || (size_t)(used + add) >= sizeof(h)) return;
+    used += add;
+    webui_http_chunk_t chunks[] = {{h, (size_t)used}, {body, n}};
+    send_response_chunks(fd, chunks, g_head_response ? 1 : 2);
 }
 #define REPLY_TXT(fd, code, s) reply(fd, code, "text/plain", s, strlen(s))
 
@@ -217,6 +233,35 @@ static int admit_request(void *context, const webui_http_request_t *request) {
 static int patch_profile(sc2_profile_t *p, void *text) {
     return sc2_profile_parse_checked(text,p,0);
 }
+static int route_is_read_only(webui_route_id_t id, int is_post) {
+    if (is_post) return 0;
+    switch (id) {
+        case WEBUI_ROUTE_INDEX:
+        case WEBUI_ROUTE_STATUS:
+        case WEBUI_ROUTE_ICON:
+        case WEBUI_ROUTE_PROFILES:
+        case WEBUI_ROUTE_PROFILE:
+        case WEBUI_ROUTE_GAMES:
+        case WEBUI_ROUTE_GAMEHOOKS:
+        case WEBUI_ROUTE_DUALSENSE:
+        case WEBUI_ROUTE_BRIDGE:
+        case WEBUI_ROUTE_LOG:
+        case WEBUI_ROUTE_DIAGNOSTICS:
+            return 1;
+        default:
+            return 0;
+    }
+}
+
+static const char *route_allow(webui_route_id_t id) {
+    int get = webui_route_method_allowed(id, 0);
+    int post = webui_route_method_allowed(id, 1);
+    if (get && post) return "GET, POST, HEAD, OPTIONS";
+    if (get) return "GET, HEAD, OPTIONS";
+    if (post) return "POST, OPTIONS";
+    return "OPTIONS";
+}
+
 static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body,
                      webui_route_request_t route) {
     webui_http_request_t request = *request_ptr;
@@ -226,8 +271,17 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     if (route.id == WEBUI_ROUTE_NOT_FOUND) {
         REPLY_TXT(fd, 404, "not found"); return;
     }
+    if (strcmp(request.method, "OPTIONS") == 0) {
+        g_allow_methods = route_allow(route.id);
+        reply(fd, 204, "text/plain", "", 0);
+        g_allow_methods = NULL;
+        return;
+    }
     if (!webui_route_method_allowed(route.id, is_post)) {
-        REPLY_TXT(fd, 405, "method not allowed"); return;
+        g_allow_methods = route_allow(route.id);
+        REPLY_TXT(fd, 405, "method not allowed");
+        g_allow_methods = NULL;
+        return;
     }
     if (!is_post && strchr(path, '?') &&
         (route.id == WEBUI_ROUTE_GAMEHOOKS || route.id == WEBUI_ROUTE_DUALSENSE ||
@@ -259,7 +313,7 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
             "X-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n",length,DIAGNOSTICS_FILENAME);
         if(n>0&&(size_t)n<sizeof(header)) {
             webui_http_chunk_t chunks[]={{header,(size_t)n},{report,(size_t)length}};
-            send_response_chunks(fd,chunks,2);
+            send_response_chunks(fd,chunks,g_head_response ? 1 : 2);
         }
         free(report);return;
     }
@@ -340,7 +394,7 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
             "Cache-Control: max-age=86400\r\nX-Content-Type-Options: nosniff\r\nConnection: close\r\n\r\n", n);
         if (hl < 0 || (size_t)hl >= sizeof(h)) { free(img); return; }
         webui_http_chunk_t chunks[] = {{h, (size_t)hl}, {img, n}};
-        send_response_chunks(fd, chunks, sizeof(chunks) / sizeof(chunks[0]));
+        send_response_chunks(fd, chunks, g_head_response ? 1 : (sizeof(chunks) / sizeof(chunks[0])));
         free(img);
         return;
     }
@@ -357,9 +411,14 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         }
         if (!haptics_available) { REPLY_TXT(fd, 400, "Steam Controller isn't connected to the payload"); return; }
         if (has_via == 1) sc2_status_set_haptic_method(via[0] - '0');
-        if      (has_kind == 1 && !strcmp(kind, "left"))   sc2_haptic_pulse(SC2_PAD_LEFT,  0x1F4, 0x1F4, 200);
-        else if (has_kind == 1 && !strcmp(kind, "right"))  sc2_haptic_pulse(SC2_PAD_RIGHT, 0x1F4, 0x1F4, 200);
-        else if (has_kind == 1 && !strcmp(kind, "rumble")) sc2_haptic_rumble_for(0x9000, 0x6000, 700);
+        int queued = -1;
+        if      (!strcmp(kind, "left"))   queued = sc2_haptic_pulse(SC2_PAD_LEFT,  0x1F4, 0x1F4, 200);
+        else if (!strcmp(kind, "right"))  queued = sc2_haptic_pulse(SC2_PAD_RIGHT, 0x1F4, 0x1F4, 200);
+        else if (!strcmp(kind, "rumble")) queued = sc2_haptic_rumble_for(0x9000, 0x6000, 700);
+        if (queued != 0) {
+            REPLY_TXT(fd, 503, "Haptic queue is full or the controller is not ready; try again");
+            return;
+        }
         REPLY_TXT(fd, 200, "queued");
         return;
     }
@@ -373,7 +432,9 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         return;
     }
     if (route.id == WEBUI_ROUTE_RECOVER_DEFAULT) {
-        if (sc2_store_recover_default()!=0) { REPLY_TXT(fd,400,"Default recovery failed or profile is already valid");return; }
+        int recovered = sc2_store_recover_default();
+        if (recovered == 1) { REPLY_TXT(fd,409,"Default profile is already valid"); return; }
+        if (recovered != 0) { REPLY_TXT(fd,500,"Default recovery failed"); return; }
         sc2_select_reload();REPLY_TXT(fd,200,"Default backed up and reset");return;
     }
     if (route.id == WEBUI_ROUTE_PROFILE) {
@@ -399,7 +460,10 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         return;
     }
     if (route.id == WEBUI_ROUTE_DELETE) {
-        if (get_id(&route, id) != 1 || sc2_store_delete(id) != 0) { REPLY_TXT(fd, 400, "cannot delete"); return; }
+        if (get_id(&route, id) != 1) { REPLY_TXT(fd, 400, "bad id"); return; }
+        if (!strcmp(id, "default")) { REPLY_TXT(fd, 409, "the default profile cannot be deleted"); return; }
+        if (!sc2_store_exists(id)) { REPLY_TXT(fd, 404, "profile not found"); return; }
+        if (sc2_store_delete(id) != 0) { REPLY_TXT(fd, 500, "profile delete failed"); return; }
         sc2_select_reload();
         REPLY_TXT(fd, 200, "deleted");
         return;
@@ -555,9 +619,16 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
             else fseek(f, 0, SEEK_SET);
             n = fread(out, 1, sizeof(out) - 1, f);
             fclose(f);
+            out[n] = 0;
         }
         if (!n) { REPLY_TXT(fd, 200, "Log is empty."); return; }
-        reply(fd, 200, "text/plain; charset=utf-8", out, n);
+        size_t clean_capacity = sizeof(out) * 4;
+        char *clean = malloc(clean_capacity);
+        if (!clean) { REPLY_TXT(fd, 500, "log filter allocation failed"); return; }
+        size_t clean_length = diagnostics_sanitize_text(out, clean, clean_capacity);
+        if (!clean_length) { free(clean); REPLY_TXT(fd, 200, "Log is empty."); return; }
+        reply(fd, 200, "text/plain; charset=utf-8", clean, clean_length);
+        free(clean);
         return;
     }
     REPLY_TXT(fd, 404, "not found");
@@ -582,10 +653,16 @@ static void handle(int fd) {
     if (webui_route_parse(request.target, &route) != 0) {
         REPLY_TXT(fd, 400, "malformed route"); return;
     }
-    if (route.id == WEBUI_ROUTE_INDEX) { dispatch(fd, &request, body, route); return; }
-    pthread_mutex_lock(&g_dispatch_lock);
-    if (!webui_stopping()) dispatch(fd, &request, body, route);
-    pthread_mutex_unlock(&g_dispatch_lock);
+    int is_post = strcmp(request.method, "POST") == 0;
+    g_head_response = strcmp(request.method, "HEAD") == 0;
+    if (route.id == WEBUI_ROUTE_INDEX || route_is_read_only(route.id, is_post)) {
+        if (!webui_stopping()) dispatch(fd, &request, body, route);
+    } else {
+        pthread_mutex_lock(&g_dispatch_lock);
+        if (!webui_stopping()) dispatch(fd, &request, body, route);
+        pthread_mutex_unlock(&g_dispatch_lock);
+    }
+    g_head_response = 0;
 }
 
 static void *client_thread(void *arg) {

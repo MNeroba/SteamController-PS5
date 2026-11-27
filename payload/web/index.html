@@ -360,6 +360,8 @@ dialog.profile-guard::backdrop{background:#0009}
       <label class="field"><span>Use</span><select id="mode" aria-label="Which profile the controller uses"></select></label>
       <div class="pacts">
         <span class="pstate" id="pstate">Saved</span>
+        <button id="rename" class="ghost" title="Rename this profile">Rename</button>
+        <button id="dup" class="ghost" title="Create a new profile from this one">Duplicate</button>
         <button id="exp" class="ghost" title="Download this profile as a file">Export</button>
         <button id="imp" class="ghost" title="Merge values from a profile file into this profile">Import</button>
         <input type="file" id="impFile" accept=".ini,.txt,text/plain" hidden aria-label="Profile file to import">
@@ -1134,6 +1136,33 @@ function saveCurrent(){
 $("#save").onclick=()=>saveCurrent();
 $("#revert").onclick=()=>{if(!saved)return;saveUnconfirmed=false;cur=parse(saved);render();dirty();toast("Changes undone")};
 /* ── export / import ── */
+$("#rename").onclick=async()=>{
+  if(!saved){toast("Profile is still loading");return}
+  const name=prompt("Profile name",cur.name||editing);
+  if(name===null)return;
+  const trimmed=name.trim();
+  if(!trimmed){toast("Profile name cannot be empty");return}
+  if(new TextEncoder().encode(trimmed).length>=48){toast("Profile name must fit in 47 UTF-8 bytes");return}
+  cur.name=trimmed;
+  if(await saveCurrent())toast("Profile renamed")
+};
+$("#dup").onclick=async()=>{
+  if(!saved){toast("Profile is still loading");return}
+  const suggested=((cur.name||editing)+"-copy").replace(/[^A-Za-z0-9_-]+/g,"-").slice(0,32)||"copy";
+  const id=prompt("New profile ID (letters, digits, _ or -)",suggested);
+  if(id===null)return;
+  if(!/^[A-Za-z0-9_-]{1,32}$/.test(id)){toast("Use 1-32 letters, digits, _ or -");return}
+  if(profiles.some(p=>p.id===id)){toast("A profile with that ID already exists");return}
+  const name=prompt("Profile name",(cur.name||editing)+" copy");
+  if(name===null)return;
+  const trimmed=name.trim()||id;
+  if(new TextEncoder().encode(trimmed).length>=48){toast("Profile name must fit in 47 UTF-8 bytes");return}
+  try{
+    const next=validatedProfile({...cur,name:trimmed});
+    await api("/api/profile?id="+encodeURIComponent(id),{method:"POST",body:profileWrite(next)});
+    await refreshList();await load(id,true);toast("Profile duplicated")
+  }catch(e){toast("Duplicate failed: "+e.message)}
+};
 $("#exp").onclick=()=>{
   if(!saved){toast("Profile is still loading");return}
   const name=(cur.name||editing).replace(/[^\w .()-]+/g,"_").trim()||"profile";

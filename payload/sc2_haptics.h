@@ -9,9 +9,10 @@
  * only the USB reader that owns the generation-tagged SC2 session may drain it. */
 enum { SC2_PAD_LEFT = 0, SC2_PAD_RIGHT = 1, SC2_PAD_BOTH = 2 };
 
-void sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count);
-void sc2_haptic_tick(void);                       /* short UI click, both sides */
-void sc2_haptic_rumble_for(uint16_t left, uint16_t right, int ms);
+/* 0 = queued, -1 = rejected (no owner, queue full or encode failure). */
+int sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count);
+int sc2_haptic_tick(void);                        /* short UI click, both sides */
+int sc2_haptic_rumble_for(uint16_t left, uint16_t right, int ms);
 /* Continuous rumble (game vibration): stays until changed; 0,0 stops. */
 void sc2_haptic_rumble_set(uint16_t left, uint16_t right);
 

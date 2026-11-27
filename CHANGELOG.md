@@ -2,6 +2,23 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
 
+## v1.6.2-experimental
+
+Experimental follow-up to 1.6.1. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.
+
+### Bug Fixes
+
+- Haptic test requests now report enqueue failure: `/api/haptic` returns 503 when the queue is full or no Steam session owns output, instead of claiming "queued". The haptics API returns enqueue status; existing game/menu/trigger callers ignore it.
+- The troubleshooting log is filtered with the same line-level redaction as the diagnostic report (private keywords, long digit/hex runs and colon-separated addresses) before it is served.
+- HTTP responses now support `HEAD` (headers only) and `OPTIONS` (204 with `Allow`); `405` responses include `Allow` for the route. `GET`/`HEAD`/`OPTIONS` read routes no longer take the global dispatch lock, so a slow tile install, hook toggle or icon response cannot block status/log reads.
+- `recover-default` distinguishes "already valid" (409) from a failed backup/save (500); profile deletion returns 409 for Default, 404 for a missing profile and 500 for a real delete failure.
+- The WebUI gains profile **Rename** and **Duplicate** actions; duplicate creates a new validated profile from the current editor state and refuses existing IDs.
+
+### New Features / Improvements
+
+- Browser regression now exercises pause, hook switch, hand-off policy, bridge policy, log and per-game profile-lock mutations, including exact query keys.
+- Version `v1.6.2-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
+
 ## v1.6.1-experimental
 
 Experimental follow-up to 1.6.0. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.

@@ -30,6 +30,7 @@ static int injected_bind(int fd, const struct sockaddr *address, socklen_t lengt
     return bind(fd, address, length);
 }
 
+static int haptic_enqueue_result;
 static char notification[256];
 static int notifications, mutations, tile_requests, tile_fail;
 int settings_tile_create(char *message,size_t capacity) { tile_requests++;snprintf(message,capacity,"host registration fixture");return tile_fail ? -1 : 0; }
@@ -47,13 +48,14 @@ int gc_game_list(gc_game_t *out, int n) { (void)out;(void)n;return 0; }
 void sc2_set_paused(int on) { (void)on; }
 int sc2_menu_is_open(void) { return 0; }
 void sc2_gyro_status(sc2_gyro_status_t *s) { memset(s,0,sizeof(*s)); }
-void sc2_haptic_pulse(int p,uint16_t a,uint16_t b,uint16_t c) { (void)p;(void)a;(void)b;(void)c; }
-void sc2_haptic_tick(void) {}
-void sc2_haptic_rumble_for(uint16_t l,uint16_t r,int ms) { (void)l;(void)r;(void)ms; }
+int sc2_haptic_pulse(int p,uint16_t a,uint16_t b,uint16_t c) { (void)p;(void)a;(void)b;(void)c; return haptic_enqueue_result; }
+int sc2_haptic_tick(void) { return 0; }
+int sc2_haptic_rumble_for(uint16_t l,uint16_t r,int ms) { (void)l;(void)r;(void)ms; return haptic_enqueue_result; }
 void sc2_select_status(char *t,char *a,char *o) { *t=0;strcpy(a,"default");*o=0; }
 void sc2_select_title_name(char *o,size_t n) { if(n)*o=0; }
 void sc2_select_active_name(char *o,size_t n) { if(n)*o=0; }
-int sc2_store_valid_id(const char *id) { return !strcmp(id,"default"); }
+int sc2_store_valid_id(const char *id) { return !strcmp(id,"default")||!strcmp(id,"game"); }
+int sc2_store_exists(const char *id) { return sc2_store_valid_id(id); }
 void sc2_store_list(void (*cb)(const char*,const char*,void*),void *u) { cb("default","Default",u); }
 int sc2_store_load(const char *id,sc2_profile_t *p) { (void)id; memset(p,0,sizeof(*p));return 0; }
 void sc2_active_get(sc2_profile_t *p) { memset(p,0,sizeof(*p)); }
@@ -162,12 +164,29 @@ int main(void) {
     assert(request("POST /api/gamehooks?input=0&vibration=1&audio=1&mode=2&hooks=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
     assert(hooks_toggle_calls==3 && hooks_toggle_value==1);
 
+    assert(request("OPTIONS /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==204);
+    assert(strstr(out,"Allow: GET, HEAD, OPTIONS"));
+    assert(request("OPTIONS /api/pause HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==204);
+    assert(strstr(out,"Allow: POST, OPTIONS"));
+    assert(request("HEAD /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
+    assert(strstr(out,"Content-Length:") && !strstr(out,"\r\n\r\n{"));
+    assert(request("POST /api/status HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==405);
+    assert(strstr(out,"Allow: GET, HEAD, OPTIONS"));
+
+    sc2_status_set_haptics(1, -1);
+    haptic_enqueue_result = -1;
+    assert(request("POST /api/haptic?kind=left HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==503);
+    haptic_enqueue_result = 0;
+    assert(request("POST /api/haptic?kind=left HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    sc2_status_set_haptics(0, -1);
+
     assert(request("POST /api/pause?on=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
     assert(request("POST /api/pause HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==400);
     assert(request("POST /api/override?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
     assert(request("POST /api/profile?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 20\r\n\r\nname=Default\nA=CROSS",out,sizeof(out))==200);
     int mutations_before=mutations;
-    assert(request("POST /api/delete?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(request("POST /api/delete?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==409);
+    assert(request("POST /api/delete?id=game HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
     assert(mutations==mutations_before+1);
     assert(request("GET /api/log HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
     assert(request("GET /api/log?prev=2 HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==400);

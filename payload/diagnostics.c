@@ -150,6 +150,31 @@ static void filtered(char *out, size_t capacity, const char *in) {
     }
     out[used] = 0;
 }
+/* Apply the same line filter used by the diagnostic report to a log tail. */
+size_t diagnostics_sanitize_text(const char *in, char *out, size_t capacity) {
+    if (!out || capacity == 0) return 0;
+    out[0] = 0;
+    if (!in) return 0;
+    size_t used = 0;
+    while (*in && used + 1 < capacity) {
+        const char *end = strchr(in, '\n');
+        size_t length = end ? (size_t)(end - in) : strlen(in);
+        char line[4097], clean[4097];
+        if (length >= sizeof(line)) length = sizeof(line) - 1;
+        memcpy(line, in, length); line[length] = 0;
+        filtered(clean, sizeof(clean), line);
+        size_t n = strlen(clean);
+        if (n > capacity - used - 1) n = capacity - used - 1;
+        memcpy(out + used, clean, n); used += n;
+        if (end) {
+            if (used + 1 < capacity) out[used++] = '\n';
+            in = end + 1;
+        } else break;
+    }
+    out[used] = 0;
+    return used;
+}
+
 void diagnostics_runtime(const char *stage, int error, uint32_t fw,
                          const runtime_policy_t *policy) {
     pthread_mutex_lock(&lock);

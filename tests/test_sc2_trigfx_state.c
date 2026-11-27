@@ -26,12 +26,13 @@ typedef struct {
     } \
 } while (0)
 
-void sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count) {
+int sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count) {
     (void)pad;
     (void)on_us;
     (void)off_us;
     (void)count;
     atomic_fetch_add(&pulse_count, 1);
+    return 0;
 }
 
 static void *run_session(void *opaque) {

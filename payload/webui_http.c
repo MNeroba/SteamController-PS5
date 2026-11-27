@@ -77,7 +77,9 @@ static int parse_request_line(const char *line, size_t length,
         if (c < 'A' || c > 'Z') return -1;
     }
     if (!((method_end == 3 && memcmp(line, "GET", 3) == 0) ||
-          (method_end == 4 && memcmp(line, "POST", 4) == 0))) return -1;
+          (method_end == 4 && memcmp(line, "POST", 4) == 0) ||
+          (method_end == 4 && memcmp(line, "HEAD", 4) == 0) ||
+          (method_end == 7 && memcmp(line, "OPTIONS", 7) == 0))) return -1;
 
     target_start = method_end + 1;
     while (target_start < length && line[target_start] == ' ') target_start++;

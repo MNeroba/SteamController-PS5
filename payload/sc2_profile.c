@@ -549,7 +549,8 @@ int sc2_store_recover_default(void) {
     pthread_mutex_lock(&g_store_lock);
     sc2_profile_t old, fresh;
     int loaded=sc2_store_load("default",&old),result=-1;
-    if(loaded==SC2_STORE_INVALID || loaded==SC2_STORE_NOT_FOUND){
+    if(loaded==0) result=1;
+    else if(loaded==SC2_STORE_INVALID || loaded==SC2_STORE_NOT_FOUND){
         int dir=profile_directory();
         if(dir>=0){
             int backed_up=loaded==SC2_STORE_NOT_FOUND;
@@ -569,6 +570,18 @@ int sc2_store_recover_default(void) {
     }
     pthread_mutex_unlock(&g_store_lock);
     return result;
+}
+
+int sc2_store_exists(const char *id) {
+    if (!sc2_store_valid_id(id)) return 0;
+    int dir = profile_directory();
+    if (dir < 0) return 0;
+    char name[SC2_ID_MAX + 8];
+    snprintf(name, sizeof(name), "%s.ini", id);
+    int fd = private_regular_open(dir, name);
+    close(dir);
+    if (fd >= 0) close(fd);
+    return fd >= 0;
 }
 
 int sc2_store_delete(const char *id) {

@@ -102,7 +102,10 @@ typedef int (*sc2_profile_update_fn)(sc2_profile_t *, void *);
  * silently replaced. Callback must not re-enter the store. */
 int sc2_store_update(const char *id, sc2_profile_update_fn update, void *context);
 /* Explicit corrupt-default recovery preserves up to 16 exact backups. */
+/* 0 = recovered, 1 = already valid, -1 = backup/save failed. */
 int sc2_store_recover_default(void);
+/* 1 when the profile file exists (even if corrupt). */
+int sc2_store_exists(const char *id);
 int  sc2_store_delete(const char *id);
 /* Calls cb for every saved profile id. */
 void sc2_store_list(void (*cb)(const char *id, const char *name, void *u), void *u);

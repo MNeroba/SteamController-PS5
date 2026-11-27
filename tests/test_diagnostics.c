@@ -107,6 +107,14 @@ int main(void) {
     for (int i = 0; i < 2000; i++)
         assert(diagnostics_report(out, sizeof(out), &s) > 0);
     assert(pthread_join(thread, NULL) == 0);
+    char log_in[]="userid=42\nhex 0123456789abcdef\naddress 01:23:45:67:89:ab\nplain line\n";
+    char log_out[512];
+    assert(diagnostics_sanitize_text(log_in, log_out, sizeof(log_out)) > 0);
+    assert(strstr(log_out, "[redacted sensitive application line]"));
+    assert(strstr(log_out, "[redacted address]"));
+    assert(strstr(log_out, "plain line"));
+    assert(!strstr(log_out, "userid=42") && !strstr(log_out, "0123456789abcdef") &&
+           !strstr(log_out, "01:23:45"));
     puts("bounded diagnostic generation/redaction/escaping/concurrency checks passed");
     return 0;
 }

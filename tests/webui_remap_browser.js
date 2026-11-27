@@ -545,6 +545,62 @@ async (page) => {
   check(await page.locator('#diagnosticsStatus').textContent().then(t=>t.includes('failed')),'oversized diagnostic report is rejected');
   await page.unroute('**/api/diagnostics');
   await page.evaluate(()=>switchTab('remap'));
+  // Mutation endpoints: exact query contract, optimistic rollback and errors.
+  await page.evaluate(()=>{switchTab('help');goSec('pause',true)});
+  let pauseQuery='';
+  await page.route('**/api/pause?*',async route=>{pauseQuery=route.request().url();await route.fulfill({status:200,body:'paused'})});
+  await page.locator('#pauseBtn').click();
+  await page.waitForFunction(()=>document.querySelector('#toast').textContent==='Paused');
+  check(pauseQuery.includes('/api/pause?on=1'),'pause mutation uses on=1');
+  await page.unroute('**/api/pause?*');
+
+  let hooksQueries=[],hooksInput=1;
+  await page.route('**/api/gamehooks*',async route=>{
+    if(route.request().method()==='POST'){hooksQueries.push(route.request().url());hooksInput=0}
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({input:hooksInput,vibration:1,audio:0,mode:2,policy:1,title:'PPSA00001',state:2,owner:1,vcalls:1})});
+  });
+  await page.evaluate(async()=>{await paintHooks()});
+  await page.locator('#ghIn').uncheck();
+  await page.waitForFunction(()=>document.querySelector('#ghIn').checked===false);
+  check(hooksQueries.some(u=>u.includes('input=0')),'hook switch sends the exact input key');
+  await page.unroute('**/api/gamehooks*');
+
+  let handoffQuery='',handoffAllowed=false;
+  await page.route('**/api/dualsense*',async route=>{
+    if(route.request().method()==='POST'){handoffQuery=route.request().url();handoffAllowed=true}
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({allowed:handoffAllowed,enabled:false,state:'idle',pads:1,ret:0})});
+  });
+  await page.evaluate(()=>{paintDs()});
+  await page.evaluate(()=>{window.confirm=()=>true});
+  await page.locator('#dsEnable').check();
+  await page.waitForFunction(()=>document.querySelector('#dsEnable').checked===true);
+  check(handoffQuery.includes('handoff=1'),'hand-off switch persists the policy flag');
+  await page.unroute('**/api/dualsense*');
+
+  let bridgeQuery='',bridgeEnabled=false;
+  await page.route('**/api/bridge*',async route=>{
+    if(route.request().method()==='POST'){bridgeQuery=route.request().url();bridgeEnabled=true}
+    await route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({enabled:bridgeEnabled,active:bridgeEnabled,title:'PPSA00001',state:3,result:2,scan:0})});
+  });
+  await page.evaluate(()=>{paintBridge()});
+  await page.locator('#bridgeEnable').check();
+  await page.waitForFunction(()=>document.querySelector('#bridgeEnable').checked===true);
+  check(bridgeQuery.includes('enable=1'),'bridge switch persists the policy flag');
+  await page.unroute('**/api/bridge*');
+
+  await page.route('**/api/log*',route=>route.fulfill({status:200,contentType:'text/plain',body:'filtered log line\n'}));
+  await page.locator('#logShow').click();
+  await page.waitForFunction(()=>!document.querySelector('#log').hidden);
+  check((await page.locator('#log').textContent()).includes('filtered log line'),'log viewer renders the sanitized tail');
+  await page.unroute('**/api/log*');
+
+  let overrideQuery='';
+  await page.route('**/api/override*',async route=>{overrideQuery=route.request().url();await route.fulfill({status:200,body:'ok'})});
+  await page.evaluate(()=>{switchTab('remap')});
+  await page.selectOption('#mode','default');
+  await page.waitForFunction(()=>document.querySelector('#toast').textContent.includes('Locked'));
+  check(overrideQuery.includes('/api/override?id=default'),'per-game profile lock uses the selected id');
+  await page.unroute('**/api/override*');
   check(errors.length===0, 'no JavaScript runtime errors');
   return {result:'PASS',checks:passed.length,passed,decoded,hardware:'NOT_RUN; loopback fixture only'};
 }

@@ -14,6 +14,8 @@
 #define DIAGNOSTICS_FILENAME "SteamController-PS5-Diagnostics-" STEAMCONTROLLER_VERSION ".txt"
 /* Sanitize before all raw sinks too; works in place and does not log itself. */
 void diagnostics_sanitize_raw_log(char *out, size_t capacity, const char *line);
+/* Same stronger filter as the report, applied line-by-line to a log tail. */
+size_t diagnostics_sanitize_text(const char *in, char *out, size_t capacity);
 void diagnostics_storage(const storage_status_t *status);
 void diagnostics_vda_observation(vda_result_t result);
 void diagnostics_vda_pending(vda_pending_summary_t observation);

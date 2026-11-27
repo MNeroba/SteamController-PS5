@@ -97,7 +97,7 @@ static int64_t now_ms(void) {
     return (int64_t)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
-static void push(const uint8_t *b, uint8_t n) {
+static int push(const uint8_t *b, uint8_t n) {
     int accepted = 0;
     pthread_mutex_lock(&q_lock);
     int nx = (q_tail + 1) % QN;
@@ -110,15 +110,17 @@ static void push(const uint8_t *b, uint8_t n) {
     pthread_mutex_unlock(&q_lock);
     if (accepted) sc2_status_haptic_queued();
     else sc2_status_haptic_dropped();
+    return accepted ? 0 : -1;
 }
 
-void sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count) {
+int sc2_haptic_pulse(int pad, uint16_t on_us, uint16_t off_us, uint16_t count) {
     uint8_t b[STEAM_HAPTIC_PULSE_SIZE];
     int n = steam_feedback_encode_pulse(b, sizeof(b), pad, on_us, off_us, count);
-    if (n > 0) push(b, (uint8_t)n);
+    if (n <= 0) return -1;
+    return push(b, (uint8_t)n);
 }
 
-void sc2_haptic_tick(void) { sc2_haptic_pulse(SC2_PAD_BOTH, 0x190, 0, 1); }
+int sc2_haptic_tick(void) { return sc2_haptic_pulse(SC2_PAD_BOTH, 0x190, 0, 1); }
 
 void sc2_haptic_rumble_set(uint16_t left, uint16_t right) {
     pthread_mutex_lock(&q_lock);
@@ -130,13 +132,15 @@ void sc2_haptic_rumble_set(uint16_t left, uint16_t right) {
     pthread_mutex_unlock(&q_lock);
 }
 
-void sc2_haptic_rumble_for(uint16_t left, uint16_t right, int ms) {
+int sc2_haptic_rumble_for(uint16_t left, uint16_t right, int ms) {
     pthread_mutex_lock(&q_lock);
-    if (q_owner_valid) {
+    int accepted = q_owner_valid;
+    if (accepted) {
         r_left = left; r_right = right;
         r_until = now_ms() + ms; r_next = 0; r_active = 1;
     }
     pthread_mutex_unlock(&q_lock);
+    return accepted ? 0 : -1;
 }
 
 static int ctrl_report(int fd, int iface, int type, const uint8_t *b, uint8_t n) {
