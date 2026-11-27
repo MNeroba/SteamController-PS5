@@ -1,4 +1,13 @@
-# Current — 1.6.0 Experimental (2026-11-28)
+# Current — 1.6.1 Experimental (2026-11-28)
+
+## M1-265 — v1.6.1-experimental runtime toggles and mutation tests (2026-11-28)
+
+Published **v1.6.1-experimental** from [`c02977510aabc57fd081c0b28a0950447350b4c2`](https://github.com/MNeroba/SteamController-PS5/tree/c02977510aabc57fd081c0b28a0950447350b4c2) by [DEV workflow 46078999218](https://github.com/MNeroba/SteamController-PS5/actions/runs/46078999218) at 2026-11-27T22:53:06Z. Seven assets, one ELF `SteamController-PS5-v1.6.1-experimental.elf`, 2,124,944 bytes, SHA-256 `33834d70f26d275a92c9a0e89eeb307559dd907a1209bb6e436d58a6069b52ab`; the downloaded sidecar matched.
+
+Adds `runtime_feature_set_handoff/bridge` (gc_main) that persist the complete runtime policy through the private writer, start/stop the hand-off observer/service or the read-only bridge worker, revert on failure and reject `ENABLE_DIRECT_HID` conflicts. `/api/dualsense?handoff=0|1` and `/api/bridge?enable=0|1` expose them; `/api/dualsense` and `/api/bridge` now report policy and worker state separately (`allowed`, `enabled`, `active`). The WebUI adds confirmation-gated hand-off and bridge switches and disables dependent controls when the policy is off. Bridge enable without a foreground user persists the policy and asks for a payload restart.
+
+`tests/test_webui_server.c` now exercises profile write/delete, pause, override, log, hand-off policy, bridge enable/request and the five-key gamehook query through the production HTTP dispatch. Local normal and sanitizer suites passed; push gates Host 46078747565, PS5 46078747671, CI Actions smoke 46078747567 and secret scan 46078747554 succeeded; DEV workflow repeated Chromium/SDK/package/checksum gates. Physical PS5 and all hardware rows remain `NOT_RUN`.
+
 
 ## M1-264 — v1.6.0-experimental WebUI quality release (2026-11-28)
 

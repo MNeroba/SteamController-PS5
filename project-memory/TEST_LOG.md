@@ -1572,3 +1572,10 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Seven assets, one ELF `SteamController-PS5-v1.6.0-experimental.elf`, 2,119,208 bytes, SHA-256 `588e415204cf023b7bfccf504f2857a3e1738cbddb2cee6c9f411b9c5a64a267`; downloaded ELF and sidecar matched.
 - Local normal and sanitizer suites passed before dispatch. Browser, SDK and package gates are CI-only here.
 - Physical PS5/FW13.60, native DualSense coexistence, hand-off/bridge policy behavior and all hardware rows: NOT_RUN.
+
+## 2026-11-28 — v1.6.1-experimental runtime toggles
+
+- Source `c02977510aabc57fd081c0b28a0950447350b4c2`; push gates Host 46078747565, PS5 46078747671, CI Actions smoke 46078747567, secret scan 46078747554 succeeded.
+- DEV workflow 46078999218 published `dev/v1.6.1-experimental` at 2026-11-27T22:53:06Z; seven assets, one ELF 2,124,944 bytes, SHA-256 `33834d70f26d275a92c9a0e89eeb307559dd907a1209bb6e436d58a6069b52ab`; downloaded ELF and sidecar matched.
+- Local normal and sanitizer suites pass, including the new HTTP mutation cases. Chromium/SDK/package gates are CI-only here.
+- Hand-off/bridge worker start-stop, policy rollback and PS5 behavior: NOT_RUN.

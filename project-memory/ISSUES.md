@@ -1,5 +1,10 @@
 # Issues and blockers — project register
 
+## 2026-11-28 — runtime toggles and mutation tests: fixed in v1.6.1-experimental
+
+- **WEBUI-08 PARTIAL:** HTTP-level mutation coverage now covers profile write/delete, pause, override, log, hand-off, bridge and five-key gamehooks. Browser-level mutation flows and real PS5 browser behavior remain NOT_RUN.
+- **WEBUI-09 FIXED:** DualSense hand-off and game-bridge check have hooks-style runtime switches that persist policy, start/stop the observer/worker, revert on failure and expose policy vs active state separately.
+
 ## 2026-11-28 — WebUI audit findings: fixed in v1.6.0-experimental
 
 Four read-only audits (frontend, backend/HTTP, completeness, tests) produced these fixes:
