@@ -43,6 +43,8 @@ static const char *const haptic_params[] = {"kind", "via", NULL};
 static const char *const id_params[] = {"id", NULL};
 static const char *const gamehook_params[] = {"input", "vibration", "audio", "mode", "hooks", NULL};
 static const char *const on_params[] = {"on", NULL};
+static const char *const handoff_params[] = {"on", "handoff", NULL};
+static const char *const bridge_params[] = {"enable", NULL};
 static const char *const log_params[] = {"prev", NULL};
 
 static const char *const *allowed_params(webui_route_id_t route) {
@@ -53,8 +55,9 @@ static const char *const *allowed_params(webui_route_id_t route) {
         case WEBUI_ROUTE_DELETE:
         case WEBUI_ROUTE_OVERRIDE: return id_params;
         case WEBUI_ROUTE_GAMEHOOKS: return gamehook_params;
-        case WEBUI_ROUTE_PAUSE:
-        case WEBUI_ROUTE_DUALSENSE: return on_params;
+        case WEBUI_ROUTE_PAUSE: return on_params;
+        case WEBUI_ROUTE_DUALSENSE: return handoff_params;
+        case WEBUI_ROUTE_BRIDGE: return bridge_params;
         case WEBUI_ROUTE_LOG: return log_params;
         case WEBUI_ROUTE_DIAGNOSTICS:
         case WEBUI_ROUTE_SETTINGS_TILE:
@@ -62,8 +65,7 @@ static const char *const *allowed_params(webui_route_id_t route) {
         case WEBUI_ROUTE_INDEX:
         case WEBUI_ROUTE_STATUS:
         case WEBUI_ROUTE_PROFILES:
-        case WEBUI_ROUTE_GAMES:
-        case WEBUI_ROUTE_BRIDGE: return no_params;
+        case WEBUI_ROUTE_GAMES: return no_params;
         case WEBUI_ROUTE_NOT_FOUND:
         default: return NULL;
     }

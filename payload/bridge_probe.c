@@ -27,6 +27,7 @@ void poords4_log(const char *format, ...) {
 static pthread_mutex_t g_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_t g_thread;
 static int g_thread_started;
+static int g_policy_enabled;
 static int32_t g_user = -1;
 static int g_force = 0;
 static struct {
@@ -155,6 +156,12 @@ int bridge_probe_stop(void) {
     return 0;
 }
 
+void bridge_probe_set_policy(int on) {
+    pthread_mutex_lock(&g_lock);
+    g_policy_enabled = on ? 1 : 0;
+    pthread_mutex_unlock(&g_lock);
+}
+
 int bridge_probe_enabled(void) {
     pthread_mutex_lock(&g_lock);
     int enabled = g_thread_started;
@@ -171,10 +178,10 @@ void bridge_probe_request(void) {
 int bridge_probe_json(char *out, size_t n) {
     pthread_mutex_lock(&g_lock);
     int w = snprintf(out, n,
-        "{\"enabled\":%d,\"title\":\"%s\",\"state\":%d,\"result\":%d,\"scan\":%d,\"read_hooks\":%d,"
+        "{\"enabled\":%d,\"active\":%d,\"title\":\"%s\",\"state\":%d,\"result\":%d,\"scan\":%d,\"read_hooks\":%d,"
         "\"vibration_hooks\":%d,\"trigger_hooks\":%d,\"remote_syscalls\":%d,\"pad_index\":%d,"
         "\"fw\":\"%s\",\"reason\":\"",
-        g_thread_started, g.title, g.state, g.result, g.scan, g.read_hooks, g.vib_hooks, g.trig_hooks,
+        g_policy_enabled, g_thread_started, g.title, g.state, g.result, g.scan, g.read_hooks, g.vib_hooks, g.trig_hooks,
         g.kekcall, g.pad_index, g.fw);
     for (const char *p = g.reason; *p && w > 0 && (size_t)w < n - 4; p++)
         if (*p != '"' && *p != '\\' && (unsigned char)*p >= 0x20) out[w++] = *p;

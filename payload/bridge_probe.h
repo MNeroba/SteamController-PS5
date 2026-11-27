@@ -9,4 +9,5 @@ void bridge_probe_start(int32_t user_id);
 int  bridge_probe_stop(void);                   /* joins the read-only probe worker */
 void bridge_probe_request(void);                /* re-run for the current game */
 int  bridge_probe_json(char *out, size_t n);    /* status for the portal */
-int  bridge_probe_enabled(void);                /* worker started by runtime policy */
+int  bridge_probe_enabled(void);                /* worker thread currently started */
+void bridge_probe_set_policy(int on);           /* persisted runtime-policy flag */

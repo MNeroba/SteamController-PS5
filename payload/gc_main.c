@@ -21,6 +21,7 @@
 #include <sys/stat.h>
 #include <sys/time.h>
 #include <sys/select.h>
+#include <stdatomic.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 
@@ -61,6 +62,7 @@
 #include "runtime_instance.h"
 #include "credential_kernel.h"
 #include "runtime_policy.h"
+#include "runtime_features.h"
 #include "private_file.h"
 #include "hid_backend.h"
 #include "power_session.h"
@@ -78,6 +80,7 @@
 static pthread_mutex_t g_log_lock = PTHREAD_MUTEX_INITIALIZER;
 static int g_log_fd = -1;
 static runtime_policy_t g_runtime_policy;
+static pthread_mutex_t g_feature_lock = PTHREAD_MUTEX_INITIALIZER;
 static power_session_t g_power = POWER_SESSION_INIT;
 static hid_backend_t g_hid = HID_BACKEND_INIT;
 static pthread_mutex_t g_hid_lock = PTHREAD_MUTEX_INITIALIZER;
@@ -179,6 +182,7 @@ static user_session_t g_users = USER_SESSION_INITIALIZER;
 static volatile sig_atomic_t g_signal_stop;
 static pthread_t g_klog_tid, g_manager_tid;
 static int g_klog_started, g_manager_started, g_runtime_shutdown_done;
+static atomic_int g_klog_stop;
 
 typedef struct {
     pthread_t thread;
@@ -269,7 +273,7 @@ static void *klog_capture_thread(void *arg) {
         }
         if (fd<0){close(sock);return NULL;}
     }
-    while (!runtime_is_stopping()) {
+    while (!runtime_is_stopping() && !atomic_load(&g_klog_stop)) {
         if (fd >= FD_SETSIZE) {
             gp_log("klog: descriptor exceeds select capacity; capture stopped\n");
             break;
@@ -295,6 +299,23 @@ static void *klog_capture_thread(void *arg) {
         }
     }
     close(fd); return NULL;
+}
+
+static int klog_observer_start(void) {
+    if (g_klog_started) return 0;
+    atomic_store(&g_klog_stop, 0);
+    if (pthread_create(&g_klog_tid, NULL, klog_capture_thread, NULL) != 0)
+        return -1;
+    g_klog_started = 1;
+    return 0;
+}
+
+static int klog_observer_stop(void) {
+    if (!g_klog_started) return 0;
+    atomic_store(&g_klog_stop, 1);
+    int result = pthread_join(g_klog_tid, NULL);
+    if (result == 0) g_klog_started = 0;
+    return result;
 }
 
 /* ── VDI injection ────────────────────────────────────────────────────── */
@@ -501,6 +522,116 @@ static int neutralize_vda_handle(int32_t handle) {
 static int runtime_cancel_requested(void *context) {
     (void)context;
     return runtime_is_stopping() || power_session_paused(&g_power);
+}
+
+static int persist_runtime_policy(const runtime_policy_t *policy) {
+    char text[RUNTIME_POLICY_MAX_BYTES];
+    int n = runtime_policy_serialize(policy, text, sizeof(text));
+    if (n <= 0) return -1;
+    return private_text_replace(RUNTIME_POLICY_PATH, text, (size_t)n);
+}
+
+static void set_message(char *message, size_t capacity, const char *text) {
+    if (message && capacity) snprintf(message, capacity, "%s", text);
+}
+
+int runtime_feature_set_handoff(int on, char *message, size_t capacity) {
+    pthread_mutex_lock(&g_feature_lock);
+    if (runtime_is_stopping()) {
+        set_message(message, capacity, "Payload is stopping");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    if (on && g_runtime_policy.enable_direct_hid) {
+        set_message(message, capacity, "Disable ENABLE_DIRECT_HID before enabling hand-off");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    int started_observer = 0;
+    if (on) {
+        if (!g_klog_started) {
+            if (klog_observer_start() != 0) {
+                set_message(message, capacity, "System-log observer could not start");
+                pthread_mutex_unlock(&g_feature_lock);
+                return -1;
+            }
+            started_observer = 1;
+        }
+        ds_handoff_start();
+        if (ds_handoff_set_enabled(1) != 0) {
+            if (started_observer) klog_observer_stop();
+            set_message(message, capacity, "DualSense hand-off could not be enabled");
+            pthread_mutex_unlock(&g_feature_lock);
+            return -1;
+        }
+    } else {
+        ds_handoff_suspend();
+    }
+    runtime_policy_t next = g_runtime_policy;
+    next.enable_ds_handoff = on ? 1 : 0;
+    if (persist_runtime_policy(&next) != 0) {
+        if (on) {
+            ds_handoff_suspend();
+            if (started_observer) klog_observer_stop();
+        } else {
+            ds_handoff_start();
+            ds_handoff_set_enabled(1);
+        }
+        set_message(message, capacity, "Runtime policy could not be saved");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    g_runtime_policy = next;
+    set_message(message, capacity, on ? "DualSense hand-off enabled" : "DualSense hand-off disabled");
+    pthread_mutex_unlock(&g_feature_lock);
+    return 0;
+}
+
+int runtime_feature_set_bridge(int on, char *message, size_t capacity) {
+    pthread_mutex_lock(&g_feature_lock);
+    if (runtime_is_stopping()) {
+        set_message(message, capacity, "Payload is stopping");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    if (on && g_runtime_policy.enable_direct_hid) {
+        set_message(message, capacity, "Disable ENABLE_DIRECT_HID before enabling the bridge check");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    int started_worker = 0, deferred = 0;
+    if (on) {
+        if (g_inject_uid <= 0) deferred = 1;
+        else if (!bridge_probe_enabled()) {
+            bridge_probe_start(g_inject_uid);
+            if (!bridge_probe_enabled()) {
+                set_message(message, capacity, "Bridge check worker could not start");
+                pthread_mutex_unlock(&g_feature_lock);
+                return -1;
+            }
+            started_worker = 1;
+        }
+    } else if (bridge_probe_stop() != 0) {
+        set_message(message, capacity, "Bridge check worker did not stop");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    runtime_policy_t next = g_runtime_policy;
+    next.enable_bridge_probe = on ? 1 : 0;
+    if (persist_runtime_policy(&next) != 0) {
+        if (on && started_worker) bridge_probe_stop();
+        else if (!on) bridge_probe_start(g_inject_uid);
+        set_message(message, capacity, "Runtime policy could not be saved");
+        pthread_mutex_unlock(&g_feature_lock);
+        return -1;
+    }
+    g_runtime_policy = next;
+    bridge_probe_set_policy(on);
+    set_message(message, capacity, on ? (deferred ?
+        "Enabled; restart the payload after a user logs in to start the worker" :
+        "Game-bridge check enabled") : "Game-bridge check disabled");
+    pthread_mutex_unlock(&g_feature_lock);
+    return 0;
 }
 
 static void load_runtime_policy(runtime_policy_t *policy) {
@@ -2108,6 +2239,7 @@ static int runtime_shutdown(void) {
         safe_to_release = 0;
     }
     if (g_klog_started) {
+        atomic_store(&g_klog_stop, 1);
         int result = pthread_join(g_klog_tid, NULL);
         if (result == 0) g_klog_started = 0;
         else {
@@ -2172,6 +2304,7 @@ int main(void) {
     notify("SteamController-PS5: starting — connect Steam Controller by USB-C or Valve Puck");
 
     load_runtime_policy(&g_runtime_policy);
+    bridge_probe_set_policy(g_runtime_policy.enable_bridge_probe);
     diagnostics_runtime("initializing services",0,kernel_get_fw_version(),&g_runtime_policy);
     diagnostics_webui(0);
 

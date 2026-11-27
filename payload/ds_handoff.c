@@ -102,6 +102,14 @@ void ds_handoff_start(void) {
     LOG("dualsense hand-off: %s\n", enabled ? "on" : "off");
 }
 
+void ds_handoff_suspend(void) {
+    pthread_mutex_lock(&g_lock);
+    g_allowed = 0;
+    g_enabled = 0;
+    pthread_mutex_unlock(&g_lock);
+    LOG("dualsense hand-off: suspended by runtime policy\n");
+}
+
 int ds_handoff_set_enabled(int on) {
     int enabled = on ? 1 : 0;
     pthread_mutex_lock(&g_lock);

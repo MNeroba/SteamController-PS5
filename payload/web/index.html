@@ -500,6 +500,7 @@ dialog.profile-guard::backdrop{background:#0009}
       <section class="sec card" data-sec="handoff" id="sec-handoff">
         <div class="ch"><div><h3>DualSense hand-off</h3><p>Hand the game to whichever controller you pick up. Experimental.</p></div></div>
         <div class="rows">
+          <label class="opt full"><span class="lbl"><b>Enable DualSense hand-off (Experimental)</b><small>Persists ENABLE_DUALSENSE_HANDOFF and starts the system-log observer now. Turning this off stops new hand-offs; if the DualSense is already off, press its PS button to bring it back.</small></span><input type="checkbox" id="dsEnable"></label>
           <label class="opt full"><span class="lbl"><b>Turn the DualSense off while the Steam Controller is in control</b><small>When you start using the Steam Controller, the DualSense is disconnected, so it can't rumble, light up or play sound. Press its PS button to switch back: the DualSense takes over and the Steam Controller steps aside until you press its Steam button.</small></span><input type="checkbox" id="dsOff"></label>
         </div>
         <div class="body"><p class="status" id="dsStatus">&nbsp;</p></div>
@@ -533,6 +534,9 @@ dialog.profile-guard::backdrop{background:#0009}
       </section>
       <section class="sec wide card" data-sec="bridge" id="sec-bridge">
         <div class="ch"><div><h3>Game bridge check</h3><p>Game vibration and DualSense-free input need to hook into the game's controller code (the PoorDS4 method). This check runs automatically about 8 seconds after a game starts. It only reads; nothing in the game is changed.</p></div></div>
+        <div class="rows">
+          <label class="opt full"><span class="lbl"><b>Enable game-bridge check (Experimental)</b><small>Persists ENABLE_BRIDGE_PROBE and starts the read-only probe worker. It needs a foreground user; start a game before enabling.</small></span><input type="checkbox" id="bridgeEnable"></label>
+        </div>
         <div id="bridgeOut" class="rows kv"></div>
         <div class="body"><div class="btns"><button id="bridgeRun">Check the running game now</button></div></div>
       </section>
@@ -1401,10 +1405,11 @@ let dsBusy=false;
 async function paintDs(){
   if(dsBusy)return;
   let d;try{d=JSON.parse(await api("/api/dualsense"))}catch(e){return}
-  const box=$("#dsOff");
+  const box=$("#dsOff"), enable=$("#dsEnable");
+  enable.checked=!!d.allowed;enable.disabled=false;
   if(d.allowed===false){
     box.disabled=true;box.checked=false;
-    $("#dsStatus").textContent="Disabled by runtime policy (ENABLE_DUALSENSE_HANDOFF=0). Enable it in /data/ghostpad/runtime-policy.ini and restart the payload.";
+    $("#dsStatus").textContent="Hand-off is off. Enable the experimental switch above."+(d.state==="off"?" The DualSense is currently off; press its PS button to bring it back.":"");
     return;
   }
   box.disabled=false;
@@ -1418,6 +1423,14 @@ async function paintDs(){
     back:"DualSense in control. Press the Steam Controller's Steam button to switch back.",
     failed:`Couldn't turn the DualSense off (error ${d.ret}). Please send the log.`}[d.state]||"");
 }
+$("#dsEnable").onchange=async e=>{
+  const want=e.target.checked;
+  if(want&&!confirm("Enable DualSense hand-off? While the Steam Controller is in control, the payload can disconnect your DualSense. Experimental; keep the DualSense available to press its PS button.")){e.target.checked=false;return}
+  dsBusy=true;
+  try{const message=await api("/api/dualsense?handoff="+(want?1:0),{method:"POST"});toast(message)}
+  catch(err){e.target.checked=!want;toast(err.message||"Hand-off policy change failed")}
+  finally{dsBusy=false;paintDs()}
+};
 $("#dsOff").onchange=async e=>{
   const want=e.target.checked;dsBusy=true;
   try{await api("/api/dualsense?on="+(want?1:0),{method:"POST"})}
@@ -1426,16 +1439,23 @@ $("#dsOff").onchange=async e=>{
 };
 
 /* ── game bridge check ── */
-let lastBridge="";
+let lastBridge="",bridgeBusy=false;
 async function paintBridge(){
+  if(bridgeBusy)return;
   let b,raw;try{raw=await api("/api/bridge");b=JSON.parse(raw)}catch(e){return}
   if(raw===lastBridge)return;lastBridge=raw;
   const g=games.find(g=>g.id===b.title),name=g?g.name:(b.title||"");
   const row=(k,v,ok)=>`<div class="opt full"><span class="lbl">${esc(k)}</span><span class="badge ${ok===true?"ok":ok===false?"warn":""}">${esc(v)}</span></div>`;
-  const run=$("#bridgeRun");
+  const run=$("#bridgeRun"), enable=$("#bridgeEnable");
+  enable.checked=!!b.enabled;enable.disabled=false;
   if(b.enabled===false){
     run.disabled=true;
-    $("#bridgeOut").innerHTML=row("Status","Disabled by runtime policy (ENABLE_BRIDGE_PROBE=0)",null)+row("How to enable","Add ENABLE_BRIDGE_PROBE=1 to /data/ghostpad/runtime-policy.ini and restart the payload",null);
+    $("#bridgeOut").innerHTML=row("Status","Game-bridge check is off. Enable the experimental switch above.",null);
+    return;
+  }
+  if(b.active===false){
+    run.disabled=true;
+    $("#bridgeOut").innerHTML=row("Status","Enabled, but the probe worker is not running (no foreground user at startup). Restart the payload after logging in to start it.",null);
     return;
   }
   run.disabled=false;
@@ -1453,6 +1473,12 @@ async function paintBridge(){
     row("Kernel helper (kstuff remote calls)", b.remote_syscalls===1?"available":b.remote_syscalls===0?"missing":"unknown", b.remote_syscalls===1)+
     row("Firmware", b.fw||"unknown", null);
 }
+$("#bridgeEnable").onchange=async e=>{
+  const want=e.target.checked;bridgeBusy=true;
+  try{const message=await api("/api/bridge?enable="+(want?1:0),{method:"POST"});toast(message)}
+  catch(err){e.target.checked=!want;toast(err.message||"Bridge policy change failed")}
+  finally{bridgeBusy=false;paintBridge()}
+};
 $("#bridgeRun").onclick=async()=>{try{await api("/api/bridge",{method:"POST"});toast("Checking the running game…")}catch(e){toast(e.message)}};
 setInterval(()=>{if(!$("#tab-help").hidden)paintBridge()},1500);
 

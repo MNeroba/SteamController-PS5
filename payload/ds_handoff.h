@@ -31,4 +31,7 @@ int  ds_handoff_take_release(void);
 
 /* Returns -1 if hand-off was not explicitly enabled by runtime policy. */
 int  ds_handoff_set_enabled(int on);
+/* Runtime policy revoke without joining a worker: keeps the observer but
+ * refuses new disconnects until ds_handoff_start() re-arms it. */
+void ds_handoff_suspend(void);
 int  ds_handoff_json(char *out, size_t n);

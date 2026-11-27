@@ -2,6 +2,22 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
 
+## v1.6.1-experimental
+
+Experimental follow-up to 1.6.0. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.
+
+### Bug Fixes
+
+- The game-bridge check now starts and stops from the WebUI: the checkbox persists `ENABLE_BRIDGE_PROBE` through the private policy writer, starts the read-only worker when a foreground user is known, stops it on disable, and reverts policy and worker state on failure. If no user was available at startup, it reports that a payload restart after login is required instead of pretending the worker is running.
+- DualSense hand-off now has the same explicit runtime switch. Enabling starts the system-log observer when needed, re-arms the hand-off service and persists `ENABLE_DUALSENSE_HANDOFF`; disabling suspends new hand-offs immediately and reports that an already-disconnected DualSense must be restored with its PS button.
+- The portal reports hand-off and bridge policy/worker state separately (`allowed`, `enabled`, `active`) so a persisted setting that cannot start a worker is visible instead of being shown as active.
+- `/api/dualsense?handoff=0|1` and `/api/bridge?enable=0|1` reject malformed values, duplicate `on`+`handoff` parameters and GET mutations; direct-HID policy conflicts are refused before any worker starts.
+
+### New Features / Improvements
+
+- HTTP-level mutation coverage now exercises profile write/delete, pause, override, log, DualSense hand-off, bridge enable/request and the full five-key game-hook query against the production server and real dispatch path.
+- Version `v1.6.1-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
+
 ## v1.6.0-experimental
 
 Experimental WebUI quality and completeness release. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target. No radio, firmware, pairing or virtual-pad ABI change is included.

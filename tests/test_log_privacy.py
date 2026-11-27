@@ -8,8 +8,9 @@ class LogPrivacy(unittest.TestCase):
         self.assertLess(body.index('diagnostics_sanitize_raw_log'),body.index('klog_printf'))
         self.assertLess(body.index('diagnostics_sanitize_raw_log'),body.index('write(g_log_fd'))
     def test_safe_policy_guards_klog_thread(self):
-        s=(ROOT/'payload/gc_main.c').read_text();p=s.index('pthread_create(&g_klog_tid')
-        self.assertIn('g_runtime_policy.enable_ds_handoff',s[p-150:p])
+        s=(ROOT/'payload/gc_main.c').read_text()
+        guard=s.index('if (g_runtime_policy.enable_ds_handoff) {')
+        self.assertIn('pthread_create(&g_klog_tid',s[guard:guard+400])
     def test_disabled_handoff_does_not_observe(self):
         s=(ROOT/'payload/ds_handoff.c').read_text();a=s.index('void ds_handoff_klog_line(');b=s.index('int added',a)
         self.assertIn('!g_allowed',s[a:b]);self.assertIn('!g_enabled',s[a:b])

@@ -16,6 +16,7 @@
 #include "webui_route.h"
 #include "webui_json.h"
 #include "runtime_control.h"
+#include "runtime_features.h"
 #include "settings_tile.h"
 #include "diagnostics.h"
 #include "private_file.h"
@@ -229,7 +230,8 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         REPLY_TXT(fd, 405, "method not allowed"); return;
     }
     if (!is_post && strchr(path, '?') &&
-        (route.id == WEBUI_ROUTE_GAMEHOOKS || route.id == WEBUI_ROUTE_DUALSENSE)) {
+        (route.id == WEBUI_ROUTE_GAMEHOOKS || route.id == WEBUI_ROUTE_DUALSENSE ||
+         route.id == WEBUI_ROUTE_BRIDGE)) {
         REPLY_TXT(fd, 400, "mutation parameters require POST"); return;
     }
     if (route.id == WEBUI_ROUTE_INDEX) {
@@ -475,9 +477,24 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     }
     if (route.id == WEBUI_ROUTE_DUALSENSE) {
         if (is_post) {
-            char on[8];
-            if (webui_route_param(&route, "on", on, sizeof(on)) != 1 ||
-                (strcmp(on, "0") && strcmp(on, "1"))) {
+            char on[8], handoff[8];
+            int has_on = webui_route_param(&route, "on", on, sizeof(on));
+            int has_handoff = webui_route_param(&route, "handoff", handoff, sizeof(handoff));
+            if (has_on < 0 || has_handoff < 0 ||
+                (has_on == 1 && has_handoff == 1)) {
+                REPLY_TXT(fd, 400, "invalid DualSense parameters"); return;
+            }
+            if (has_handoff == 1) {
+                if (strcmp(handoff, "0") && strcmp(handoff, "1")) {
+                    REPLY_TXT(fd, 400, "invalid handoff parameter"); return;
+                }
+                char message[192];
+                int result = runtime_feature_set_handoff(handoff[0] == '1',
+                                                         message, sizeof(message));
+                REPLY_TXT(fd, result ? 500 : 200, message);
+                return;
+            }
+            if (has_on != 1 || (strcmp(on, "0") && strcmp(on, "1"))) {
                 REPLY_TXT(fd, 400, "invalid on parameter"); return;
             }
             if (ds_handoff_set_enabled(on[0] == '1') != 0) {
@@ -491,7 +508,22 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         return;
     }
     if (route.id == WEBUI_ROUTE_BRIDGE) {
-        if (is_post) bridge_probe_request();
+        if (is_post) {
+            char enable[8];
+            int has_enable = webui_route_param(&route, "enable", enable, sizeof(enable));
+            if (has_enable < 0 ||
+                (has_enable == 1 && strcmp(enable, "0") && strcmp(enable, "1"))) {
+                REPLY_TXT(fd, 400, "invalid enable parameter"); return;
+            }
+            if (has_enable == 1) {
+                char message[192];
+                int result = runtime_feature_set_bridge(enable[0] == '1',
+                                                        message, sizeof(message));
+                REPLY_TXT(fd, result ? 500 : 200, message);
+                return;
+            }
+            bridge_probe_request();
+        }
         char out[1024]; int n = bridge_probe_json(out, sizeof(out));
         if (n < 0 || (size_t)n >= sizeof(out)) REPLY_TXT(fd, 500, "bridge response overflow");
         else reply(fd, 200, "application/json", out, (size_t)n);

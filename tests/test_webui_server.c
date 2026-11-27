@@ -76,8 +76,21 @@ int game_hooks_set_runtime_enabled(int enable, char *message, size_t capacity) {
 }
 int ds_handoff_set_enabled(int on) { return on?-1:0; }
 int ds_handoff_json(char *o,size_t n) { return snprintf(o,n,"{}"); }
-void bridge_probe_request(void) {}
+static int bridge_requests;
+void bridge_probe_request(void) { ++bridge_requests; }
 int bridge_probe_json(char *o,size_t n) { return snprintf(o,n,"{}"); }
+static int handoff_toggle_calls, handoff_toggle_value, handoff_toggle_result;
+int runtime_feature_set_handoff(int on,char *message,size_t capacity) {
+    ++handoff_toggle_calls; handoff_toggle_value=on;
+    snprintf(message,capacity,"handoff=%d",on);
+    return handoff_toggle_result;
+}
+static int bridge_toggle_calls, bridge_toggle_value, bridge_toggle_result;
+int runtime_feature_set_bridge(int on,char *message,size_t capacity) {
+    ++bridge_toggle_calls; bridge_toggle_value=on;
+    snprintf(message,capacity,"bridge=%d",on);
+    return bridge_toggle_result;
+}
 
 static int connect_client(void) {
     struct sockaddr_in address; socklen_t n=sizeof(address);
@@ -124,6 +137,42 @@ int main(void) {
     assert(hooks_toggle_calls == 2 && hooks_toggle_value == 0);
     hooks_toggle_result = 0;
     assert(request("POST /api/gamehooks?hooks=2 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==400);
+    assert(request("POST /api/dualsense?handoff=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(handoff_toggle_calls==1 && handoff_toggle_value==1 && strstr(out,"handoff=1"));
+    handoff_toggle_result=1;
+    assert(request("POST /api/dualsense?handoff=0 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==500);
+    assert(handoff_toggle_calls==2 && handoff_toggle_value==0);
+    handoff_toggle_result=0;
+    assert(request("POST /api/dualsense?handoff=2 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==400);
+    assert(request("POST /api/dualsense?on=1&handoff=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==400);
+
+    assert(request("POST /api/bridge?enable=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(bridge_toggle_calls==1 && bridge_toggle_value==1 && strstr(out,"bridge=1"));
+    bridge_toggle_result=1;
+    assert(request("POST /api/bridge?enable=0 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==500);
+    assert(bridge_toggle_calls==2 && bridge_toggle_value==0);
+    bridge_toggle_result=0;
+    assert(request("GET /api/bridge?enable=1 HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==400);
+    assert(request("POST /api/bridge HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(bridge_requests==1);
+
+    assert(request("POST /api/dualsense?on=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==403);
+    assert(request("POST /api/dualsense?on=0 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+
+    assert(request("POST /api/gamehooks?input=0&vibration=1&audio=1&mode=2&hooks=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(hooks_toggle_calls==3 && hooks_toggle_value==1);
+
+    assert(request("POST /api/pause?on=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(request("POST /api/pause HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==400);
+    assert(request("POST /api/override?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(request("POST /api/profile?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Type: text/plain;charset=UTF-8\r\nContent-Length: 20\r\n\r\nname=Default\nA=CROSS",out,sizeof(out))==200);
+    int mutations_before=mutations;
+    assert(request("POST /api/delete?id=default HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==200);
+    assert(mutations==mutations_before+1);
+    assert(request("GET /api/log HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
+    assert(request("GET /api/log?prev=2 HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==400);
+    assert(request("GET /api/status? HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==400);
+
     assert(request("GET /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
     assert(strstr(out,"X-Content-Type-Options: nosniff"));
     assert(request("GET / HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
