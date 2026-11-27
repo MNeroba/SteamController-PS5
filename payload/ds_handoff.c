@@ -447,8 +447,8 @@ int ds_handoff_stop(void) {
 
 int ds_handoff_json(char *out, size_t n) {
     pthread_mutex_lock(&g_lock);
-    int w = snprintf(out, n, "{\"enabled\":%d,\"state\":\"%s\",\"pads\":%d,\"ret\":%d}",
-                     g_enabled, k_state[g_state], g_n_pads, g_last_ret);
+    int w = snprintf(out, n, "{\"allowed\":%d,\"enabled\":%d,\"state\":\"%s\",\"pads\":%d,\"ret\":%d}",
+                     g_allowed, g_enabled, k_state[g_state], g_n_pads, g_last_ret);
     pthread_mutex_unlock(&g_lock);
     return w;
 }

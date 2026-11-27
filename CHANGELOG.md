@@ -2,6 +2,27 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
 
+## v1.6.0-experimental
+
+Experimental WebUI quality and completeness release. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target. No radio, firmware, pairing or virtual-pad ABI change is included.
+
+### Bug Fixes
+
+- The off-screen save bar is no longer keyboard/screen-reader reachable before a profile is loaded; Save and Undo are inert while hidden, and a profile save is refused until a canonical profile has been loaded. This removes the path that could POST an empty activator set and clear existing long/double/shift/turbo/toggle bindings.
+- Save-state handling no longer reports a confirmed save as failed when the follow-up profile list refresh fails; Undo and the unsaved-changes Discard path clear the "Save not confirmed" state; an in-flight save cannot be cancelled by Discard.
+- Core controls now surface failures instead of failing silently: the per-game profile lock (`#mode`), pause, log show/copy/previous, DualSense hand-off, game-hook switches and "Use recommended settings" report an error and revert the control when the request fails.
+- Polling backs off to 1.2 s while the backend is offline, pauses while the page is hidden, resumes immediately on visibility, and clears the stale battery/paused indicators. Icon hydration is sequential instead of firing one request per installed game at once, reducing pressure on the four-client serialized server.
+- The remap sheet keeps keyboard focus after activator/picker re-renders, marks the background inert while open, restores focus on close, and the unload guard now covers a staged sheet draft.
+- The game list distinguishes a read failure from an empty library and offers Retry; a settings-only profile file is accepted by the import heuristic; a malformed `#profile=` hash cannot abort startup.
+- DualSense hand-off and the game-bridge check now report when their runtime-policy flags are off, disable the affected controls, and explain how to enable them instead of appearing functional and failing with 403 or doing nothing.
+- The route parser accepts a fully populated `/api/gamehooks` query (all five allowed keys); the status JSON buffer has more room and non-finite gyro samples are written as 0; `/api/log` and `/api/icon` open regular files with `O_NOFOLLOW` instead of following symlinks.
+
+### New Features / Improvements
+
+- Version `v1.6.0-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
+- `/api/dualsense` and `/api/bridge` now expose their runtime-policy availability; the WebUI uses it to label disabled features honestly.
+- Tab lists expose `aria-controls`/`tabpanel` relationships and support arrow/Home/End navigation; picker and sheet focus handling is documented by host/browser regressions.
+
 ## v1.5.2-experimental
 
 Experimental follow-up to 1.5.1. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.

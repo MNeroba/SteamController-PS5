@@ -250,8 +250,8 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
 .kv .opt{min-height:48px;padding:10px 16px}
 
 /* save bar, sheet, toast */
-.savebar{position:fixed;left:0;right:0;bottom:0;z-index:7;background:rgba(30,38,55,.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line);transform:translateY(110%);transition:transform .18s;box-shadow:0 -8px 24px rgba(0,0,0,.25)}
-.savebar.show{transform:none}
+.savebar{position:fixed;left:0;right:0;bottom:0;z-index:7;background:rgba(30,38,55,.96);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);border-top:1px solid var(--line);transform:translateY(110%);visibility:hidden;transition:transform .18s;box-shadow:0 -8px 24px rgba(0,0,0,.25)}
+.savebar.show{transform:none;visibility:visible}
 .savebar .wrap{display:flex;gap:10px;align-items:center;justify-content:space-between;min-height:68px;padding-top:10px;padding-bottom:calc(10px + env(safe-area-inset-bottom))}
 .savebar .msg{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .savebar .msg::before{content:"";display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--warn);margin-right:8px;vertical-align:1px}
@@ -333,9 +333,9 @@ dialog.profile-guard::backdrop{background:#0009}
   <div class="wrap head">
     <div class="brand">SteamController-PS5<small>Steam Controller for PS5</small></div>
     <nav class="tabs" role="tablist" aria-label="Pages">
-      <button role="tab" aria-selected="true" data-tab="remap">Remap</button>
-      <button role="tab" aria-selected="false" data-tab="games">Games</button>
-      <button role="tab" aria-selected="false" data-tab="help"><span class="long">Settings &amp; help</span><span class="short">Settings</span></button>
+      <button id="tabbtn-remap" role="tab" aria-selected="true" aria-controls="tab-remap" data-tab="remap">Remap</button>
+      <button id="tabbtn-games" role="tab" aria-selected="false" aria-controls="tab-games" data-tab="games">Games</button>
+      <button id="tabbtn-help" role="tab" aria-selected="false" aria-controls="tab-help" data-tab="help"><span class="long">Settings &amp; help</span><span class="short">Settings</span></button>
     </nav>
     <span class="pill"><span class="dot" id="dot"></span><span id="conn">Connecting…</span><span id="batt" class="batt" hidden></span></span>
   </div>
@@ -352,7 +352,7 @@ dialog.profile-guard::backdrop{background:#0009}
   </section>
 
   <!-- REMAP -->
-  <section id="tab-remap">
+  <section id="tab-remap" role="tabpanel" aria-labelledby="tabbtn-remap">
     <div id="profileRecovery" class="card" hidden><b>Default profile cannot be read</b><p>Recover compiled defaults and preserve the damaged file as a backup. Other game profiles are kept.</p><button id="recoverDefault">Recover Default</button></div>
 
     <div class="card pbar">
@@ -467,7 +467,7 @@ dialog.profile-guard::backdrop{background:#0009}
   </section>
 
   <!-- GAMES -->
-  <section id="tab-games" hidden>
+  <section id="tab-games" role="tabpanel" aria-labelledby="tabbtn-games" hidden>
     <div class="games-head">
       <input type="search" id="gsearch" placeholder="Search installed games" aria-label="Search installed games">
       <span class="pill" id="gcount">…</span>
@@ -476,7 +476,7 @@ dialog.profile-guard::backdrop{background:#0009}
   </section>
 
   <!-- SETTINGS & HELP -->
-  <section id="tab-help" hidden>
+  <section id="tab-help" role="tabpanel" aria-labelledby="tabbtn-help" hidden>
     <nav class="sub" aria-label="Settings sections"><div class="subs">
       <button data-sec="setup">Quick setup</button><button data-sec="diagnostics">Diagnostics</button><button data-sec="tile">PS5 tile</button><button data-sec="pause">Pause</button><button data-sec="handoff">DualSense hand-off</button><button data-sec="ingame">In games</button><button data-sec="vibration">Vibration test</button><button data-sec="menu">On-console menu</button><button data-sec="bridge">Game bridge check</button><button data-sec="log">Troubleshooting log</button>
     </div></nav>
@@ -545,7 +545,7 @@ dialog.profile-guard::backdrop{background:#0009}
   </section>
 </div>
 
-<div class="savebar" id="savebar"><div class="wrap"><span class="msg">Unsaved changes to <b id="saveName"></b></span><span class="btns"><button id="revert" class="ghost">Undo</button><button class="primary" id="save">Save changes</button></span></div></div>
+<div class="savebar" id="savebar" inert aria-hidden="true"><div class="wrap"><span class="msg">Unsaved changes to <b id="saveName"></b></span><span class="btns"><button id="revert" class="ghost">Undo</button><button class="primary" id="save">Save changes</button></span></div></div>
 
 <div class="sheet" id="sheet" role="dialog" aria-modal="true" aria-labelledby="sheetT">
   <div class="box">
@@ -691,7 +691,9 @@ async function api(path,opt={}){
   if(!r.ok){const error=new Error(t);error.status=r.status;throw error}return t;
 }
 function isDirty(){return saveUnconfirmed||(saved!==""&&fmt(cur)!==saved)}
-function dirty(){const d=isDirty();$("#savebar").classList.toggle("show",d);$("#saveName").textContent=pname(editing);
+function dirty(){const d=isDirty();const bar=$("#savebar");bar.classList.toggle("show",d);
+  if(d)bar.removeAttribute("inert");else bar.setAttribute("inert","");
+  bar.setAttribute("aria-hidden",d?"false":"true");$("#saveName").textContent=pname(editing);
   const s=$("#pstate");s.textContent=saveUnconfirmed?"Save not confirmed":d?"Unsaved changes":"Saved";s.classList.toggle("dirty",d)}
 
 /* ── storage (optional: the page works without it) ── */
@@ -703,7 +705,7 @@ const TABS=["remap","games","help"];
 let tab="remap", sec={}, scrolls={};
 try{scrolls=JSON.parse(srecall("pb.scroll")||"{}")}catch(e){scrolls={}}
 function parseHash(h){const o={tab:null,prof:null,sec:null};(h||"").replace(/^#/,"").split("/").filter(Boolean).forEach((p,i)=>{
-  if(i===0)o.tab=p;else if(p.startsWith("profile="))o.prof=decodeURIComponent(p.slice(8));else o.sec=p});return o}
+  if(i===0)o.tab=p;else if(p.startsWith("profile=")){try{o.prof=decodeURIComponent(p.slice(8))}catch(e){o.prof=null}}else o.sec=p});return o}
 function hashOf(){let h="#"+tab;if(tab==="remap")h+="/profile="+encodeURIComponent(editing);if(sec[tab])h+="/"+sec[tab];return h}
 function syncHash(push){const h=hashOf();store("pb.loc",h);if(location.hash===h)return;
   try{history[push?"pushState":"replaceState"](push?null:history.state,"",h)}catch(e){location.hash=h}}
@@ -717,6 +719,14 @@ function showTab(t,push){if(!TABS.includes(t))t="remap";
   if(t==="games")refreshGames();if(t==="help"){paintHooks();paintDs();paintBridge()}
   syncHash(push);restoreScroll();paintSub()}
 $$("nav.tabs button").forEach(b=>b.onclick=()=>{if(b.dataset.tab!==tab)showTab(b.dataset.tab,true);else scrollTo({top:0,behavior:"auto"})});
+$("nav.tabs").addEventListener("keydown",e=>{
+  if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key))return;
+  const tabs=[...$$("nav.tabs button")],i=tabs.indexOf(document.activeElement);
+  if(i<0)return;
+  e.preventDefault();
+  const next=e.key==="Home"?0:e.key==="End"?tabs.length-1:(i+(e.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length;
+  tabs[next].focus();showTab(tabs[next].dataset.tab,true);
+});
 function switchTab(t){showTab(t,true)}
 function secTop(el){return el.getBoundingClientRect().top+scrollY-hh()-parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--sub"))-10}
 let pinT=0; /* after a programmatic scroll, keep the chosen section until the user scrolls */
@@ -929,16 +939,34 @@ function openSheet(k,options={}){
   draft.turbo=cur[k+".turbo"]==="1";draft.toggle=cur[k+".toggle"]==="1";
   $$(".ctl").forEach(g=>g.classList.toggle("sel",g.dataset.k===k));
   act="";renderActTabs();renderPick();
-  $("#sheet").classList.add("show");paintPad();$("#pick button").focus();requestAnimationFrame(updateSheetScroll);
+  $("#sheet").classList.add("show");setBackgroundInert(true);paintPad();$("#pick button").focus();requestAnimationFrame(updateSheetScroll);
 }
+function setBackgroundInert(on){
+  for(const el of document.querySelectorAll("body > header, body > .wrap, body > .savebar"))
+    if(on)el.setAttribute("inert","");else el.removeAttribute("inert");
+}
+document.addEventListener("focusin",e=>{
+  if(!$("#sheet").classList.contains("show"))return;
+  if($("#sheet").contains(e.target))return;
+  const first=$("#pick button")||$("#done");if(first)first.focus();
+});
 function updateSheetScroll(){
   const box=$("#sheet > .box");
   $("#sheetScrollHint").textContent=box.scrollHeight-box.scrollTop-box.clientHeight>24?"More output actions below ↓":"All output actions shown";
 }
 $("#sheet > .box").onscroll=updateSheetScroll;
 function renderActTabs(){
-  $("#actTabs").innerHTML=actsFor(sheetKey).map(([a,l])=>`<button role="tab" data-a="${a}" aria-selected="${a===act}">${l}${a&&draft[a].size?'<span class="n"></span>':""}</button>`).join("");
+  const hadFocus=!!document.activeElement?.closest?.("#actTabs");
+  $("#actTabs").innerHTML=actsFor(sheetKey).map(([a,l])=>`<button role="tab" data-a="${a}" aria-selected="${a===act}" aria-controls="pick">${l}${a&&draft[a].size?'<span class="n"></span>':""}</button>`).join("");
+  if(hadFocus){const active=$(`#actTabs button[data-a="${act}"]`);if(active)active.focus()}
   $$("#actTabs button").forEach(b=>b.onclick=()=>{act=b.dataset.a;renderActTabs();renderPick()});
+  $("#actTabs").onkeydown=e=>{
+    if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key))return;
+    const tabs=[...$$("#actTabs button")],i=tabs.indexOf(document.activeElement);
+    if(i<0)return;e.preventDefault();
+    const next=e.key==="Home"?0:e.key==="End"?tabs.length-1:(i+(e.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length;
+    tabs[next].focus();tabs[next].click();
+  };
   $("#actHelp").textContent=ACTS.find(a=>a[0]===act)[2]+(act===""&&sheetAddOutput?" "+outputAccessibleLabel(sheetAddOutput)+" staged; choose Done to apply or Cancel to discard.":"");
   $("#actOpts").hidden=act!=="";
   $("#optTurbo").checked=draft.turbo;$("#optToggle").checked=draft.toggle;
@@ -946,15 +974,18 @@ function renderActTabs(){
 $("#optTurbo").onchange=e=>{draft.turbo=e.target.checked;if(draft.turbo){draft.toggle=false;$("#optToggle").checked=false}};
 $("#optToggle").onchange=e=>{draft.toggle=e.target.checked;if(draft.toggle){draft.turbo=false;$("#optTurbo").checked=false}};
 function renderPick(){
-  const set=draft[act],p=$("#pick");p.innerHTML="";
+  const set=draft[act],p=$("#pick");
+  const focused=document.activeElement?.dataset?.v;
+  p.innerHTML="";
   OUTPUT_GROUPS.forEach(([label,keys])=>{
     const section=document.createElement("section");section.className="pick-group";
     const heading=document.createElement("h4");heading.textContent=label;section.appendChild(heading);
     const grid=document.createElement("div");grid.className="pick-grid";
-    keys.forEach(v=>{const b=document.createElement("button");b.type="button";b.className="g-"+v;b.innerHTML=outputChoice(v);b.setAttribute("aria-label",outputAccessibleLabel(v));b.setAttribute("aria-pressed",set.has(v));
+    keys.forEach(v=>{const b=document.createElement("button");b.type="button";b.className="g-"+v;b.dataset.v=v;b.innerHTML=outputChoice(v);b.setAttribute("aria-label",outputAccessibleLabel(v));b.setAttribute("aria-pressed",set.has(v));
       b.onclick=()=>toggleOutput(v);grid.appendChild(b)});
     section.appendChild(grid);p.appendChild(section);
   });
+  if(focused){const again=p.querySelector(`[data-v="${focused}"]`);if(again)again.focus()}
   paintDestinations();requestAnimationFrame(updateSheetScroll);
 }
 function closeSheet(apply){
@@ -965,7 +996,7 @@ function closeSheet(apply){
     if(draft.toggle)cur[k+".toggle"]="1";else delete cur[k+".toggle"];
     normalizeBindingFlags(cur);render();showCaption(k);
   }
-  $("#sheet").classList.remove("show");sheetKey=null;sheetAddOutput=null;paintPad();
+  $("#sheet").classList.remove("show");setBackgroundInert(false);sheetKey=null;sheetAddOutput=null;paintPad();
   const returnTo=sheetReturnFocus&&sheetReturnFocus.isConnected?sheetReturnFocus:$("#steamStage svg:not([hidden]) .ctl[data-k='"+selectedKey+"']");if(returnTo)returnTo.focus();
 }
 function extras(k){const t=[];
@@ -1002,7 +1033,10 @@ async function canLeaveProfile(){
       $("#guardCancel").onclick=()=>finish("cancel");
       dialog.oncancel=e=>{e.preventDefault();finish("cancel")};
       dialog.showModal();
-    }).then(async choice=>choice==="discard"|| (choice==="save"&&await saveCurrent()&&!isDirty()))
+    }).then(async choice=>{
+      if(choice==="discard"){saveUnconfirmed=false;dirty();return true}
+      return choice==="save"&&await saveCurrent()&&!isDirty();
+    })
       .finally(()=>{guardPromise=null});
   }
   return guardPromise;
@@ -1061,10 +1095,18 @@ async function createFor(tid,name){
   }catch(e){if(ticket===navigationGeneration)toast("Profile creation failed: "+e.message)}
 }
 $("#prof").onchange=e=>load(e.target.value);
-$("#mode").onchange=async e=>{await api("/api/override?id="+encodeURIComponent(e.target.value),{method:"POST"});toast(e.target.value?"Locked to "+pname(e.target.value):"Switching automatically per game")};
+$("#mode").onchange=async e=>{
+  const value=e.target.value,previous=status.override||"";
+  modeBusy=true;
+  try{await api("/api/override?id="+encodeURIComponent(value),{method:"POST"});
+    toast(value?"Locked to "+pname(value):"Switching automatically per game")}
+  catch(err){e.target.value=previous;toast("Profile lock failed: "+err.message)}
+  finally{modeBusy=false}
+};
 let saving=false;
 function saveCurrent(){
   if(savePromise)return savePromise;
+  if(!saved){toast("Profile is still loading; nothing was saved");return false}
   const id=editing,ticket=editorGeneration;
   saving=true;$("#save").disabled=true;
   savePromise=Promise.resolve().then(async()=>{
@@ -1077,7 +1119,8 @@ function saveCurrent(){
         if(fmt(cur)===submitted)cur=canonical;
         saved=applied;saveUnconfirmed=false;render();
       }
-      await refreshList();toast(editing===id&&isDirty()?"Saved earlier changes; newer edits are unsaved":"Saved and confirmed");
+      try{await refreshList()}catch(_){/* the save itself is already confirmed */}
+      toast(editing===id&&isDirty()?"Saved earlier changes; newer edits are unsaved":"Saved and confirmed");
       return true;
     }catch(e){if(editing===id&&ticket===editorGeneration){dirty();toast("Save not confirmed: "+e.message)}return false}
     finally{saving=false;$("#save").disabled=false;savePromise=null}
@@ -1085,16 +1128,17 @@ function saveCurrent(){
   return savePromise;
 }
 $("#save").onclick=()=>saveCurrent();
-$("#revert").onclick=()=>{cur=parse(saved);render();toast("Changes undone")};
+$("#revert").onclick=()=>{if(!saved)return;saveUnconfirmed=false;cur=parse(saved);render();dirty();toast("Changes undone")};
 /* ── export / import ── */
 $("#exp").onclick=()=>{
+  if(!saved){toast("Profile is still loading");return}
   const name=(cur.name||editing).replace(/[^\w .()-]+/g,"_").trim()||"profile";
   const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([fmt(cur)],{type:"text/plain"}));
   a.download=`SteamController-PS5 - ${name}.ini`;document.body.appendChild(a);a.click();a.remove();
   setTimeout(()=>URL.revokeObjectURL(a.href),1000);
   toast(isDirty()?"Exported, including unsaved changes":"Exported");
 };
-$("#imp").onclick=()=>{$("#impFile").value="";$("#impFile").click()};
+$("#imp").onclick=()=>{if(!saved){toast("Profile is still loading");return}$("#impFile").value="";$("#impFile").click()};
 function mergeImportedProfile(current,incoming){
   const checked=validatedProfile(incoming),next={...current};
   Object.entries(checked).forEach(([key,value])=>{
@@ -1110,7 +1154,7 @@ $("#impFile").onchange=async e=>{
   if(f.size>32768){toast("That file is too big to be a profile");return}
   try{
     const p=parse(await f.text()),next=mergeImportedProfile(cur,p);
-    if(!BITS.some(k=>Object.hasOwn(p,k))){toast("That doesn't look like a SteamController-PS5 profile");return}
+    if(!Object.keys(p).length){toast("That doesn't look like a SteamController-PS5 profile");return}
     if(!confirm("Merge settings from "+f.name+" into \""+pname(editing)+"\"? Values present in the file replace current values; omitted settings stay unchanged. An empty or NONE activator clears only that activator. Review, then Save."))return;
     cur=next;render();dirty();toast("Merged. Check the profile, then Save");
   }catch(error){toast("Import rejected: "+error.message)}
@@ -1127,7 +1171,7 @@ $("#del").onclick=async()=>{
     toast("Deleted");
   }catch(e){if(ticket===navigationGeneration){selectionCommitted();toast("Delete failed: "+e.message)}}
 };
-window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()){e.preventDefault();e.returnValue=""}});
+window.addEventListener("beforeunload",e=>{saveScroll();if(isDirty()||$("#sheet").classList.contains("show")){e.preventDefault();e.returnValue=""}});
 
 /* ── games ── */
 const iconUrls=new Map(),iconRequests=new Map();
@@ -1148,18 +1192,23 @@ async function authenticatedIcon(id){
   iconRequests.set(id,pending);
   try{return await pending}finally{if(iconRequests.get(id)===pending)iconRequests.delete(id)}
 }
-function hydrateIcons(root){root.querySelectorAll("img[data-game-icon]").forEach(async img=>{
-  try{const url=await authenticatedIcon(img.dataset.gameIcon);if(img.isConnected)img.src=url}
-  catch(e){if(img.isConnected)img.replaceWith(document.createTextNode("?"))}
-})}
+async function hydrateIcons(root){
+  for(const img of root.querySelectorAll("img[data-game-icon]")){
+    try{const url=await authenticatedIcon(img.dataset.gameIcon);if(img.isConnected)img.src=url}
+    catch(e){if(img.isConnected)img.replaceWith(document.createTextNode("?"))}
+  }
+}
+let gamesError=false;
 async function refreshGames(){
-  try{games=JSON.parse(await api("/api/games"))}catch(e){games=[]}
+  try{games=JSON.parse(await api("/api/games"));gamesError=false}catch(e){games=[];gamesError=true}
   games.sort((a,b)=>a.name.localeCompare(b.name));renderGames();
 }
 function renderGames(){
   const q=$("#gsearch").value.trim().toLowerCase();
   const list=games.filter(g=>!q||g.name.toLowerCase().includes(q)||g.id.toLowerCase().includes(q));
   $("#gcount").textContent=`${games.length} installed`;
+  if(gamesError){$("#games").innerHTML='<div class="empty"><b>Could not read the game list</b>Check the payload log, then try again. <button id="gamesRetry">Retry</button></div>';
+    $("#gamesRetry").onclick=refreshGames;return}
   if(!games.length){$("#games").innerHTML='<div class="empty"><b>No installed games found</b>Games appear here once the PS5 has finished listing them.</div>';return}
   $("#games").innerHTML=list.map(g=>{const has=profiles.some(p=>p.id===g.id),playing=status.title===g.id;
     return `<div class="card game${playing?" playing":""}"><div class="art">${art(g)}</div><div class="name">${esc(g.name)}</div>
@@ -1199,8 +1248,9 @@ function paintLive(live){
   $$(".row").forEach(r=>r.classList.toggle("live",!!(live&(1<<BITS.indexOf(r.dataset.k)))));
   if(fresh){const i=BITS.findIndex((_,i)=>fresh&(1<<i));if(i>=0)showCaption(BITS[i])}
 }
-let lastConn="";
+let lastConn="",pollTimer=0,pollDelay=300;
 async function poll(){
+  if(document.hidden){pollTimer=0;return}
   try{
     status=JSON.parse(await api("/api/status"));
     const ck=[status.connected,status.paused].join();
@@ -1211,12 +1261,21 @@ async function poll(){
       $("#pauseBtn").textContent=status.paused?"Resume now":"Pause now";$("#pauseBtn").className=status.paused?"primary":""}
     paintBattery();
     renderNow();paintLive(status.inputs>>>0);paintHap();paintGyro();
-    if($("#mode").value!==(status.override||""))$("#mode").value=status.override||"";
-  }catch(e){lastConn="";$("#dot").classList.remove("on");$("#conn").textContent="Backend offline"}
-  setTimeout(poll,150);
+    if(!modeBusy&&$("#mode").value!==(status.override||""))$("#mode").value=status.override||"";
+    pollDelay=300;
+  }catch(e){lastConn="";$("#dot").classList.remove("on");$("#dot").classList.remove("paused");
+    $("#batt").hidden=true;lastBatt="";$("#conn").textContent="Backend offline";pollDelay=1200}
+  pollTimer=setTimeout(poll,pollDelay);
 }
+document.addEventListener("visibilitychange",()=>{if(!document.hidden){clearTimeout(pollTimer);poll()}});
 
-$("#pauseBtn").onclick=async()=>{try{await api("/api/pause?on="+(status.paused?0:1),{method:"POST"});toast(status.paused?"Resumed":"Paused")}catch(e){toast(e.message)}};
+$("#pauseBtn").onclick=async()=>{
+  const button=$("#pauseBtn");button.disabled=true;
+  try{const reply=await api("/api/pause?on="+(status.paused?0:1),{method:"POST"});
+    toast(reply==="paused"?"Paused":"Resumed")}
+  catch(e){toast(e.message||"Pause request failed")}
+  finally{button.disabled=false}
+};
 
 /* ── battery ── */
 let lastBatt="";
@@ -1250,6 +1309,8 @@ function paintGyro(){
 /* ── help ── */
 $$("[data-hap]").forEach(b=>b.onclick=async()=>{try{await api("/api/haptic?kind="+b.dataset.hap+"&via="+$("#hapVia").value,{method:"POST"});toast("Sent to controller")}catch(e){toast(e.message||"Request failed")}});
 function paintHap(){const h=status.hap,el=$("#hapDiag");if(!h){el.textContent="";return}
+  const viaSelect=$("#hapVia");
+  if(viaSelect&&document.activeElement!==viaSelect&&h.via>=0&&h.via<=4)viaSelect.value=String(h.via);
   const via=["–","interrupt OUT","output report","feature report","every Puck output"][h.via]||"–";
   const txt=!status.haptics?"Controller not connected to the payload.":
    `Queued ${h.q}, sent ${h.sent}, failed ${h.fail}. Last: ${h.q?(h.err?"error "+h.err:"OK")+" via "+via:"none yet"}. OUT endpoint: ${h.out>=0?"0x"+h.out.toString(16).padStart(2,"0"):"not available"}.`;
@@ -1284,12 +1345,24 @@ $("#tileInstall").onclick=async()=>{
   catch(error){$("#tileStatus").textContent="Tile request failed: "+error.message}
   finally{button.disabled=false}
 };
-$("#logShow").onclick=async()=>{const p=$("#log");if(!p.hidden){p.hidden=true;$("#logShow").textContent="Show log";return}p.textContent=await api("/api/log");p.hidden=false;$("#logShow").textContent="Hide log";p.scrollTop=p.scrollHeight};
-$("#logPrev").onclick=async()=>{const t=await api("/api/log?prev=1");try{await navigator.clipboard.writeText(t);toast("Previous run's log copied")}catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}};
-$("#logCopy").onclick=async()=>{const t=await api("/api/log");try{await navigator.clipboard.writeText(t);toast("Log copied")}catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}};
+$("#logShow").onclick=async()=>{const p=$("#log");if(!p.hidden){p.hidden=true;$("#logShow").textContent="Show log";return}
+  try{p.textContent=await api("/api/log");p.hidden=false;$("#logShow").textContent="Hide log";p.scrollTop=p.scrollHeight}
+  catch(e){toast("Log unavailable: "+e.message)}};
+$("#logPrev").onclick=async()=>{
+  let t;try{t=await api("/api/log?prev=1")}catch(err){toast("Previous log unavailable: "+err.message);return}
+  try{await navigator.clipboard.writeText(t);toast("Previous run's log copied")}
+  catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}
+};
+$("#logCopy").onclick=async()=>{
+  let t;try{t=await api("/api/log")}catch(err){toast("Log unavailable: "+err.message);return}
+  try{await navigator.clipboard.writeText(t);toast("Log copied")}
+  catch(e){const p=$("#log");p.textContent=t;p.hidden=false;$("#logShow").textContent="Hide log";toast("Select the log text to copy it")}
+};
 
 /* ── in-game hooks ── */
+let hooksBusy=false,modeBusy=false;
 async function paintHooks(){
+  if(hooksBusy)return;
   let v;try{v=JSON.parse(await api("/api/gamehooks"))}catch(e){return}
   $("#ghIn").checked=!!v.input;$("#ghVib").checked=!!v.vibration;$("#ghAud").checked=!!v.audio;
   if(document.activeElement!==$("#ghMode"))$("#ghMode").value=String(v.mode);
@@ -1303,24 +1376,39 @@ async function paintHooks(){
         :"No DualSense haptics/speaker ports seen yet. If the game was already running when the payload loaded, restart the game."):""):
     v.state===3?`Couldn't hook ${name}: ${v.why}.`:`Waiting for ${name}… ${v.why||""}`;
 }
-async function setHooks(q){try{await api("/api/gamehooks?"+q,{method:"POST"});paintHooks()}catch(e){toast(e.message)}}
+async function setHooks(q){
+  hooksBusy=true;
+  try{await api("/api/gamehooks?"+q,{method:"POST"});await paintHooks();return true}
+  catch(e){toast(e.message||"Setting failed");return false}
+  finally{hooksBusy=false}
+}
 $("#ghOn").onchange=async e=>{
   const on=e.target.checked;
   if(on&&!confirm("Enable experimental game hooks? This patches the running game's controller code so PS5 vibration and haptics reach the Steam Controller. Leave it off if a game becomes unstable.")){e.target.checked=false;return}
-  try{const message=await api("/api/gamehooks?hooks="+(on?1:0),{method:"POST"});toast(message);paintHooks()}
-  catch(error){toast(error.message||"Game-hook toggle failed");e.target.checked=!on;paintHooks()}
+  hooksBusy=true;
+  try{const message=await api("/api/gamehooks?hooks="+(on?1:0),{method:"POST"});toast(message);hooksBusy=false;await paintHooks()}
+  catch(error){toast(error.message||"Game-hook toggle failed");e.target.checked=!on;hooksBusy=false;await paintHooks()}
 };
-$("#ghIn").onchange=e=>setHooks("input="+(e.target.checked?1:0));
-$("#ghVib").onchange=e=>setHooks("vibration="+(e.target.checked?1:0));
-$("#ghMode").onchange=e=>setHooks("mode="+e.target.value);
-$("#ghAud").onchange=e=>{setHooks("audio="+(e.target.checked?1:0));toast("Restart the game for this to take effect")};
-$("#ghRec").onclick=()=>{setHooks("input=0&vibration=1&audio=1&mode=2");toast("Recommended settings applied — restart the game")};
+$("#ghIn").onchange=async e=>{if(!await setHooks("input="+(e.target.checked?1:0)))e.target.checked=!e.target.checked};
+$("#ghVib").onchange=async e=>{if(!await setHooks("vibration="+(e.target.checked?1:0)))e.target.checked=!e.target.checked};
+$("#ghMode").onchange=async e=>{if(!await setHooks("mode="+e.target.value))await paintHooks()};
+$("#ghAud").onchange=async e=>{if(await setHooks("audio="+(e.target.checked?1:0)))toast("Restart the game for this to take effect")};
+$("#ghRec").onclick=async()=>{if(await setHooks("input=0&vibration=1&audio=1&mode=2"))toast("Recommended settings applied — restart the game")};
 setInterval(()=>{if(!$("#tab-help").hidden){paintHooks();paintDs()}},1000);
 
 /* ── DualSense hand-off ── */
+let dsBusy=false;
 async function paintDs(){
+  if(dsBusy)return;
   let d;try{d=JSON.parse(await api("/api/dualsense"))}catch(e){return}
-  $("#dsOff").checked=!!d.enabled;
+  const box=$("#dsOff");
+  if(d.allowed===false){
+    box.disabled=true;box.checked=false;
+    $("#dsStatus").textContent="Disabled by runtime policy (ENABLE_DUALSENSE_HANDOFF=0). Enable it in /data/ghostpad/runtime-policy.ini and restart the payload.";
+    return;
+  }
+  box.disabled=false;
+  box.checked=!!d.enabled;
   const seen=d.pads?"":" The DualSense hasn't been identified yet: start a game, or turn the DualSense off and on once.";
   $("#dsStatus").textContent=!d.enabled?"Off.":({
     idle:"Ready. The DualSense turns off the first time you use the Steam Controller after it turns on."+seen,
@@ -1330,7 +1418,12 @@ async function paintDs(){
     back:"DualSense in control. Press the Steam Controller's Steam button to switch back.",
     failed:`Couldn't turn the DualSense off (error ${d.ret}). Please send the log.`}[d.state]||"");
 }
-$("#dsOff").onchange=async e=>{try{await api("/api/dualsense?on="+(e.target.checked?1:0),{method:"POST"});paintDs()}catch(err){toast(err.message)}};
+$("#dsOff").onchange=async e=>{
+  const want=e.target.checked;dsBusy=true;
+  try{await api("/api/dualsense?on="+(want?1:0),{method:"POST"})}
+  catch(err){e.target.checked=!want;toast(err.message||"DualSense hand-off failed")}
+  finally{dsBusy=false;paintDs()}
+};
 
 /* ── game bridge check ── */
 let lastBridge="";
@@ -1339,6 +1432,13 @@ async function paintBridge(){
   if(raw===lastBridge)return;lastBridge=raw;
   const g=games.find(g=>g.id===b.title),name=g?g.name:(b.title||"");
   const row=(k,v,ok)=>`<div class="opt full"><span class="lbl">${esc(k)}</span><span class="badge ${ok===true?"ok":ok===false?"warn":""}">${esc(v)}</span></div>`;
+  const run=$("#bridgeRun");
+  if(b.enabled===false){
+    run.disabled=true;
+    $("#bridgeOut").innerHTML=row("Status","Disabled by runtime policy (ENABLE_BRIDGE_PROBE=0)",null)+row("How to enable","Add ENABLE_BRIDGE_PROBE=1 to /data/ghostpad/runtime-policy.ini and restart the payload",null);
+    return;
+  }
+  run.disabled=false;
   if(!b.title||b.state===0){$("#bridgeOut").innerHTML=row("Status","Start a game to run the check",null);return}
   if(b.state<3){$("#bridgeOut").innerHTML=row(name,b.state===1?"Waiting for the game to finish loading…":"Checking…",null);return}
   const pass=b.result===2&&b.scan===0;

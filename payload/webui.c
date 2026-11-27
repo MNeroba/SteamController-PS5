@@ -18,6 +18,7 @@
 #include "runtime_control.h"
 #include "settings_tile.h"
 #include "diagnostics.h"
+#include "private_file.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -33,6 +34,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <sys/stat.h>
+#include <fcntl.h>
+#include <math.h>
 
 #ifdef __PROSPERO__
 void ghostpad_status_log(const char *fmt, ...);   /* gc_main.c: klog + /data/ghostpad/gc_status.log */
@@ -277,7 +280,7 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         sc2_select_status(t, a, ov);
         sc2_select_title_name(tn, sizeof(tn));
         sc2_select_active_name(pn, sizeof(pn));
-        char out[1024]; sb_t sb; webui_json_writer_init(&sb, out, sizeof(out));
+        char out[2048]; sb_t sb; webui_json_writer_init(&sb, out, sizeof(out));
         sb_put(&sb, "{\"title\":"); json_str(&sb, t);
         sb_put(&sb, ",\"title_name\":"); json_str(&sb, tn);
         sb_put(&sb, ",\"active\":"); json_str(&sb, a);
@@ -294,7 +297,9 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         sb_printf(&sb, ",\"gyro\":{\"wanted\":%d,\"imu\":%d,\"active\":%d,\"cal\":%d,\"grips\":%d,\"button\":%d,"
                   "\"yaw\":%.1f,\"pitch\":%.1f,\"roll\":%.1f}}",
                   gs.wanted, gs.imu, gs.active, gs.calibrated, gs.grips, gs.button,
-                  (double)gs.yaw, (double)gs.pitch, (double)gs.roll);
+                  isfinite(gs.yaw) ? (double)gs.yaw : 0.0,
+                  isfinite(gs.pitch) ? (double)gs.pitch : 0.0,
+                  isfinite(gs.roll) ? (double)gs.roll : 0.0);
         if (sb.failed) REPLY_TXT(fd, 500, "status response overflow");
         else reply(fd, 200, "application/json", out, sb.length);
         return;
@@ -307,8 +312,14 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         const size_t img_capacity = 2 * 1024 * 1024;
         char *img = malloc(img_capacity);
         if (!img) { REPLY_TXT(fd, 500, "icon allocation failed"); return; }
-        FILE *f = fopen(ip, "rb");
-        if (!f) { free(img); REPLY_TXT(fd, 404, "no icon"); return; }
+        int ifd = open(ip, O_RDONLY | O_NOFOLLOW | O_CLOEXEC);
+        struct stat ist;
+        if (ifd < 0 || fstat(ifd, &ist) != 0 || !S_ISREG(ist.st_mode)) {
+            if (ifd >= 0) close(ifd);
+            free(img); REPLY_TXT(fd, 404, "no icon"); return;
+        }
+        FILE *f = fdopen(ifd, "rb");
+        if (!f) { close(ifd); free(img); REPLY_TXT(fd, 500, "icon unreadable"); return; }
         /* Refuse an oversized or unreadable icon instead of serving a
          * truncated PNG with a matching Content-Length. */
         long icon_size = -1;
@@ -481,7 +492,7 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     }
     if (route.id == WEBUI_ROUTE_BRIDGE) {
         if (is_post) bridge_probe_request();
-        char out[768]; int n = bridge_probe_json(out, sizeof(out));
+        char out[1024]; int n = bridge_probe_json(out, sizeof(out));
         if (n < 0 || (size_t)n >= sizeof(out)) REPLY_TXT(fd, 500, "bridge response overflow");
         else reply(fd, 200, "application/json", out, (size_t)n);
         return;
@@ -495,9 +506,16 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
             (has_previous == 1 && strcmp(previous, "0") && strcmp(previous, "1"))) {
             REPLY_TXT(fd, 400, "invalid prev parameter"); return;
         }
-        FILE *f = fopen(has_previous == 1 && !strcmp(previous, "1") ?
-                        "/data/ghostpad/gc_status.log.prev" :
-                        "/data/ghostpad/gc_status.log", "r");
+        const char *log_name = has_previous == 1 && !strcmp(previous, "1") ?
+                               "gc_status.log.prev" : "gc_status.log";
+        FILE *f = NULL;
+        int log_dir = private_directory_open("/data/ghostpad");
+        if (log_dir >= 0) {
+            int log_fd = private_regular_open(log_dir, log_name);
+            close(log_dir);
+            if (log_fd >= 0) f = fdopen(log_fd, "r");
+            if (log_fd >= 0 && !f) close(log_fd);
+        }
         if (f) {
             fseek(f, 0, SEEK_END);
             long sz = ftell(f);

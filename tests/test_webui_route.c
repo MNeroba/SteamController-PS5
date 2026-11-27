@@ -63,6 +63,9 @@ static void test_query_keys_are_exact_and_unique(void) {
     CHECK(webui_route_parse("/api/pause?on=1&", &request) == -1);
     CHECK(webui_route_parse("/api/pause?on==1", &request) == -1);
     CHECK(webui_route_parse("/api/pause?on=%31", &request) == -1);
+    CHECK(webui_route_parse("/api/gamehooks?input=0&vibration=1&audio=1&mode=2&hooks=1",
+                            &request) == 0);
+    CHECK(webui_route_parse("/api/gamehooks?hooks=1", &request) == 0);
 }
 
 static void test_query_values_are_bounded_and_methods_explicit(void) {

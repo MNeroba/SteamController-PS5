@@ -86,7 +86,7 @@ static int name_allowed(webui_route_id_t route, const char *name, size_t length)
 }
 
 static int validate_query(webui_route_id_t route, const char *query) {
-    query_name_t seen[4];
+    query_name_t seen[8];
     size_t count = 0;
     const char *pair = query;
     if (!query) return 0;
@@ -102,7 +102,8 @@ static int validate_query(webui_route_id_t route, const char *query) {
         name_length = (size_t)(equal - pair);
         if (name_length == 0 || name_length >= pair_length) return -1;
         value_length = pair_length - name_length - 1;
-        if (!name_allowed(route, pair, name_length) || count >= 4) return -1;
+        if (!name_allowed(route, pair, name_length) ||
+            count >= sizeof(seen) / sizeof(seen[0])) return -1;
         for (i = 0; i < name_length; i++)
             if (!ascii_param_char((unsigned char)pair[i])) return -1;
         for (i = 0; i < value_length; i++)
