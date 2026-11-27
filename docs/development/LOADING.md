@@ -1,6 +1,6 @@
 # Experimental DEV build: loading and configuration
 
-Current prerelease: [v1.5.0-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.0-experimental). Use its one ELF and matching checksum. The contributor's earlier FW13.20/Puck report applies to original PR8 source, while this revised ELF still needs controlled console verification.
+Current prerelease: [v1.5.2-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.2-experimental). Use its one ELF and matching checksum. The contributor's earlier FW13.20/Puck report applies to original PR8 source, while this revised ELF still needs controlled console verification.
 
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
@@ -16,10 +16,10 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 
    ```sh
    # Linux
-   ELF=SteamController-PS5-v1.5.0-experimental.elf
+   ELF=SteamController-PS5-v1.5.2-experimental.elf
    sha256sum --check "$ELF.sha256"
    # macOS
-   ELF=SteamController-PS5-v1.5.0-experimental.elf
+   ELF=SteamController-PS5-v1.5.2-experimental.elf
    shasum -a 256 -c "$ELF.sha256"
    ```
 
@@ -27,7 +27,7 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   ELF=SteamController-PS5-v1.5.0-experimental.elf
+   ELF=SteamController-PS5-v1.5.2-experimental.elf
    nc -w 8 <PS5-IP> <loader-port> < "$ELF"
    ```
 
@@ -37,12 +37,12 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 
 1. Stop the old payload completely (`SIGINT`/`SIGTERM` and wait for its shutdown log) before loading the new file. Do not run two copies.
 2. Download `SteamController-PS5-v1.5.0-experimental.elf` and its `.sha256` from the release above, then verify:
-   `shasum -a 256 -c SteamController-PS5-v1.5.0-experimental.elf.sha256`
+   `shasum -a 256 -c SteamController-PS5-v1.5.2-experimental.elf.sha256`
 3. Load only that verified ELF through your loader. Keep the old file as a rollback copy; do not mix assets from different versions.
 4. On first start the Media tile registration is retried with the fixed NID resolution; open **Media → Steam Controller Settings** and check the WebUI `Diagnostics` section, which now also renders the report inline.
 5. In-game vibration is still opt-in (see "Safe defaults and in-game feedback" below). Enabling it requires `ENABLE_GAME_HOOKS=1`, the "In games" switches, and a payload plus game restart.
 
-## First launch — v1.5.0-experimental
+## First launch — v1.5.2-experimental
 
 1. Load the verified ELF through an independently confirmed compatible payload loader.
 2. The payload starts a background attempt to register **Steam Controller Settings** in the PS5 Media section, using its embedded icon and metadata. Registration is retried when the post-success marker or embedded assets are missing; a staged-but-unregistered directory is not treated as installed. Existing foreign or inaccessible paths are not overwritten. Watch for the console notification and check Media.

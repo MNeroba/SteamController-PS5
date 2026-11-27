@@ -1,10 +1,14 @@
 # Steam Controller 2026: feature and evidence status
 
-## Current experimental release — v1.5.0-experimental
+## Current experimental release — v1.5.2-experimental
 
-Published experimental [v1.5.0-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.0-experimental) from `65ba503f28a6dcb0a34bd544b2581a51473728ea` by [DEV workflow 46064596992](https://github.com/MNeroba/SteamController-PS5/actions/runs/46064596992) on 2026-11-27T20:37:45Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.0-experimental.elf`, 2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`; the downloaded sidecar, embedded source/version and metadata were independently verified. The workflow repeated normal host, ASan/UBSan, Chromium, deterministic-asset, SDK v0.43/LLVM 18 and checksum gates; the push gates Host 46064305214, PS5 46064305101 and secret scan 46064305150 succeeded. Physical PS5/FW13.60, native DualSense coexistence, game feedback, motion/haptics and tile visibility remain NOT_RUN; the stable hardware gate is unchanged.
+Published experimental [v1.5.2-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.2-experimental) from `ef6e2ae0af87b393a090ec477ddc6668cddbeeb7` by [DEV workflow 46069613276](https://github.com/MNeroba/SteamController-PS5/actions/runs/46069613276) on 2026-11-27T21:23:12Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.2-experimental.elf`, 2,099,840 bytes, SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`; the downloaded sidecar, embedded source/version and metadata were independently verified. Push gates Host 46069328761, PS5 46069328676 and secret scan 46069328700 succeeded; the workflow repeated normal host, ASan/UBSan, Chromium, deterministic-asset, SDK v0.43/LLVM 18 and checksum gates. Physical PS5/FW13.60 and all hardware rows remain NOT_RUN.
 
-The v1.5 source applies every fix from the [mechanism audit](docs/development/MECHANISM_AUDIT_2026-11-27.md); all physical rows below remain NOT_RUN. In-game vibration remains opt-in (`ENABLE_GAME_HOOKS=1`).
+v1.5.1 added classic PS4-style rumble forwarding from the virtual pad remote setting; v1.5.2 adds the Experimental game-hook checkbox in the WebUI. PS5-native haptics still require that opt-in hook path, and all physical rows below remain NOT_RUN.
+
+## Previous experimental releases — 1.5.1 / 1.5.0 / 1.0.0
+
+`dev/v1.5.1-experimental` (`d4b3a36`), `dev/v1.5.0-experimental` (`65ba503`) and `dev/v1.0.0-experimental` (`f5208ad`) remain published with their recorded receipts.
 
 ## Previous experimental release — 1.0.0 Experimental
 

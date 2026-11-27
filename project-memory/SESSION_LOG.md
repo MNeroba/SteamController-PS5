@@ -1561,3 +1561,10 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Verified issue #10 against its attached FW13.60 log and prepared the post-upgrade instructions; physical acceptance remains NOT_RUN.
 
 - Posted the issue #10 diagnosis and post-upgrade steps (including the opt-in game-feedback policy) at https://github.com/MNeroba/SteamController-PS5/issues/10#issuecomment-7227721020, and recorded the publication receipt in docs commit `c923653`.
+
+## 2026-11-27 — v1.5.1 and v1.5.2 feedback follow-ups
+
+- Compared the virtual-pad feedback path with LibrePadPS5, AnyController, FGG-XSense and octet/padbridge; confirmed classic DS4 rumble is readable through `scePadVirtualDeviceGetRemoteSetting` while PS5-native haptics are converted to DualSense haptic audio.
+- Implemented and published v1.5.1 (`d4b3a36`): 16 ms remote-setting poll, motor forwarding, stop-on-zero, hook-takeover handling and decoder tests.
+- Implemented and published v1.5.2 (`ef6e2ae`): Experimental game-hook checkbox, atomic policy persistence, direct-HID conflict refusal, worker start/stop with a dedicated stop flag, portal route and tests; ADR-070 documents the owner authorization.
+- Verified both releases and push gates; corrected README/LOADING/SECURITY/ARCHITECTURE and audit wording. Physical testing remains NOT_RUN.

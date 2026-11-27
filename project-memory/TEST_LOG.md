@@ -1556,3 +1556,11 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Physical PS5/FW13.60, native DualSense coexistence, game feedback, motion/haptics, tile visibility and rest/wake: NOT_RUN.
 
 - Publication receipt docs commit `c923653`; push gates on that commit: Host 46065131468, PS5 46065131405 and secret scan 46065131430 (Host result recorded separately in the session; secret scan and SDK succeeded at the time of writing).
+
+## 2026-11-27 — v1.5.1 / v1.5.2 publication verified
+
+- v1.5.1 source `d4b3a368b8f01c5bff634c06eb7be431290ee992`, DEV workflow 46068476289; push gates Host 46068226274, PS5 46068226083 and secret scan 46068226076 succeeded. Its assets were not re-downloaded for this record.
+- v1.5.2 source `ef6e2ae0af87b393a090ec477ddc6668cddbeeb7`, push gates Host 46069328761, PS5 46069328676, secret scan 46069328700; DEV workflow 46069613276 published 2026-11-27T21:23:12Z.
+- Downloaded v1.5.2 ELF and sidecar: `shasum -c` OK; 2,099,840 bytes; SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`; embedded source/version and metadata checksum verified.
+- Host tests and sanitizer suite pass locally, including new policy serializer, toggle conflict/persistence and portal `hooks` route regressions.
+- Physical PS5/FW13.60, game-hook attach, rollback and rumble behavior: NOT_RUN.

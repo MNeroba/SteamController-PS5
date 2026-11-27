@@ -21,7 +21,8 @@ Full audit and evidence: [MECHANISM_AUDIT_2026-11-27](../docs/development/MECHAN
 - AUD-16 FIXED: haptic method is session-scoped; dropped-pulse counter exposed.
 - AUD-17 FIXED: GitHub Actions pinned to full commit SHAs.
 - AUD-18 DOCUMENTED: legacy adapters and eager/assignment-lease paths marked unreachable scaffolding.
-- PUBLISHED: v1.5.0-experimental from `65ba503f28a6dcb0a34bd544b2581a51473728ea` by DEV workflow 46064596992; seven assets/one ELF (2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`). Issue #10 answered with log analysis and post-upgrade steps. Physical gates remain NOT_RUN.
+- PUBLISHED: v1.5.0-experimental (`65ba503`) by DEV workflow 46064596992; v1.5.1-experimental (`d4b3a36`) added PS4-style remote-setting rumble; v1.5.2-experimental (`ef6e2ae`) by DEV workflow 46069613276 adds the Experimental game-hook checkbox. Current ELF 2,099,840 bytes, SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`. Issue #10 answered with log analysis; a follow-up correction covers the limited DS4 remote channel and the checkbox. Physical gates remain NOT_RUN.
+- AUD-02 FOLLOW-UP: the earlier "virtual pad is write-only" statement was too broad. `octet` (GPL-3.0, pin `f7383ff`) shows `scePadVirtualDeviceGetRemoteSetting` exposes classic DS4 motors; v1.5.1 polls it. PS5-native haptics are system-converted to audio and still need hooks; v1.5.2 exposes that toggle in the UI.
 
 ## M1-252 — comparative review findings, 2026-11-03## M1-252 — comparative review findings, 2026-11-03
 

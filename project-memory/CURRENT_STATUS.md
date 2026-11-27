@@ -1,5 +1,15 @@
 # Current — 1.0.0 Experimental (2026-11-18)
 
+## M1-262 — v1.5.1 / v1.5.2 experimental published (2026-11-27)
+
+Current published source is **v1.5.2-experimental**: `ef6e2ae0af87b393a090ec477ddc6668cddbeeb7`, [release](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.2-experimental), [DEV workflow 46069613276](https://github.com/MNeroba/SteamController-PS5/actions/runs/46069613276), published 2026-11-27T21:23:12Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.2-experimental.elf`, 2,099,840 bytes, SHA-256 `b48aa18ad5bed2e267b177319adfb8439e6efb9b6986f05bc8d00c5922bde744`; sidecar, embedded source/version and metadata verified. Push gates Host 46069328761, PS5 46069328676 and secret scan 46069328700 succeeded.
+
+Two feedback changes since 1.5.0:
+- **v1.5.1** (`d4b3a36`): reads classic DualShock-4-style rumble from the owned virtual pad with `scePadVirtualDeviceGetRemoteSetting` (large byte 3, small byte 4) every 16 ms while hooks are inactive, and forwards it to `sc2_haptics`. PS4 games fill these fields; PS5-native haptics are converted to DualSense haptic audio and leave them at zero.
+- **v1.5.2** (`ef6e2ae`): adds the **Enable game hooks (Experimental)** checkbox. It persists the complete runtime policy through the private writer, starts/stops the worker immediately, rejects `ENABLE_DIRECT_HID` combinations, requires UI confirmation, reverts the policy on worker-start failure, and reports a retained rollback. ADR-070 records the owner authorization and the unchanged trusted-loopback limitation. A worker stop flag makes runtime disable joinable.
+
+Documentation now states the PS4-vs-PS5 feedback split precisely instead of the earlier "write-only" simplification. Issue #10 is being updated with the correction and the checkbox instructions. Hardware remains NOT_RUN for both builds; the stable gate is unchanged. Next: controlled FW13.60 testing of `v1.5.2` and a report on whether the game-hook checkbox attaches for GTA VI.
+
 ## M1-261 — v1.5.0-experimental published (2026-11-27)
 
 Current published source is **v1.5.0-experimental**: `65ba503f28a6dcb0a34bd544b2581a51473728ea`, [release](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.0-experimental), [DEV workflow 46064596992](https://github.com/MNeroba/SteamController-PS5/actions/runs/46064596992), published 2026-11-27T20:37:45Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.0-experimental.elf`, 2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`; the downloaded sidecar, embedded source/version and Payload Manager metadata were independently verified. History was squashed to one root commit after local backups (`backup/pre-1.5-state`, `backup/pre-squash-v1.5`, `backup/pre-1.5-20261127-221021`) and pushed with force-with-lease; push gates Host 46064305214, PS5 46064305101 and secret scan 46064305150 succeeded. The previous 1.0.0 release/tag remains published and unchanged.
