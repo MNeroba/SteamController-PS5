@@ -1,4 +1,13 @@
-# Current — 1.6.1 Experimental (2026-11-28)
+# Current — 1.6.2 Experimental (2026-11-28)
+
+## M1-266 — v1.6.2-experimental final WebUI audit fixes (2026-11-28)
+
+Published **v1.6.2-experimental** from [`9afa9f6fa05dffe3f2308ee3b94f670fcc40e394`](https://github.com/MNeroba/SteamController-PS5/tree/9afa9f6fa05dffe3f2308ee3b94f670fcc40e394) by [DEV workflow 46081216835](https://github.com/MNeroba/SteamController-PS5/actions/runs/46081216835) at 2026-11-27T23:15:29Z. Seven assets, one ELF `SteamController-PS5-v1.6.2-experimental.elf`, 2,127,824 bytes, SHA-256 `da9663f1c39e7d40e4932b892ea0dff381111f527f02a99e90cf7f77dd80ba86`; downloaded sidecar matched.
+
+Completes the remaining audit list: `/api/haptic` returns 503 when enqueue is rejected; `sc2_haptic_pulse/tick/rumble_for` return status; `/api/log` applies the diagnostic report's line-level redaction; HTTP supports `HEAD`/`OPTIONS` with `Allow` and returns `Allow` on 405; read-only routes bypass the global dispatch lock; `recover-default` distinguishes already-valid (409) and failure (500), delete returns 409/404/500; profile Rename/Duplicate actions use the existing validated update API. Browser regression now covers pause, hooks, hand-off, bridge, log and profile-lock mutations.
+
+Local normal/sanitizer suites pass; push gates Host 46080984292, PS5 46080984319, CI Actions smoke 46080984293 and secret scan 46080984349 succeeded; DEV workflow repeated Chromium/SDK/package/checksum gates. Physical PS5 and all hardware rows remain `NOT_RUN`.
+
 
 ## M1-265 — v1.6.1-experimental runtime toggles and mutation tests (2026-11-28)
 

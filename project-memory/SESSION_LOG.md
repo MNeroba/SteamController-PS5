@@ -1592,3 +1592,8 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Added confirmation-gated WebUI switches and disabled-state messaging for both services.
 - Expanded `test_webui_server.c` with profile write/delete, pause, override, log, hand-off, bridge and five-key gamehook mutation requests.
 - Published v1.6.1-experimental from c029775 by DEV workflow 46078999218; gates Host 46078747565, PS5 46078747671, smoke 46078747567, secret 46078747554. Physical gates remain NOT_RUN.
+
+## 2026-11-28 — v1.6.2-experimental final WebUI fixes
+
+- Completed the remaining audit list: truthful haptic enqueue status, diagnostic-grade log redaction, HEAD/OPTIONS/Allow, read-route dispatch-lock narrowing, precise recover/delete statuses, profile rename/duplicate and browser mutation-flow tests.
+- Published v1.6.2-experimental from 9afa9f6 by DEV workflow 46081216835; gates Host 46080984292, PS5 46080984319, smoke 46080984293, secret 46080984349. Physical gates remain NOT_RUN.

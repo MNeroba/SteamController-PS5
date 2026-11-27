@@ -1,5 +1,14 @@
 # Issues and blockers — project register
 
+## 2026-11-28 — final WebUI audit items: fixed in v1.6.2-experimental
+
+- **WEBUI-10 FIXED:** haptic enqueue failures are no longer reported as success; `/api/haptic` returns 503 with a truthful message.
+- **WEBUI-11 FIXED:** the served log uses the same line-level redaction as diagnostics.
+- **WEBUI-12 FIXED:** HEAD/OPTIONS/Allow and 405 `Allow` are implemented; read routes no longer serialize behind slow mutations.
+- **WEBUI-13 FIXED:** `recover-default` and delete return precise 409/404/500 statuses.
+- **WEBUI-14 FIXED:** profile Rename and Duplicate are available in the editor.
+- **WEBUI-15 FIXED:** browser mutation flows cover pause, hooks, hand-off, bridge, log and profile lock. Real PS5 browser behavior remains NOT_RUN.
+
 ## 2026-11-28 — runtime toggles and mutation tests: fixed in v1.6.1-experimental
 
 - **WEBUI-08 PARTIAL:** HTTP-level mutation coverage now covers profile write/delete, pause, override, log, hand-off, bridge and five-key gamehooks. Browser-level mutation flows and real PS5 browser behavior remain NOT_RUN.

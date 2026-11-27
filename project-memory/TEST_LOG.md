@@ -1579,3 +1579,10 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - DEV workflow 46078999218 published `dev/v1.6.1-experimental` at 2026-11-27T22:53:06Z; seven assets, one ELF 2,124,944 bytes, SHA-256 `33834d70f26d275a92c9a0e89eeb307559dd907a1209bb6e436d58a6069b52ab`; downloaded ELF and sidecar matched.
 - Local normal and sanitizer suites pass, including the new HTTP mutation cases. Chromium/SDK/package gates are CI-only here.
 - Hand-off/bridge worker start-stop, policy rollback and PS5 behavior: NOT_RUN.
+
+## 2026-11-28 — v1.6.2-experimental final WebUI fixes
+
+- Source `9afa9f6fa05dffe3f2308ee3b94f670fcc40e394`; push gates Host 46080984292, PS5 46080984319, CI Actions smoke 46080984293 and secret scan 46080984349 succeeded.
+- DEV workflow 46081216835 published `dev/v1.6.2-experimental` at 2026-11-27T23:15:29Z; seven assets, one ELF 2,127,824 bytes, SHA-256 `da9663f1c39e7d40e4932b892ea0dff381111f527f02a99e90cf7f77dd80ba86`; downloaded ELF and sidecar matched.
+- Local normal/sanitizer suites pass, including HTTP HEAD/OPTIONS/405, haptic 503, log sanitizer, delete/recover statuses and browser mutation-flow checks in CI.
+- Physical PS5/FW13.60 behavior: NOT_RUN.
