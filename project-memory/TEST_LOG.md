@@ -1546,3 +1546,11 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Parsed evidence: `hooks=0` policy line; zero `game hook`/`first vibration` lines; five Puck sessions; five `VDA ret=0x803b0006` + correlated events; 1,580 `VDI #` progress lines (~0.9 M inserts); `native-connected=1` local-bind deferrals; 61 manual `/api/haptic` requests; one logged interrupt-OUT success (result 0); ten `method 2 ... result -5` failures; one tile-installer failure matching AUD-01.
 - Conclusion: controller haptics work, but in-game feedback is unreachable with hooks disabled; this is the documented v1.5 limitation, not a transport defect. No hardware run was performed here.
 - UI/README changes for the reporter: inline diagnostic report rendering and an explicit vibration troubleshooting section (v1.5).
+
+## 2026-11-27 — v1.5.0-experimental publication verified
+
+- Source `65ba503f28a6dcb0a34bd544b2581a51473728ea`; squash pushed with force-with-lease after local backups. Push gates: Host 46064305214 success (normal, sanitizer, Chromium), PS5 cross-build 46064305101 success, secret scan 46064305150 success.
+- DEV workflow 46064596992: select-source, validate-build and publish-prerelease all success; published 2026-11-27T20:37:45Z.
+- Release `dev/v1.5.0-experimental`: seven assets, one ELF, `SteamController-PS5-v1.5.0-experimental.elf`, 2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`; downloaded sidecar `shasum -c` OK; embedded source SHA and version found in the ELF; Payload Manager checksum matches.
+- Tags: `dev/v1.5.0-experimental` points to the selected source; the previous `dev/v1.0.0-experimental` tag/asset set is unchanged.
+- Physical PS5/FW13.60, native DualSense coexistence, game feedback, motion/haptics, tile visibility and rest/wake: NOT_RUN.

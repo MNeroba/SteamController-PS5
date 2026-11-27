@@ -21,6 +21,7 @@ Full audit and evidence: [MECHANISM_AUDIT_2026-11-27](../docs/development/MECHAN
 - AUD-16 FIXED: haptic method is session-scoped; dropped-pulse counter exposed.
 - AUD-17 FIXED: GitHub Actions pinned to full commit SHAs.
 - AUD-18 DOCUMENTED: legacy adapters and eager/assignment-lease paths marked unreachable scaffolding.
+- PUBLISHED: v1.5.0-experimental from `65ba503f28a6dcb0a34bd544b2581a51473728ea` by DEV workflow 46064596992; seven assets/one ELF (2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`). Issue #10 answered with log analysis and post-upgrade steps. Physical gates remain NOT_RUN.
 
 ## M1-252 — comparative review findings, 2026-11-03## M1-252 — comparative review findings, 2026-11-03
 

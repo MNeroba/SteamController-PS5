@@ -1552,3 +1552,10 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 - Backed up refs (`backup/pre-1.5-state`, `backup/pre-1.5-20261127-221021`) and deleted the seven inherited upstream tags; then squashed all history into one root commit per owner request.
 
 - Added issue #10 to scope: downloaded and parsed its attached FW13.60 `gc_status.log` (2,642 lines), confirmed hooks=0 and zero hook activity, active VDA/VDI and working interrupt-OUT haptics, and reproduced the AUD-01 tile failure. Recorded the analysis in the audit document and README/UI; added an inline diagnostic-report view for the PS5 browser limitation.
+
+## 2026-11-27 — v1.5.0-experimental published
+
+- Pushed the squashed `main` (`65ba503`) with force-with-lease after local backups and the foreign-tag cleanup; Host, PS5 cross-build and full-history secret scan push gates succeeded.
+- Dispatched DEV workflow 46064596992 for `v1.5.0-experimental`; select-source/validate-build/publish-prerelease succeeded and published seven assets with one ELF (2,096,232 bytes, SHA-256 49bbd70d…).
+- Downloaded and verified the sidecar, embedded source/version and metadata; updated README, LOADING, docs index, feature page, DEV receipt, changelog, provenance and project memory.
+- Verified issue #10 against its attached FW13.60 log and prepared the post-upgrade instructions; physical acceptance remains NOT_RUN.

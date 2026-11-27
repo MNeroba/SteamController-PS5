@@ -25,6 +25,8 @@ Source-release candidate for the mechanism-audit fixes. Not a stable release and
 - Version `v1.5.0-experimental` across `version.h`, changelog, Payload Manager metadata and the DEV workflow default.
 - Documented that in-game vibration/trigger feedback requires the opt-in `ENABLE_GAME_HOOKS=1` runtime policy; the default virtual-DualSense backend has no reverse feedback channel. The console UI now shows when hooks are unavailable instead of implying they will attach.
 - Corrected architecture, tile, loading and security documentation for NID resolution, unreachable legacy adapter/dialog scaffolding, the portless literal `Host` form, private install locking and the lifetime kernel-credential scope.
+- The Diagnostics section now renders the bounded report inline before attempting a download, because the PS5 browser does not reliably handle file downloads.
+- Verified issue #10 against its attached FW13.60 GTA VI log: hooks were disabled, the virtual pad and interrupt-OUT haptics worked, and the missing in-game vibration is the documented opt-in feedback limitation rather than a transport defect. Startup now logs the disabled state.
 
 ## v1.0.0-experimental
 

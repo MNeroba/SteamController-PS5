@@ -1,10 +1,12 @@
 # Steam Controller 2026: feature and evidence status
 
-## Current source — v1.5.0-experimental (unpublished)
+## Current experimental release — v1.5.0-experimental
 
-`main` contains the v1.5 reliability fixes (tile NID installer, retry-safe and atomic first install, no lifetime VDA latch, haptic OUT recovery, stale-temp profile recovery, bounded shutdown, fail-fast UBSan, pinned Actions). No v1.5 ELF is published; see the [audit](docs/development/MECHANISM_AUDIT_2026-11-27.md) and [changelog](CHANGELOG.md). All physical rows below remain NOT_RUN.
+Published experimental [v1.5.0-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.5.0-experimental) from `65ba503f28a6dcb0a34bd544b2581a51473728ea` by [DEV workflow 46064596992](https://github.com/MNeroba/SteamController-PS5/actions/runs/46064596992) on 2026-11-27T20:37:45Z. Seven assets contain one ELF, `SteamController-PS5-v1.5.0-experimental.elf`, 2,096,232 bytes, SHA-256 `49bbd70d53c7734a85136cf6b8827a97469e22d5a4ded1b4c08f874521eb832b`; the downloaded sidecar, embedded source/version and metadata were independently verified. The workflow repeated normal host, ASan/UBSan, Chromium, deterministic-asset, SDK v0.43/LLVM 18 and checksum gates; the push gates Host 46064305214, PS5 46064305101 and secret scan 46064305150 succeeded. Physical PS5/FW13.60, native DualSense coexistence, game feedback, motion/haptics and tile visibility remain NOT_RUN; the stable hardware gate is unchanged.
 
-## Last published experimental release — 1.0.0 Experimental
+The v1.5 source applies every fix from the [mechanism audit](docs/development/MECHANISM_AUDIT_2026-11-27.md); all physical rows below remain NOT_RUN. In-game vibration remains opt-in (`ENABLE_GAME_HOOKS=1`).
+
+## Previous experimental release — 1.0.0 Experimental
 
 Published experimental [1.0.0 Experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.0.0-experimental) from `f5208adb9608a589708f3f9d2f987ff0857e07bc` by [DEV workflow 44410095266](https://github.com/MNeroba/SteamController-PS5/actions/runs/44410095266) on 2026-11-18T22:27:39Z. Seven assets contain exactly one ELF, `SteamController-PS5-v1.0.0-experimental.elf`, 2,069,488 bytes, SHA-256 `3f2ed1f28122391bfda161db9d2221a645daa216993ae6c4edf1a44e69660c4c`. The tag points to the selected source; downloaded assets, embedded source/version, metadata and sidecar checksum were independently verified.
 
