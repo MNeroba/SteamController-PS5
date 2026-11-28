@@ -87,6 +87,8 @@ class Controllers(unittest.TestCase):
             text = page.decode('utf-8')
             self.assertNotIn('/*__CONTROLLERS__*/', text)
             self.assertNotIn('/*__ICONS__*/', text)
+            self.assertNotIn('/*__QR_ENCODER__*/', text)
+            self.assertIn('Copyright (c) Project Nayuki.', text)
             data = json.loads(re.search(r'const SHAPES=(\{.*?\});', text).group(1))
             for device in ('steam', 'dual'):
                 for view in ('front', 'back'):

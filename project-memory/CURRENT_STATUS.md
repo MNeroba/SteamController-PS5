@@ -1,5 +1,9 @@
 # Current — 1.6.2 Experimental (2026-11-28)
 
+## v1.6.3 phone profile editing — 2026-11-28
+
+Owner selected the header popup and explicitly approved the next experimental publication. The default console listener stays on loopback. **On phone** starts a temporary same-subnet listener, displays an offline QR and address, and generates an eight-digit one-use code. Phone access edits existing profiles and can be revoked on the console. It uses local HTTP. PS5/phone runtime and FW 13.60 remain NOT_RUN. Source and release gates are recorded in TEST_LOG and SESSION_LOG.
+
 ## WebUI controller contours — 2026-11-28
 
 The source diagrams now follow the supplied controller photos. DualSense uses curved rear bumper and trigger outlines and realigned front controls. Steam uses the same SVG renderer for its cross-shaped D-pad, trackpads, rear controls and other calibrated regions. The README gallery shows all four views with the button outlines visible. Local Chromium passed 246 checks, including clicks, edge probes and touch at 390 and 768 px. Normal host, ASan/UBSan and the SDK v0.43 cross-build passed. Hardware remains `NOT_RUN`. The published v1.6.2 experimental ELF predates the update.

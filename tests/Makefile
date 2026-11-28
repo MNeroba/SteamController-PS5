@@ -12,7 +12,7 @@ TESTS := $(BUILD)/test_hid_report_full $(BUILD)/test_dev8_backend $(BUILD)/test_
 
 all: test
 
-WEB_ASSETS := $(wildcard ../payload/web/icons/*.png ../payload/web/controllers/*.webp) ../payload/web/controllers/layouts.json
+WEB_ASSETS := $(wildcard ../payload/web/icons/*.png ../payload/web/controllers/*.webp) ../payload/web/controllers/layouts.json ../payload/web/vendor/qrcodegen.js
 ../payload/webui_html.h: ../payload/web/index.html ../payload/gen_html.py ../payload/version.h $(WEB_ASSETS)
 	python3 ../payload/gen_html.py
 
@@ -209,7 +209,7 @@ $(BUILD)/test_runtime_policy: test_runtime_policy.c ../payload/runtime_policy.c 
 clean:
 	rm -rf $(BUILD)
 
-$(BUILD)/test_webui_server: test_webui_server.c ../payload/diagnostics.c ../payload/vda_pending.c ../payload/webui.c ../payload/webui_auth.c ../payload/webui_http.c ../payload/webui_route.c ../payload/webui_peer_policy.c ../payload/webui_json.c ../payload/runtime_control.c ../payload/sc2_status.c ../payload/sc2_control.c ../payload/webui_html.h | $(BUILD)
+$(BUILD)/test_webui_server: test_webui_server.c ../payload/diagnostics.c ../payload/vda_pending.c ../payload/webui.c ../payload/webui_phone.c ../payload/webui_phone.h ../payload/webui_auth.c ../payload/webui_http.c ../payload/webui_route.c ../payload/webui_peer_policy.c ../payload/webui_json.c ../payload/runtime_control.c ../payload/sc2_status.c ../payload/sc2_control.c ../payload/webui_html.h | $(BUILD)
 	$(CC) $(CFLAGS) -I../payload -Ihost_stubs $(filter-out ../payload/webui.c,$(filter-out ../payload/webui_auth.c,$(filter %.c,$^))) -pthread -o $@
 
 # Shared storage contracts must invalidate incremental host binaries.

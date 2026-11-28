@@ -213,3 +213,9 @@ Physical NOT_RUN: target firmware acceptance/readback, real motion/touch game, C
 ## Dev.9 local WebUI and automatic tile — 2026-11-15
 
 Host: verify loopback bind, literal Host/DNS-rebinding rejection, same-origin and mandatory POST Origin, no code/token, first-run absent/existing/inaccessible title path, failed installer continuation and joined shutdown. Browser: no pairing prompt, editing, offline recovery, diagnostics and explicit retry. Target PS5 NOT_RUN: initial registration/privilege, actual visible icon, browser loopback/Origin, failed registration recovery, user-interface navigation and shutdown during installation. Other local PS5 processes can access loopback; no authentication claim.
+
+## Phone profile editing — v1.6.3
+
+The host socket fixture checks explicit activation, the private address listener, one-use code and attempt limit, same-origin mutations, bearer-scoped profile save and revocation. Chromium exercises the console popup and the phone editor at a separate test origin.
+
+H-09 phone procedure remains NOT_RUN on PS5. Open **On phone** on the console, scan the QR on a phone on the same home network, and verify code enrollment and active-profile save during gameplay. Close the popup, test that the paired phone can still save, then turn access off and verify a subsequent request fails. Repeat with code expiry, reconnect, DHCP address changes and payload shutdown. Confirm console management remains usable and console-only. Record exact firmware/ELF digest and outcomes without addresses, codes or tokens.

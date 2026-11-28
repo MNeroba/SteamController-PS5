@@ -9,6 +9,9 @@
 
 int webui_token_is_valid(const char *token);
 int webui_auth_matches(const char *authorization, const char *token);
+/* Generate a fresh RAM-only 256-bit credential. No storage is touched. */
+int webui_auth_session_token(char token[WEBUI_TOKEN_HEX_LENGTH + 1],
+                             storage_status_t *status);
 int webui_auth_path_allows(const char *path, const char *authorization,
                            const char *token);
 /* Load an existing private 256-bit token or create one. Returns 0 on success,

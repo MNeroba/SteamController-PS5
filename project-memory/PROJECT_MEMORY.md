@@ -374,3 +374,7 @@ Plan phases: R1 host-only foundations (single decode, `transport_ops_t`, identit
 ## 2026-11-28 — photo-aligned controller diagrams
 
 See [current status](CURRENT_STATUS.md#webui-controller-contours--2026-11-28) and the [README gallery](../README.md#visual-remapping). Continue layout calibration in `payload/web/controllers/layouts.json` using the supplied photos' logical coordinates. The same SVG shape controls highlighting and pointer hit testing. Reproduce with `python3 payload/gen_html.py` and `bash scripts/run_webui_browser.sh`. PS5 H-09 remains `NOT_RUN`.
+
+## v1.6.3 phone access
+
+The console-local handler is the default. The optional private IPv4 listener runs through the existing WebUI server and profile store. Enable from **On phone**, scan, enter the displayed code, save an existing profile, and revoke from the console. Test again with `make -C tests build/test_webui_server`, `./tests/build/test_webui_server` and `bash scripts/run_webui_browser.sh`. Use [H-09](../docs/TEST_PLAN.md#phone-profile-editing--v163) for measured phone/gameplay testing.

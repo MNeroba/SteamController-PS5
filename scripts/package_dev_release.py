@@ -92,6 +92,9 @@ def package(source_sha, version, elf, output):
     for file in ('payload/settings-tile/NOTICE.md', 'payload/bridge/NOTICE.md', 'payload/web/icons/LICENSE.txt',
                  'payload/web/controllers/NOTICE.md'):
         notices += f'## {file}\n\n' + (ROOT / file).read_text() + '\n'
+    qr_notice = (ROOT / 'payload/web/vendor/qrcodegen.js').read_text().split('*/', 1)[0]
+    notices += '\n## Project Nayuki QR Code generator (MIT)\n\n'
+    notices += '\n'.join(line[3:] for line in qr_notice.splitlines()[1:] if line.startswith(' *')) + '\n'
     (output / 'NOTICES.md').write_text(notices)
     notes = (f'# SteamController-PS5 {version} — experimental DEV\n\n**{WARNING}**\n\n' +
              changes+'\n'+
@@ -100,7 +103,7 @@ def package(source_sha, version, elf, output):
              f'- SDK archive SHA-256: `{SDK_SHA}`\n'
              f'- Payload: `{asset}`\n- ELF SHA-256: `{digest}`\n\n'
              'Required workflow gates: normal host, ASan/UBSan, 220+ Chromium assertions, '
-             'nine image/embedding contracts, deterministic asset generation, clean PS5 cross-build '
+             'controller asset and embedding checks, deterministic asset generation, clean PS5 cross-build '
              'and checksum verification. These establish software/build evidence only.\n\n'
              'Contributor PR8 reports WebUI and Puck/system-menu input on one FW13.20 fat PS5 at source c3a7ddb; '
              'that original build predates the revised filesystem adapter in this release. '
@@ -109,7 +112,9 @@ def package(source_sha, version, elf, output):
              'One active Steam Controller 2026 session. Native BLE and Edge identity are research only. '
              'Game hooks, bridge probing and DualSense handoff are disabled by default. '
              'An absent runtime policy starts WebUI on PS5 loopback port 8090 without a pairing code. '
-             'It cannot be accessed from phones, PCs or the LAN. Host and Origin checks protect browser requests. '
+             'On phone enables separate, temporary local-network access to existing profiles by one-time code. '
+             'Phone access is off by default, uses local HTTP and can be revoked from the PS5. '
+             'Host and Origin checks protect browser requests. '
              'A first-run background task attempts to register the Media tile using its owned assets. '
              'Actual registration, browser behavior and console runtime are unverified.\n\n'
              'Opt-in direct HID (ENABLE_DIRECT_HID=1) uses a full touch/Create/motion report and requires '

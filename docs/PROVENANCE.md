@@ -145,3 +145,9 @@ These are engineering references; their licenses and notices remain their own.
 The SVG curves in `payload/web/controllers/layouts.json` were drawn against the four owner-authorized WebPs listed above. The images in `docs/images/remap/` are new Chromium screenshots of the generated WebUI served by the loopback host fixture. The same artwork rights and attribution apply.
 
 The README hero at `docs/images/remap/hero.png` composes the same Steam and DualSense front photos into an original HTML/CSS layout rendered in Chromium. It uses their existing logical crops and artwork notice.
+
+## Phone pairing QR encoder
+
+| Local path | Exact upstream | Scope |
+|---|---|---|
+| `payload/web/vendor/qrcodegen.js` | [Project Nayuki QR Code generator v1.8.0](https://github.com/nayuki/QR-Code-generator/releases/tag/v1.8.0), commit `720f62bddb7226106071d4728c292cb1df519ceb`, asset `qrcodegen-v1.8.0-es6.js`, MIT | Upstream asset SHA-256 `6a1116192ed1dd67fa1bf31e77f5817103d71c23bbac24c382e698b7668bdd01`. Removed trailing spaces only. Vendored SHA-256 `5d65f10cbda9bc5f61df20e4dfb716ef3203b19f7daedb6cc7c0ae51193f033f`. Embedded for offline QR encoding of the LAN URL. |

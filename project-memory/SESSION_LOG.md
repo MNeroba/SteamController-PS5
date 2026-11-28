@@ -1609,3 +1609,8 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 
 - Owner requested a concise feature-first README, more badges and a hero banner. Added `docs/images/remap/hero.png` using the existing two front photos and kept the four WebUI gallery views. The README covers the current prerelease, game layouts, feedback, quick start, the shared input pipeline and build entry points. Historical version details remain in CHANGELOG and the project records.
 - GitHub's Markdown renderer returned the main banner, six badges, the feature grid, the screenshot gallery and the compatibility callout. Checked local paths and anchors, fetched each badge, compared the ELF and checksum URLs with the current release assets, and visually checked the final banner. See TEST_LOG for the exact source CI receipt. For future README changes check the live release with `gh release view dev/v1.6.2-experimental --json assets`.
+
+## 2026-11-28 — v1.6.3 temporary phone profile editor
+
+- Owner chose the header popup variant and authorized the next experimental release. Implemented the UI, offline QR, numeric address, one-use pairing, existing-profile save/readback and revocation. Retained console loopback startup and the source/build prerequisite of SDK v0.43. No native PS5 or firmware experiment.
+- Source baseline `d305e1a3f371a29d7536d9f065acf578ae0e6ad0`. Wait for exact-source main Host, PS5 and secret-scan workflows before `gh workflow run dev-release.yml --ref main -f source_sha=<full-tested-sha> -f version=v1.6.3-experimental`. Then verify the acknowledged tag, the seven assets and the downloaded checksum.

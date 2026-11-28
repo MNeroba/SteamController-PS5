@@ -68,7 +68,8 @@ class DevRelease(unittest.TestCase):
             # isolated root. Never clear the real project's blocker manifest.
             fixture_root = Path(temp) / 'source'; fixture_root.mkdir()
             for name in ['CHANGELOG.md','payload/version.h','config/payload/SteamController-PS5.elf.json','LICENSE', 'docs/development/LOADING.md', 'payload/bridge/NOTICE.md',
-                         'payload/web/icons/LICENSE.txt', 'payload/web/controllers/NOTICE.md', 'payload/settings-tile/NOTICE.md', 'payload/settings-tile/icon0.png', 'payload/settings-tile/param.json']:
+                         'payload/web/icons/LICENSE.txt', 'payload/web/controllers/NOTICE.md', 'payload/web/vendor/qrcodegen.js',
+                         'payload/settings-tile/NOTICE.md', 'payload/settings-tile/icon0.png', 'payload/settings-tile/param.json']:
                 target = fixture_root / name; target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes((ROOT / name).read_bytes())
             (fixture_root / 'docs/development/dev-release.json').write_text(json.dumps(dict(self.policy, critical_code_blockers=[])))
@@ -78,6 +79,7 @@ class DevRelease(unittest.TestCase):
                     package('a' * 40, VERSION, incomplete, out)
                 package('a' * 40, VERSION, elf, out)
             notes = (out / 'RELEASE_NOTES.md').read_text()
+            self.assertIn('Copyright (c) Project Nayuki.', (out / 'NOTICES.md').read_text())
             self.assertIn(WARNING, notes)
             self.assertIn("ENABLE_DIRECT_HID=1", notes)
             self.assertIn("disconnected native pad", notes)

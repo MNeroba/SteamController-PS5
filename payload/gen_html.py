@@ -10,6 +10,10 @@ version = re.search(r'#define STEAMCONTROLLER_VERSION "([^"]+)"', Path('version.
 if html.count('/*__VERSION__*/""') != 1:
     raise ValueError('Expected one application version placeholder')
 html = html.replace('/*__VERSION__*/""', json.dumps(version))
+qr_marker = '/*__QR_ENCODER__*/'
+if html.count(qr_marker) != 1:
+    raise ValueError('Expected one QR encoder placeholder')
+html = html.replace(qr_marker, Path('web/vendor/qrcodegen.js').read_text(encoding='utf-8'))
 
 # Inline web/icons/*.png as data URIs at the /*__ICONS__*/{} placeholder.
 icons = {}

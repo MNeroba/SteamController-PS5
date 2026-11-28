@@ -22,6 +22,71 @@ async (page) => {
   const base = await page.evaluate(() => 'name=Default\n' + Object.entries(DEFAULTS).map(([k,v])=>k+'='+v).join('\n') + '\nSHIFT=L4\nDEADZONE=9\n' + BITS.map(k=>['long','double','shift'].map(a=>k+'.'+a+'=NONE\n').join('')+k+'.turbo=0\n'+k+'.toggle=0\n').join('')+'LT.full=NONE\nRT.full=NONE\n');
   await page.request.post('http://127.0.0.1:8765/api/profile?id=default', {headers:{Authorization:'Bearer preview-only'},data:base});
   await page.reload();await page.waitForFunction(() => saved !== '' && cur.A === 'CROSS');
+  // Separate browser origins mirror the console and phone. The C socket
+  // fixture covers real admission; this fixture exercises both UIs and save.
+  const phoneUrl='http://192.0.2.10:8765/',pin='53820741',bearer='a'.repeat(64);
+  let enabled=false,paired=false,phoneWrites=0;
+  await page.route('**/api/phone*',async route=>{
+    const req=route.request(),post=req.method()==='POST';
+    if(post){enabled=new URL(req.url()).searchParams.get('on')==='1';paired=false}
+    await route.fulfill({json:{enabled,paired,url:enabled?phoneUrl:'',code:post&&enabled?pin:''}});
+  });
+  await page.locator('#phoneOpen').click();
+  await page.waitForFunction(()=>document.querySelector('#phoneNote').textContent==='Phone access is off.');
+  check(!await page.locator('#phoneState').isVisible(),'opening phone popup does not enable LAN');
+  await page.locator('#phoneStart').click();
+  await page.waitForFunction(()=>document.querySelector('#phoneCode').textContent.length===8);
+  check(await page.locator('#phoneAddress').inputValue()===phoneUrl &&
+    await page.locator('#phoneQr').evaluate(canvas=>canvas.width>25&&canvas.width===canvas.height),
+    'console shows matching LAN address, offline QR canvas and pairing code');
+  await page.locator('#phoneDialog').screenshot({path:'output/playwright/phone-popup.png'});
+  await page.locator('#phoneDialog form button').click();
+  check(enabled,'closing setup popup keeps phone session active');
+  const mobile=await page.context().browser().newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+  try {
+    const phone=await mobile.newPage();
+    phone.on('pageerror',error=>errors.push(error.message));
+    await phone.route(phoneUrl+'**',async route=>{
+      const req=route.request(),path=new URL(req.url()).pathname;
+      if(path==='/api/phone/pair') {
+        if(!enabled||req.postData()!==pin){
+          await route.fulfill({status:401,body:'Code incorrect'});return;
+        }
+        paired=true;await route.fulfill({body:bearer});return;
+      }
+      if(path.startsWith('/api/')&&(!paired||!enabled||req.headers().authorization!==('Bearer '+bearer))){
+        await route.fulfill({status:401,body:'Pair the phone on PS5'});return;
+      }
+      if(path==='/api/profile'&&req.method()==='POST')phoneWrites++;
+      const response=await route.fetch({url:req.url().replace(phoneUrl,'http://127.0.0.1:8765/')});
+      await route.fulfill({response});
+    });
+    await phone.goto(phoneUrl);
+    await phone.locator('#phonePair[open]').waitFor();
+    check(!await phone.locator('#tabbtn-help').isVisible()&&!await phone.locator('#phoneOpen').isVisible(),'phone shows only profile editing');
+    await phone.locator('#phonePin').fill('12345678');
+    await phone.locator('#phonePairForm button').click();
+    await phone.getByText('Code incorrect',{exact:true}).waitFor();
+    await phone.locator('#phonePin').fill(pin);
+    await phone.locator('#phonePairForm button').click();
+    await phone.waitForFunction(()=>saved!==''&&cur.A==='CROSS');
+    check(!await phone.locator('#phonePair').isVisible(),'valid pairing code unlocks the phone editor');
+    await phone.locator('#steamStage svg:not([hidden]) .ctl[data-k="A"]').tap();
+    await phone.locator('#clear').tap();
+    await phone.locator('#pick .g-CIRCLE').tap();
+    await phone.locator('#done').tap();
+    await phone.locator('#save').tap();
+    await phone.waitForFunction(()=>!isDirty()&&cur.A==='CIRCLE');
+    check(phoneWrites===1,'phone saves and reads back through the existing profile API with bearer');
+    await page.locator('#phoneOpen').click();
+    await page.waitForFunction(()=>document.querySelector('#phoneNote').textContent==='Phone connected');
+    await page.locator('#phoneStop').click();
+    await phone.locator('#phonePair[open]').waitFor();
+    check(!enabled&&!await page.locator('#phoneState').isVisible(),'turning off on PS5 revokes the phone editor');
+    await page.locator('#phoneDialog form button').click();
+  } finally {await mobile.close();await page.unroute('**/api/phone*')}
+  await page.request.post('http://127.0.0.1:8765/api/profile?id=default',{data:base});
+  await page.reload();await page.waitForFunction(()=>saved!==''&&cur.A==='CROSS');
   // Audit regressions: hostile profiles never reach HTML attributes or prototypes.
   const auditFailures=[];
   const auditCheck=(ok,name)=>{if(ok)passed.push(name);else auditFailures.push(name)};
@@ -174,7 +239,7 @@ async (page) => {
       for(const [v,points] of [
         ['front',[[260,418,'UP'],[228,446,'LEFT'],[625,244,'TOUCHPAD'],[1078,483,'CIRCLE']]],
         ['back',[[980,250,'L1'],[975,268,'L2'],[274,249,'R1'],[279,270,'R2'],
-          [977,256,'L1'],[272,257,'R1']]]
+          [977,256,'L1'],[272,254,'R1']]]
       ]){
         await tp.locator('.viewswitch[data-controller="dual"] [data-view="'+v+'"]').tap();
         await tp.locator('#dualStage').scrollIntoViewIfNeeded();

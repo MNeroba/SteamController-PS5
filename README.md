@@ -4,7 +4,7 @@
 
 ![Steam Controller on PS5. A Steam Controller 2026 connects through the payload as a virtual DualSense.](docs/images/remap/hero.png)
 
-[![Download v1.6.2 Experimental](https://img.shields.io/badge/Download-v1.6.2_Experimental-4f73db)](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.2-experimental)
+[![Download v1.6.3 Experimental](https://img.shields.io/badge/Download-v1.6.3_Experimental-4f73db)](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.3-experimental)
 [![USB-C and Valve Puck](https://img.shields.io/badge/Connection-USB--C_%2B_Valve_Puck-267a68)](#quick-start)
 [![GPL-3.0-or-later](https://img.shields.io/badge/License-GPL--3.0--or--later-8555b6)](LICENSE)
 
@@ -44,9 +44,15 @@ The host preview shows the current source with every outline visible for inspect
 
 ## Quick start
 
-1. Download the current experimental ELF and its matching checksum. [ELF](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.6.2-experimental/SteamController-PS5-v1.6.2-experimental.elf) · [SHA-256 file](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.6.2-experimental/SteamController-PS5-v1.6.2-experimental.elf.sha256)
+1. Download the current experimental ELF and its matching checksum. [ELF](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.6.3-experimental/SteamController-PS5-v1.6.3-experimental.elf) · [SHA-256 file](https://github.com/MNeroba/SteamController-PS5/releases/download/dev/v1.6.3-experimental/SteamController-PS5-v1.6.3-experimental.elf.sha256)
 2. Verify the checksum, keep your native DualSense handy, and load the ELF with your compatible development loader. [Loading guide](docs/development/LOADING.md)
-3. Connect your Steam Controller over USB-C or through the official Puck. On first launch, the payload attempts to add **Steam Controller Settings** to PS5 Media. Open it while the payload is running. The editor uses console-only loopback and opens without a pairing code.
+3. Connect your Steam Controller over USB-C or through the official Puck. On first launch, the payload attempts to add **Steam Controller Settings** to PS5 Media. Open it while the payload is running. The editor opens on the PS5 without a pairing code.
+
+### Edit from your phone
+
+With your PS5 and phone on the same trusted home network, open **On phone → Enable phone access** in the WebUI. Scan the QR code or enter the displayed IP address and port, then enter the one-time code from the console. On your phone, select an existing profile and choose **Save changes**. The payload reloads the active profile without a restart.
+
+Phone access starts off, lasts up to one hour and can be ended from **On phone → Turn off**. The code is valid for five minutes and one use. Phone access uses local HTTP and is limited to existing profile edits. [Phone setup and limits](docs/development/LOADING.md#edit-from-your-phone)
 
 For troubleshooting, open **Settings & help → Diagnostics** to copy or download a report with build, USB and virtual-controller status. Review the report before sharing it. [Report a problem](.github/ISSUE_TEMPLATE/bug_report.yml)
 

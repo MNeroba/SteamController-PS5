@@ -14,6 +14,7 @@
 #include "webui_html.h"
 #include "webui_http.h"
 #include "webui_route.h"
+#include "webui_phone.h"
 #include "webui_json.h"
 #include "runtime_control.h"
 #include "runtime_features.h"
@@ -59,7 +60,11 @@ static webui_notify_fn g_tile_notify;
 static int g_listener = -1;
 static atomic_int g_webui_stopping;
 #define WEBUI_CLIENT_MAX 4
-typedef struct { pthread_t thread; int fd; int started; int done; } webui_client_t;
+typedef struct {
+    pthread_t thread;
+    int fd, started, done;
+    webui_phone_peer_t phone;
+} webui_client_t;
 static webui_client_t g_clients[WEBUI_CLIENT_MAX];
 static pthread_mutex_t g_clients_lock = PTHREAD_MUTEX_INITIALIZER;
 static pthread_cond_t g_clients_cond = PTHREAD_COND_INITIALIZER;
@@ -85,13 +90,15 @@ static void reply(int fd, int code, const char *type, const char *body, size_t n
                          code == 401 ? "Unauthorized" :
                          code == 403 ? "Forbidden" :
                          code == 404 ? "Not Found" : code == 405 ? "Method Not Allowed" :
+                         code == 409 ? "Conflict" : code == 503 ? "Service Unavailable" :
                          code == 413 ? "Payload Too Large" :
                          code == 408 ? "Request Timeout" :
                          code == 500 ? "Internal Server Error" : "Bad Request";
     int used = snprintf(h, sizeof(h),
         "HTTP/1.1 %d %s\r\nContent-Type: %s\r\nContent-Length: %zu\r\n"
         "Cache-Control: no-store\r\nX-Content-Type-Options: nosniff\r\n"
-        "X-Frame-Options: DENY\r\nContent-Security-Policy: frame-ancestors 'none'\r\n",
+        "X-Frame-Options: DENY\r\nReferrer-Policy: no-referrer\r\n"
+        "Content-Security-Policy: frame-ancestors 'none'\r\n",
         code, reason, type, n);
     if (used < 0 || (size_t)used >= sizeof(h)) return;
     if (code == 401) {
@@ -219,15 +226,68 @@ static int loopback_host(const char *host) {
      * it so a different local service cannot borrow our Host value. */
     return g_listener_port && port==g_listener_port;
 }
+static int phone_route_allowed(webui_route_id_t id, int post) {
+    if (post) return id == WEBUI_ROUTE_PROFILE || id == WEBUI_ROUTE_PHONE_PAIR;
+    return id == WEBUI_ROUTE_INDEX || id == WEBUI_ROUTE_STATUS ||
+           id == WEBUI_ROUTE_PROFILES || id == WEBUI_ROUTE_PROFILE;
+}
+
 static int admit_request(void *context, const webui_http_request_t *request) {
-    (void)context;
-    if (!request->has_host || !loopback_host(request->host) ||
+    const webui_phone_peer_t *phone = context;
+    int post = !strcmp(request->method, "POST");
+    if (!request->has_host ||
         !webui_http_origin_matches_host(request) ||
-        (!strcmp(request->method,"POST") && !request->has_origin))
+        (post && !request->has_origin))
         return WEBUI_HTTP_READ_FORBIDDEN;
     webui_route_request_t route;
     if (webui_route_parse(request->target, &route) != 0) return WEBUI_HTTP_READ_MALFORMED;
+    if (!phone || !phone->generation)
+        return loopback_host(request->host) && route.id != WEBUI_ROUTE_PHONE_PAIR ?
+               WEBUI_HTTP_READ_OK : WEBUI_HTTP_READ_FORBIDDEN;
+    uint64_t now;
+    if (webui_monotonic_ms(NULL, &now) != 0 ||
+        !webui_phone_host_matches(*phone, request->host, now) ||
+        !phone_route_allowed(route.id, post)) return WEBUI_HTTP_READ_FORBIDDEN;
+    if (route.id == WEBUI_ROUTE_PHONE_PAIR) {
+        if (request->content_length != WEBUI_PAIR_CODE_LENGTH)
+            return WEBUI_HTTP_READ_MALFORMED;
+    } else if (route.id != WEBUI_ROUTE_INDEX &&
+               !webui_phone_authorized(*phone, request->authorization, now)) {
+        return WEBUI_HTTP_READ_UNAUTHORIZED;
+    }
     return WEBUI_HTTP_READ_OK;
+}
+
+static void phone_reply(int fd, webui_route_request_t route, size_t length, int post) {
+    char code[WEBUI_PAIR_CODE_LENGTH + 1] = "";
+    uint64_t now;
+    if (webui_monotonic_ms(NULL, &now) != 0) {
+        webui_phone_stop();
+        REPLY_TXT(fd, 503, "Phone access clock unavailable"); return;
+    }
+    if (post) {
+        char on[2];
+        if (length || webui_route_param(&route, "on", on, sizeof(on)) != 1 ||
+            (strcmp(on, "0") && strcmp(on, "1"))) {
+            REPLY_TXT(fd, 400, "Expected an empty request with on=0 or on=1"); return;
+        }
+        if (on[0] == '0') webui_phone_stop();
+        else if (webui_phone_start(g_listener_port, now, code) != 0) {
+            REPLY_TXT(fd, 503, "Could not start phone access. Check the PS5 home network and try again.");
+            return;
+        }
+    } else if (strchr(route.target, '?')) {
+        REPLY_TXT(fd, 400, "Phone access changes require POST"); return;
+    }
+    webui_phone_info_t info;
+    webui_phone_info(now, &info);
+    char json[144];
+    int bytes = snprintf(json, sizeof(json),
+        "{\"enabled\":%s,\"paired\":%s,\"url\":\"%s%s%s\",\"code\":\"%s\"}",
+        info.enabled ? "true" : "false", info.paired ? "true" : "false",
+        info.enabled ? "http://" : "", info.host, info.enabled ? "/" : "", code);
+    if (bytes < 0 || (size_t)bytes >= sizeof(json)) REPLY_TXT(fd, 500, "Phone status overflow");
+    else reply(fd, 200, "application/json", json, (size_t)bytes);
 }
 
 static int patch_profile(sc2_profile_t *p, void *text) {
@@ -247,6 +307,7 @@ static int route_is_read_only(webui_route_id_t id, int is_post) {
         case WEBUI_ROUTE_BRIDGE:
         case WEBUI_ROUTE_LOG:
         case WEBUI_ROUTE_DIAGNOSTICS:
+        case WEBUI_ROUTE_PHONE:
             return 1;
         default:
             return 0;
@@ -263,7 +324,7 @@ static const char *route_allow(webui_route_id_t id) {
 }
 
 static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body,
-                     webui_route_request_t route) {
+                     webui_route_request_t route, const webui_phone_peer_t *phone) {
     webui_http_request_t request = *request_ptr;
     char *path = request.target;
     char id[SC2_ID_MAX + 1];
@@ -290,6 +351,27 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     }
     if (route.id == WEBUI_ROUTE_INDEX) {
         reply(fd, 200, "text/html; charset=utf-8", (const char *)webui_html, webui_html_len);
+        return;
+    }
+    if (route.id == WEBUI_ROUTE_PHONE) {
+        phone_reply(fd, route, request.content_length, is_post);
+        return;
+    }
+    if (route.id == WEBUI_ROUTE_PHONE_PAIR) {
+        uint64_t now;
+        char token[WEBUI_TOKEN_HEX_LENGTH + 1];
+        if (!webui_http_profile_body_valid(&request, body)) {
+            REPLY_TXT(fd, 400, "Expected an eight-digit pairing code"); return;
+        }
+        for (size_t i = 0; i < WEBUI_PAIR_CODE_LENGTH; ++i) {
+            if (body[i] < '0' || body[i] > '9') {
+                REPLY_TXT(fd, 400, "Expected an eight-digit pairing code"); return;
+            }
+        }
+        if (!phone || webui_monotonic_ms(NULL, &now) != 0 ||
+            !webui_phone_pair(*phone, body, now, token)) {
+            REPLY_TXT(fd, 401, "Code incorrect, expired or used. Request a new code on PS5.");
+        } else REPLY_TXT(fd, 200, token);
         return;
     }
     if (route.id == WEBUI_ROUTE_DIAGNOSTICS) {
@@ -341,6 +423,12 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         sb_put(&sb, ",\"title_name\":"); json_str(&sb, tn);
         sb_put(&sb, ",\"active\":"); json_str(&sb, a);
         sb_put(&sb, ",\"active_name\":"); json_str(&sb, pn);
+        if (phone) {
+            sb_printf(&sb, ",\"connected\":%d}", runtime.live_connected);
+            if (sb.failed) REPLY_TXT(fd, 500, "status response overflow");
+            else reply(fd, 200, "application/json", out, sb.length);
+            return;
+        }
         sb_put(&sb, ",\"override\":"); json_str(&sb, ov);
         sb_printf(&sb, ",\"inputs\":%u,\"connected\":%d,\"menu\":%d,\"haptics\":%d,\"paused\":%d",
                   (unsigned)runtime.live_inputs, runtime.live_connected, sc2_menu_is_open(), runtime.haptic_available, sc2_pause_is_active());
@@ -441,6 +529,9 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
         if (get_id(&route, id) != 1) { REPLY_TXT(fd, 400, "bad id"); return; }
         sc2_profile_t p;
         if (is_post) {
+            if (phone && !sc2_store_exists(id)) {
+                REPLY_TXT(fd, 404, "Create the profile on PS5 before editing it on a phone"); return;
+            }
             if (!webui_http_profile_body_valid(&request, body)) {
                 REPLY_TXT(fd, 400, "profile requires a non-empty text/plain UTF-8 body");
                 return;
@@ -634,19 +725,23 @@ static void dispatch(int fd, const webui_http_request_t *request_ptr, char *body
     REPLY_TXT(fd, 404, "not found");
 }
 
-static void handle(int fd) {
+static void respond_admission_error(int fd, int result) {
+    if (result == WEBUI_HTTP_READ_UNAUTHORIZED) REPLY_TXT(fd, 401, "Pair the phone on PS5");
+    else if (result == WEBUI_HTTP_READ_FORBIDDEN) REPLY_TXT(fd, 403, "Request not allowed on this connection");
+    else if (result == WEBUI_HTTP_READ_TIMEOUT) REPLY_TXT(fd, 408, "request timed out");
+    else if (result == WEBUI_HTTP_READ_TOO_LARGE) REPLY_TXT(fd, 413, "request too large");
+    else REPLY_TXT(fd, 400, "malformed or incomplete request");
+}
+
+static void handle(int fd, webui_phone_peer_t *phone) {
     char req[REQ_MAX + 1];
     webui_http_request_t request;
     char *body = NULL;
     int result = webui_http_read_request_checked(&fd, webui_socket_receive,
         webui_monotonic_ms, WEBUI_REQUEST_TIMEOUT_MS, req, sizeof(req),
-        &request, &body, admit_request, NULL);
+        &request, &body, admit_request, phone);
     if (result != WEBUI_HTTP_READ_OK) {
-        if (result == WEBUI_HTTP_READ_UNAUTHORIZED) REPLY_TXT(fd, 401, "local access required");
-        else if (result == WEBUI_HTTP_READ_FORBIDDEN) REPLY_TXT(fd, 403, "request origin does not match host");
-        else if (result == WEBUI_HTTP_READ_TIMEOUT) REPLY_TXT(fd, 408, "request timed out");
-        else if (result == WEBUI_HTTP_READ_TOO_LARGE) REPLY_TXT(fd, 413, "request too large");
-        else REPLY_TXT(fd, 400, "malformed or incomplete request");
+        respond_admission_error(fd, result);
         return;
     }
     webui_route_request_t route;
@@ -656,10 +751,15 @@ static void handle(int fd) {
     int is_post = strcmp(request.method, "POST") == 0;
     g_head_response = strcmp(request.method, "HEAD") == 0;
     if (route.id == WEBUI_ROUTE_INDEX || route_is_read_only(route.id, is_post)) {
-        if (!webui_stopping()) dispatch(fd, &request, body, route);
+        if (!webui_stopping()) dispatch(fd, &request, body, route, phone);
     } else {
         pthread_mutex_lock(&g_dispatch_lock);
-        if (!webui_stopping()) dispatch(fd, &request, body, route);
+        if (!webui_stopping()) {
+            /* The code/token may have been revoked while the body arrived. */
+            result = phone ? admit_request(phone, &request) : WEBUI_HTTP_READ_OK;
+            if (result == WEBUI_HTTP_READ_OK) dispatch(fd, &request, body, route, phone);
+            else respond_admission_error(fd, result);
+        }
         pthread_mutex_unlock(&g_dispatch_lock);
     }
     g_head_response = 0;
@@ -668,7 +768,7 @@ static void handle(int fd) {
 static void *client_thread(void *arg) {
     webui_client_t *client = arg;
     int fd = client->fd;
-    if (!webui_stopping()) handle(fd);
+    if (!webui_stopping()) handle(fd, client->phone.generation ? &client->phone : NULL);
     pthread_mutex_lock(&g_clients_lock);
     close(fd);
     client->fd = -1;
@@ -722,24 +822,43 @@ static void *server_thread(void *arg) {
         }
         fd_set readable;
         FD_ZERO(&readable); FD_SET(s, &readable);
+        uint64_t now, generation = 0;
+        int phone_fd = -1;
+        if (webui_monotonic_ms(NULL, &now) == 0)
+            phone_fd = webui_phone_listener(now, &generation);
+        else webui_phone_stop();
+        if (phone_fd >= 0) FD_SET(phone_fd, &readable);
         struct timeval wait = {0, 200000};
-        int ready = select(s + 1, &readable, NULL, NULL, &wait);
-        if (ready == 0) continue;
-        if (ready < 0) {
-            if (errno == EINTR) continue;
-            LOG("webui: select failed errno=%d\n", errno); break;
+        int ready = select((phone_fd > s ? phone_fd : s) + 1, &readable, NULL, NULL, &wait);
+        if (ready <= 0 || webui_stopping()) {
+            int select_error = errno;
+            if (phone_fd >= 0) close(phone_fd);
+            if (webui_stopping()) break;
+            if (!ready || select_error == EINTR) continue;
+            LOG("webui: select failed errno=%d\n", select_error); break;
         }
-        if (webui_stopping()) break;
+        int remote = !FD_ISSET(s, &readable);
         struct sockaddr_in peer;
         socklen_t peer_length = sizeof(peer);
-        int c = accept(s, (struct sockaddr *)&peer, &peer_length);
+        int c = accept(remote ? phone_fd : s, (struct sockaddr *)&peer, &peer_length);
+        int accept_error = errno;
+        if (phone_fd >= 0) close(phone_fd);
         if (c < 0) {
-            if (errno != EINTR && errno != EAGAIN && errno != EWOULDBLOCK)
-                LOG("webui: accept failed errno=%d\n", errno);
+            if (!remote && accept_error != EINTR && accept_error != EAGAIN && accept_error != EWOULDBLOCK)
+                LOG("webui: accept failed errno=%d\n", accept_error);
             continue;
         }
-        if (peer_length < sizeof(peer) || peer.sin_family != AF_INET ||
-            (ntohl(peer.sin_addr.s_addr) >> 24) != 127u) { close(c); continue; }
+        if (peer_length < sizeof(peer) || peer.sin_family != AF_INET) { close(c); continue; }
+        webui_phone_peer_t phone = {remote ? generation : 0, peer.sin_addr.s_addr};
+        if (remote) {
+            /* BSD may inherit O_NONBLOCK from the listener. Request I/O uses timeouts. */
+            if (webui_monotonic_ms(NULL, &now) != 0 || !webui_phone_peer_allowed(phone, now) ||
+                fcntl(c, F_SETFL, 0) != 0) { close(c); continue; }
+            int remote_clients = 0;
+            for (int i = 0; i < WEBUI_CLIENT_MAX; ++i)
+                remote_clients += g_clients[i].started && g_clients[i].phone.generation != 0;
+            if (remote_clients >= WEBUI_CLIENT_MAX / 2) { close(c); continue; }
+        } else if ((ntohl(peer.sin_addr.s_addr) >> 24) != 127u) { close(c); continue; }
 #ifdef SO_NOSIGPIPE
         int one = 1;
         if (setsockopt(c, SOL_SOCKET, SO_NOSIGPIPE, &one, sizeof(one)) != 0) {
@@ -750,7 +869,7 @@ static void *server_thread(void *arg) {
         while (slot < WEBUI_CLIENT_MAX && g_clients[slot].started) ++slot;
         if (slot == WEBUI_CLIENT_MAX) { close(c); continue; }
         webui_client_t *client = &g_clients[slot];
-        client->fd = c; client->done = 0;
+        client->fd = c; client->done = 0; client->phone = phone;
         /* Local patch: dispatch() alone needs ~105 KiB of stack (plus ~38 KiB
          * in handle); the PS5 default thread stack is too small and the first
          * HTTP request crashed the payload. Use an explicit 1 MiB stack. */
@@ -765,6 +884,7 @@ static void *server_thread(void *arg) {
         else client->started = 1;
     }
     atomic_store(&g_webui_stopping, 1);
+    webui_phone_stop();
     pthread_mutex_lock(&g_clients_lock);
     for (int i = 0; i < WEBUI_CLIENT_MAX; ++i)
         if (g_clients[i].started && g_clients[i].fd >= 0) shutdown(g_clients[i].fd, SHUT_RDWR);
@@ -853,7 +973,7 @@ int webui_start(webui_notify_fn notify) {
         LOG("tile: automatic installer thread could not start\n");
         notify("SteamController-PS5: automatic Media tile installer could not start");
     }
-    LOG("webui: listener ready on loopback port %d; no network access\n", WEBUI_PORT);
+    LOG("webui: loopback listener ready on port %u; phone access off\n", g_listener_port);
     return 0;
 }
 

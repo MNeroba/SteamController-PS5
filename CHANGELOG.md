@@ -2,6 +2,20 @@
 
 DEV entries describe software and build verification. They do not establish physical PS5 compatibility. The dev.1–dev.9 and v1.0.0-experimental.1/.2 GitHub releases and tags were removed during the 1.0.0 Experimental consolidation; the entries below remain historical records and their assets are archived outside the repository.
 
+## v1.6.3-experimental
+
+2026-11-28 · Experimental development release. Host and SDK verification only.
+
+### Bug Fixes
+
+- Align Steam Controller and DualSense remapping outlines with the physical controls, including curved bumper and trigger boundaries.
+
+### New Features / Improvements
+
+- Open **On phone** in the PS5 WebUI to start a temporary phone session with an offline QR code, local IP and port, and an eight-digit one-time code.
+- Edit and save existing profiles from the phone over the home network. The console controls a one-hour session and can revoke it at any time.
+- Add a README hero banner, controller gallery and quick-start instructions for phone access.
+
 ## v1.6.2-experimental
 
 Experimental follow-up to 1.6.1. Not a stable release and not a hardware claim; physical PS5 acceptance remains NOT_RUN and firmware 13.60 is still the intended, unverified target.

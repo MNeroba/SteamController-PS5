@@ -104,11 +104,121 @@ static int connect_client(void) {
     assert(setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout))==0);
     return fd;
 }
-static int request(const char *wire,char *out,size_t cap) {
-    int fd=connect_client();assert(send(fd,wire,strlen(wire),0)==(ssize_t)strlen(wire));
+static int request_fd(int fd,const char *wire,char *out,size_t cap) {
+    assert(send(fd,wire,strlen(wire),0)==(ssize_t)strlen(wire));
     size_t used=0;ssize_t n;
     while(used+1<cap&&(n=recv(fd,out+used,cap-1-used,0))>0)used+=(size_t)n;
-    out[used]=0;close(fd);int code=0;assert(sscanf(out,"HTTP/1.1 %d",&code)==1);return code;
+    out[used]=0;close(fd);int code=0;
+    if (!used) return 0;
+    assert(sscanf(out,"HTTP/1.1 %d",&code)==1);return code;
+}
+static int request(const char *wire,char *out,size_t cap) {
+    return request_fd(connect_client(),wire,out,cap);
+}
+
+static int phone_request(const char *host,const char *method,const char *path,
+                         const char *origin,const char *token,const char *body,
+                         char *out,size_t cap) {
+    char ip[16],wire[560];
+    unsigned port;
+    assert(sscanf(host,"%15[^:]:%u",ip,&port)==2 && port<=65535);
+    struct sockaddr_in address={0};
+    address.sin_family=AF_INET;
+    address.sin_port=htons((uint16_t)port);
+    assert(inet_pton(AF_INET,ip,&address.sin_addr)==1);
+    int fd=socket(AF_INET,SOCK_STREAM,0);
+    assert(fd>=0);
+    struct sockaddr_in source=address;
+    source.sin_port=0;
+    assert(bind(fd,(struct sockaddr*)&source,sizeof(source))==0);
+    assert(fd<FD_SETSIZE && fcntl(fd,F_SETFL,O_NONBLOCK)==0);
+    int connected=connect(fd,(struct sockaddr*)&address,sizeof(address));
+    if (connected!=0 && errno==EINPROGRESS) {
+        fd_set writable;
+        FD_ZERO(&writable);FD_SET(fd,&writable);
+        struct timeval wait={2,0};
+        int error=0;
+        socklen_t error_size=sizeof(error);
+        if (select(fd+1,NULL,&writable,NULL,&wait)==1 &&
+            getsockopt(fd,SOL_SOCKET,SO_ERROR,&error,&error_size)==0 && !error)
+            connected=0;
+    }
+    if (connected!=0) {
+        close(fd);
+        return -1;
+    }
+    assert(fcntl(fd,F_SETFL,0)==0);
+    struct timeval timeout={3,0};
+    assert(setsockopt(fd,SOL_SOCKET,SO_RCVTIMEO,&timeout,sizeof(timeout))==0);
+    int n=snprintf(wire,sizeof(wire),
+        "%s %s HTTP/1.1\r\nHost: %s\r\n%s%s%s%s%s%s"
+        "Content-Type: text/plain;charset=UTF-8\r\nContent-Length: %zu\r\n\r\n%s",
+        method,path,host,origin?"Origin: ":"",origin?origin:"",origin?"\r\n":"",
+        token?"Authorization: Bearer ":"",token?token:"",token?"\r\n":"",
+        strlen(body),body);
+    assert(n>0 && (size_t)n<sizeof(wire));
+    return request_fd(fd,wire,out,cap);
+}
+
+static void test_phone_access(void) {
+    char out[8192],host[22],code[9],token[65],origin[30];
+    const char *enable="POST /api/phone?on=1 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n";
+    const char *disable="POST /api/phone?on=0 HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n";
+    int http=request(enable,out,sizeof(out));
+    if (http==503) { puts("SKIP: phone socket checks require a private test-host IPv4 interface"); return; }
+    assert(http==200);
+    const char *start=strstr(out,"\"url\":\"http://"),*pin=strstr(out,"\"code\":\"");
+    assert(start && sscanf(start,"\"url\":\"http://%21[^/]",host)==1);
+    assert(pin && sscanf(pin,"\"code\":\"%8[0-9]",code)==1 && strlen(code)==8);
+    snprintf(origin,sizeof(origin),"http://%s",host);
+    webui_phone_info_t stale;
+    webui_phone_info(0,&stale);
+    assert(!stale.enabled); /* A stale clock observation cannot revoke the new listener. */
+    assert(request("GET /api/phone HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
+    assert(strstr(out,"\"enabled\":true") && strstr(out,"\"code\":\"\""));
+
+    int index=phone_request(host,"HEAD","/",NULL,NULL,"",out,sizeof(out));
+    if (index!=200) fprintf(stderr,"Phone index request returned %d\n",index);
+    assert(index==200);
+    assert(phone_request(host,"GET","/api/status",NULL,NULL,"",out,sizeof(out))==401);
+    assert(phone_request(host,"POST","/api/phone/pair",NULL,NULL,code,out,sizeof(out))==403);
+    assert(phone_request(host,"POST","/api/phone/pair","http://elsewhere.invalid",NULL,code,out,sizeof(out))==403);
+    assert(phone_request(host,"POST","/api/phone/pair",origin,NULL,code,out,sizeof(out))==200);
+    const char *body=strstr(out,"\r\n\r\n");
+    assert(body && strlen(body+4)==64);
+    memcpy(token,body+4,sizeof(token));
+    assert(phone_request(host,"POST","/api/phone/pair",origin,NULL,code,out,sizeof(out))==401);
+    assert(phone_request(host,"GET","/api/profiles",NULL,token,"",out,sizeof(out))==200);
+    assert(phone_request(host,"GET","/api/status",NULL,token,"",out,sizeof(out))==200);
+    assert(!strstr(out,"\"inputs\"") && !strstr(out,"\"battery\""));
+    assert(phone_request(host,"GET","/api/diagnostics",NULL,token,"",out,sizeof(out))==403);
+    assert(phone_request(host,"POST","/api/pause?on=1",origin,token,"",out,sizeof(out))==403);
+    assert(phone_request(host,"POST","/api/phone?on=0",origin,token,"",out,sizeof(out))==403);
+    assert(phone_request(host,"POST","/api/profile?id=default",origin,NULL,"A=CROSS\n",out,sizeof(out))==401);
+    assert(phone_request(host,"POST","/api/profile?id=default",NULL,token,"A=CROSS\n",out,sizeof(out))==403);
+    int previous=mutations;
+    assert(phone_request(host,"POST","/api/profile?id=default",origin,token,"A=CROSS\n",out,sizeof(out))==200);
+    assert(mutations==previous+1);
+    assert(request(enable,out,sizeof(out))==200);
+    assert(phone_request(host,"GET","/api/profiles",NULL,token,"",out,sizeof(out))==401);
+
+    assert(request(enable,out,sizeof(out))==200);
+    pin=strstr(out,"\"code\":\"");
+    assert(pin && sscanf(pin,"\"code\":\"%8[0-9]",code)==1);
+    char wrong[9];
+    memcpy(wrong,code,sizeof(wrong));
+    wrong[0]=wrong[0]=='0'?'1':'0';
+    for (unsigned tries=0; tries<WEBUI_PAIR_ATTEMPTS; ++tries)
+        assert(phone_request(host,"POST","/api/phone/pair",origin,NULL,wrong,out,sizeof(out))==401);
+    assert(phone_request(host,"POST","/api/phone/pair",origin,NULL,code,out,sizeof(out))==401);
+    assert(request(enable,out,sizeof(out))==200);
+    uint64_t now;
+    assert(webui_monotonic_ms(NULL,&now)==0);
+    webui_phone_info(now+60u*60u*1000u,&stale);
+    assert(!stale.enabled);
+    assert(request(disable,out,sizeof(out))==200 && strstr(out,"\"enabled\":false"));
+    assert(phone_request(host,"GET","/api/profiles",NULL,token,"",out,sizeof(out))<=0);
+    puts("phone sockets: opt-in, one-use pairing, attempt limit, origin, scoped save and revocation passed");
 }
 int main(void) {
     char out[8192];
@@ -121,6 +231,11 @@ int main(void) {
     struct sockaddr_in local; socklen_t len=sizeof(local);
     assert(getsockname(g_listener,(struct sockaddr*)&local,&len)==0);
     assert(ntohl(local.sin_addr.s_addr)==INADDR_LOOPBACK);
+    assert(request("GET /api/phone HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
+    assert(strstr(out, "\"enabled\":false"));
+    assert(request("POST /api/phone?on=1 HTTP/1.1\r\nHost: localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==403);
+    assert(request("POST /api/phone/pair HTTP/1.1\r\nHost: localhost\r\nOrigin: http://localhost\r\nContent-Length: 0\r\n\r\n",out,sizeof(out))==403);
+
     {
         unsigned bound_port=(unsigned)ntohs(local.sin_port), other_port=bound_port==65535u?1u:bound_port+1u;
         char hostreq[192];
@@ -223,6 +338,7 @@ int main(void) {
     assert(request("GET /does-not-exist HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==404);
     assert(request("GET /api/diagnostics?path=secrets HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==400);
     assert(request("GET /api/diagnostics HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
+    test_phone_access();
     int slow=connect_client();assert(send(slow,"G",1,0)==1);
     assert(request("GET /api/status HTTP/1.1\r\nHost: localhost\r\n\r\n",out,sizeof(out))==200);
     assert(webui_stop()==0);close(slow);assert(webui_stop()==0);

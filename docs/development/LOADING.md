@@ -1,6 +1,6 @@
 # Experimental DEV build: loading and configuration
 
-Current prerelease: [v1.6.2-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.2-experimental). Use its one ELF and matching checksum. The contributor's earlier FW13.20/Puck report applies to original PR8 source, while this revised ELF still needs controlled console verification.
+Current prerelease: [v1.6.3-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.3-experimental). Use its one ELF and matching checksum. The contributor's earlier FW13.20/Puck report applies to original PR8 source, while this revised ELF still needs controlled console verification.
 
 
 **Experimental development build. Not verified on physical PS5 hardware. PS5 firmware 13.60 is the intended test environment, not a confirmed compatible firmware. Use at your own risk.**
@@ -16,10 +16,10 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 
    ```sh
    # Linux
-   ELF=SteamController-PS5-v1.6.2-experimental.elf
+   ELF=SteamController-PS5-v1.6.3-experimental.elf
    sha256sum --check "$ELF.sha256"
    # macOS
-   ELF=SteamController-PS5-v1.6.2-experimental.elf
+   ELF=SteamController-PS5-v1.6.3-experimental.elf
    shasum -a 256 -c "$ELF.sha256"
    ```
 
@@ -27,29 +27,33 @@ This is a native PS5 ELF, not a PKG/FPKG. A stock console cannot load it using t
 4. Start your independently confirmed compatible payload loader. If it accepts an ELF over TCP, send the verified file to its actual port:
 
    ```sh
-   ELF=SteamController-PS5-v1.6.2-experimental.elf
+   ELF=SteamController-PS5-v1.6.3-experimental.elf
    nc -w 8 <PS5-IP> <loader-port> < "$ELF"
    ```
 
    Port 9021 is an inherited convenience default, not a compatibility guarantee. This project has not tested the transfer or loading procedure on physical hardware. Do not repeatedly send the payload when a loader has failed or become unresponsive.
 
-## Updating from 1.0.0 Experimental
+## Updating
 
-1. Stop the old payload completely (`SIGINT`/`SIGTERM` and wait for its shutdown log) before loading the new file. Do not run two copies.
-2. Download `SteamController-PS5-v1.5.0-experimental.elf` and its `.sha256` from the release above, then verify:
-   `shasum -a 256 -c SteamController-PS5-v1.6.2-experimental.elf.sha256`
-3. Load only that verified ELF through your loader. Keep the old file as a rollback copy; do not mix assets from different versions.
-4. On first start the Media tile registration is retried with the fixed NID resolution; open **Media → Steam Controller Settings** and check the WebUI `Diagnostics` section, which now also renders the report inline.
-5. In-game vibration is still opt-in (see "Safe defaults and in-game feedback" below). Enabling it requires `ENABLE_GAME_HOOKS=1`, the "In games" switches, and a payload plus game restart.
+Stop the running payload and wait for its shutdown to finish. Verify and load the current ELF using the steps above. Keep the previous verified file for rollback.
 
-## First launch — v1.6.2-experimental
+## First launch — v1.6.3-experimental
 
 1. Load the verified ELF through an independently confirmed compatible payload loader.
 2. The payload starts a background attempt to register **Steam Controller Settings** in the PS5 Media section, using its embedded icon and metadata. Registration is retried when the post-success marker or embedded assets are missing; a staged-but-unregistered directory is not treated as installed. Existing foreign or inaccessible paths are not overwritten. Watch for the console notification and check Media.
-3. Open the tile on the PS5. It opens `http://127.0.0.1:8090/` while the payload is running. No code or password is requested. This WebUI is reachable only from the console itself, not from a phone, PC or LAN.
+3. Open the tile on the PS5. It opens `http://127.0.0.1:8090/` while the payload is running. No code or password is requested. By default the WebUI is reachable only from the console itself.
 4. Configure the controller; Save confirms the stored profile with a fresh readback. If the tile cannot be registered, use an existing PS5 browser/launcher to reach the loopback URL and inspect the error before using the explicit retry in Settings & help. Do not repeatedly reload the payload while VDA ownership is unresolved.
 
-The listener binds IPv4 loopback, checks literal loopback Host and browser Origin, and requires Origin for POST requests. These checks reduce browser-origin abuse; other processes on the PS5 that can access loopback can control the WebUI. No TLS or user authentication is present. Tile registration, notifications, PS5 browser Origin behavior and firmware 13.60 have not been physically tested.
+The console listener keeps its IPv4 loopback binding and Host/Origin validation. Other processes with console loopback access can use the local WebUI. Tile registration and console browser behavior remain unverified on physical hardware.
+
+## Edit from your phone
+
+1. Put the phone and PS5 on the same trusted home network. On the PS5 WebUI, open **On phone** in the header and select **Enable phone access**.
+2. Scan the QR code or enter the displayed `http://IP:port/` address. Enter the eight-digit code on your phone within five minutes.
+3. Select an existing profile, edit your bindings, then choose **Save changes**. Saving reloads the active profile. The setup window can be closed on PS5 while the phone remains paired.
+4. Select **Turn off** on PS5 to revoke access. **New code** revokes the preceding session and starts a fresh one. Access also expires after one hour or when the payload stops.
+
+The listener binds a specific local IPv4 address. Phone peers must be on its local subnet. Enrollment is single-use and limited to five attempts. The phone credential is held in memory and scoped to the paired address. Phone access uses unencrypted HTTP, so enable it on a trusted home network. PS5 system controls, logs, diagnostics, profile creation and deletion remain available from the console. A physical PS5-to-phone session is still unverified.
 
 ## Safe defaults and in-game feedback
 

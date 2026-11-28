@@ -325,7 +325,23 @@ pre.log{white-space:pre-wrap;word-break:break-word;background:var(--panel2);bord
 dialog.profile-guard{color:var(--text);background:var(--panel,#1c2030);border:1px solid var(--line,#383d56);border-radius:16px;padding:24px;max-width:min(440px,calc(100vw - 32px))}
 dialog.profile-guard::backdrop{background:#0009}
 .profile-guard .guard-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:20px}
-/* First-run enrollment uses the established dialog/card visual language. */
+#phoneOpen{display:inline-flex;align-items:center;gap:7px;white-space:nowrap}
+#phoneOpen[hidden],#phoneState[hidden],#phoneCodeRow[hidden]{display:none}
+.phone-icon{display:inline-block;width:10px;height:16px;border:1.5px solid currentColor;border-radius:3px;position:relative}
+.phone-icon::after{content:"";position:absolute;width:3px;height:1px;background:currentColor;bottom:2px;left:2px}
+.phone-dialog{width:min(440px,calc(100vw - 32px))}
+.phone-dialog p{margin:10px 0;color:var(--muted)}
+.phone-details{display:flex;gap:14px;align-items:center;flex-wrap:wrap}
+.phone-details>div{flex:1 1 170px;min-width:0}
+.phone-details canvas{width:132px;height:132px;image-rendering:pixelated}
+.phone-dialog label{display:grid;gap:4px}
+.phone-dialog input{width:100%;min-height:42px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--text)}
+.phone-dialog input,.phone-dialog output{font-family:ui-monospace,monospace}
+#phoneAddress{font-size:.75rem}
+.phone-dialog .guard-actions{margin-top:14px}
+.phone-note{min-height:1.4em}
+.phone-client :is(#tabbtn-help,#tabbtn-games,#tab-help,#tab-games,#nowAction,#profileRecovery,#del,#dup,.use-profile){display:none !important}
+.phone-client .brand small{display:none}
 </style>
 </head>
 <body>
@@ -338,6 +354,7 @@ dialog.profile-guard::backdrop{background:#0009}
       <button id="tabbtn-games" role="tab" aria-selected="false" aria-controls="tab-games" data-tab="games">Games</button>
       <button id="tabbtn-help" role="tab" aria-selected="false" aria-controls="tab-help" data-tab="help"><span class="long">Settings &amp; help</span><span class="short">Settings</span></button>
     </nav>
+    <button id="phoneOpen" class="ghost" type="button" aria-haspopup="dialog" hidden><span class="phone-icon" aria-hidden="true"></span>On phone</button>
     <span class="pill"><span class="dot" id="dot"></span><span id="conn">Connecting…</span><span id="batt" class="batt" hidden></span></span>
   </div>
 </header>
@@ -358,7 +375,7 @@ dialog.profile-guard::backdrop{background:#0009}
 
     <div class="card pbar">
       <label class="field"><span>Editing</span><select id="prof" aria-label="Profile to edit"></select></label>
-      <label class="field"><span>Use</span><select id="mode" aria-label="Which profile the controller uses"></select></label>
+      <label class="field use-profile"><span>Use</span><select id="mode" aria-label="Which profile the controller uses"></select></label>
       <div class="pacts">
         <span class="pstate" id="pstate">Saved</span>
         <button id="rename" class="ghost" title="Rename this profile">Rename</button>
@@ -572,11 +589,39 @@ dialog.profile-guard::backdrop{background:#0009}
 </div>
 <div class="toast" id="toast" role="status"></div>
 
+<dialog class="profile-guard phone-dialog" id="phoneDialog" aria-labelledby="phoneHeading">
+  <h3 id="phoneHeading">Open on phone</h3>
+  <p>Connect your phone and PS5 to the same trusted home network. Existing profiles can be edited over local HTTP for one hour.</p>
+  <div class="phone-details" id="phoneState" hidden>
+    <canvas id="phoneQr" role="img" aria-label="QR code for the WebUI address"></canvas>
+    <div>
+      <label>PS5 address <input id="phoneAddress" readonly></label>
+      <div id="phoneCodeRow" hidden>One-time code <output id="phoneCode"></output></div>
+    </div>
+  </div>
+  <p id="phoneNote" class="phone-note" role="status"></p>
+  <div class="guard-actions">
+    <button type="button" class="primary" id="phoneStart">Enable phone access</button>
+    <button type="button" id="phoneStop" hidden>Turn off</button>
+    <form method="dialog"><button>Close</button></form>
+  </div>
+</dialog>
+<dialog class="profile-guard phone-dialog" id="phonePair" aria-labelledby="phonePairHeading">
+  <h3 id="phonePairHeading">Connect to the PS5</h3>
+  <p>Enter the one-time code from <strong>On phone</strong> on your PS5.</p>
+  <form id="phonePairForm">
+    <label>One-time code <input id="phonePin" required inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="one-time-code"></label>
+    <p id="phonePairNote" class="phone-note" role="status"></p>
+    <button class="primary" type="submit">Connect</button>
+  </form>
+</dialog>
+
 <dialog id="profileGuard" class="profile-guard" aria-labelledby="profileGuardTitle">
   <h3 id="profileGuardTitle">Unsaved profile changes</h3>
   <p>Save and confirm your changes before continuing, or discard this draft.</p>
   <div class="guard-actions"><button id="guardSave">Save</button><button id="guardDiscard">Discard</button><button id="guardCancel" autofocus>Cancel</button></div>
 </dialog>
+<script>/*__QR_ENCODER__*/</script>
 <script>
 /* ── data ── */
 const LABEL={A:"A",B:"B",X:"X",Y:"Y",LB:"Left bumper",RB:"Right bumper",LT:"Left trigger",RT:"Right trigger",
@@ -691,7 +736,13 @@ function comboText(v){const c=combo(v);return c.length?c.map(outputLabel).join("
 function norm(v){return combo(v).sort().join("+")}
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove("show"),2400)}
 async function authorizedFetch(path,opt={}){
-  return await fetch(path,opt);
+  if(!phoneClient)return fetch(path,opt);
+  const headers=new Headers(opt.headers);
+  const token=phoneToken;
+  if(token)headers.set("Authorization","Bearer "+token);
+  const response=await fetch(path,{...opt,headers});
+  if(response.status===401&&token&&token===phoneToken)showPhonePair("Phone access expired. Request a new code on the PS5.");
+  return response;
 }
 async function api(path,opt={}){
   const r=await authorizedFetch(path,opt),t=await r.text();
@@ -707,8 +758,79 @@ function dirty(){const d=isDirty();const bar=$("#savebar");bar.classList.toggle(
 const store=(k,v)=>{try{localStorage.setItem(k,v)}catch(e){}}, recall=k=>{try{return localStorage.getItem(k)}catch(e){return null}};
 const sstore=(k,v)=>{try{sessionStorage.setItem(k,v)}catch(e){}}, srecall=k=>{try{return sessionStorage.getItem(k)}catch(e){return null}};
 
+/* Phone enrollment is separate from the console's loopback session. */
+const phoneClient=!["localhost","127.0.0.1"].includes(location.hostname);
+let phoneToken=phoneClient?srecall("pb.phone")||"":"",portalStarted=false;
+document.body.classList.toggle("phone-client",phoneClient);
+$("#phoneOpen").hidden=phoneClient;
+function showPhonePair(message=""){
+  phoneToken="";sstore("pb.phone","");
+  $("#phonePairNote").textContent=message;
+  const dialog=$("#phonePair");
+  if(!dialog.open)dialog.showModal();
+}
+$("#phonePair").addEventListener("cancel",event=>event.preventDefault());
+$("#phonePairForm").onsubmit=async event=>{
+  event.preventDefault();
+  if(!phoneClient)return;
+  const input=$("#phonePin"),button=event.currentTarget.querySelector("button");
+  button.disabled=true;
+  try{
+    const response=await fetch("/api/phone/pair",{method:"POST",body:input.value});
+    const token=await response.text();
+    if(!response.ok)throw new Error(token);
+    if(!/^[a-f0-9]{64}$/.test(token))throw new Error("Invalid pairing response");
+    phoneToken=token;sstore("pb.phone",token);input.value="";
+    $("#phonePair").close();
+    if(!portalStarted)await startPortal();
+    else {clearTimeout(pollTimer);poll()}
+  }catch(error){$("#phonePairNote").textContent=error.message||"Could not connect. Check the PS5 address."}
+  finally{button.disabled=false}
+};
+
+let phoneInfo={},phoneBusy=false,phoneRevision=0;
+function paintPhone(info){
+  const previous=phoneInfo;
+  phoneInfo=info;
+  $("#phoneStart").textContent=info.enabled?"New code":"Enable phone access";
+  $("#phoneStop").hidden=$("#phoneState").hidden=!info.enabled;
+  $("#phoneCodeRow").hidden=!info.code||info.paired;
+  $("#phoneCode").textContent=info.paired?"":info.code||"";
+  $("#phoneAddress").value=info.url||"";
+  $("#phoneNote").textContent=info.enabled?(info.paired?"Phone connected":info.code?
+    "Scan the QR or open the address, then enter the code within five minutes.":"Choose New code to connect a phone."):"Phone access is off.";
+  if(info.enabled&&info.url!==previous.url){
+    const qr=qrcodegen.QrCode.encodeText(info.url,qrcodegen.QrCode.Ecc.MEDIUM),canvas=$("#phoneQr");
+    canvas.width=canvas.height=qr.size+8;
+    const draw=canvas.getContext("2d");
+    draw.fillStyle="#fff";draw.fillRect(0,0,canvas.width,canvas.height);draw.fillStyle="#000";
+    for(let y=0;y<qr.size;y++)for(let x=0;x<qr.size;x++)if(qr.getModule(x,y))draw.fillRect(x+4,y+4,1,1);
+  }
+}
+async function refreshPhone(){
+  const revision=phoneRevision;
+  try{
+    const info=JSON.parse(await api("/api/phone"));
+    if(revision!==phoneRevision||!$("#phoneDialog").open)return;
+    if(info.enabled&&!info.paired&&info.url===phoneInfo.url)info.code=phoneInfo.code||"";
+    paintPhone(info);
+  }catch(error){if(revision===phoneRevision)$("#phoneNote").textContent=error.message||"Could not read phone access status."}
+}
+async function changePhone(on){
+  if(phoneBusy)return;
+  phoneBusy=true;++phoneRevision;$("#phoneStart").disabled=$("#phoneStop").disabled=true;
+  try{paintPhone(JSON.parse(await api("/api/phone?on="+(on?1:0),{method:"POST"})))}
+  catch(error){$("#phoneNote").textContent=error.message||"Could not change phone access."}
+  finally{phoneBusy=false;$("#phoneStart").disabled=$("#phoneStop").disabled=false}
+}
+$("#phoneOpen").onclick=()=>{$("#phoneDialog").showModal();refreshPhone()};
+$("#phoneStart").onclick=()=>changePhone(true);
+$("#phoneStop").onclick=()=>changePhone(false);
+$("#phoneAddress").onclick=event=>event.currentTarget.select();
+setInterval(()=>{if($("#phoneDialog").open&&phoneInfo.enabled&&!phoneBusy)refreshPhone()},2500);
+
 /* ── location: #tab[/profile=ID][/section], mirrored to localStorage; scroll per tab in sessionStorage ── */
-const TABS=["remap","games","help"];
+const TABS=phoneClient?["remap"]:["remap","games","help"];
 let tab="remap", sec={}, scrolls={};
 try{scrolls=JSON.parse(srecall("pb.scroll")||"{}")}catch(e){scrolls={}}
 function parseHash(h){const o={tab:null,prof:null,sec:null};(h||"").replace(/^#/,"").split("/").filter(Boolean).forEach((p,i)=>{
@@ -728,7 +850,7 @@ function showTab(t,push){if(!TABS.includes(t))t="remap";
 $$("nav.tabs button").forEach(b=>b.onclick=()=>{if(b.dataset.tab!==tab)showTab(b.dataset.tab,true);else scrollTo({top:0,behavior:"auto"})});
 $("nav.tabs").addEventListener("keydown",e=>{
   if(!["ArrowLeft","ArrowRight","Home","End"].includes(e.key))return;
-  const tabs=[...$$("nav.tabs button")],i=tabs.indexOf(document.activeElement);
+  const tabs=[...$$("nav.tabs button")].filter(b=>TABS.includes(b.dataset.tab)),i=tabs.indexOf(document.activeElement);
   if(i<0)return;
   e.preventDefault();
   const next=e.key==="Home"?0:e.key==="End"?tabs.length-1:(i+(e.key==="ArrowRight"?1:-1)+tabs.length)%tabs.length;
@@ -1260,7 +1382,7 @@ function renderNow(){
   const key=[status.title,status.active,status.override,status.title_name,status.active_name,status.menu].join("|");
   if(key===lastNow)return;lastNow=key;
   const g=games.find(g=>g.id===status.title);
-  $("#nowArt").innerHTML=status.title?art(g||{id:status.title,name:status.title_name||status.title,icon:true}):"–";
+  $("#nowArt").innerHTML=status.title?art(g||{id:status.title,name:status.title_name||status.title,icon:!phoneClient}):"–";
   hydrateIcons($("#nowArt"));
   const img=$("#nowArt img");if(img)img.onerror=()=>{$("#nowArt").textContent=(status.title_name||"?").slice(0,1)};
   $("#nowTitle").textContent=status.title?(status.title_name||status.title):"No game running";
@@ -1285,7 +1407,7 @@ function paintLive(live){
 }
 let lastConn="",pollTimer=0,pollDelay=300;
 async function poll(){
-  if(document.hidden){pollTimer=0;return}
+  if(document.hidden||(phoneClient&&!phoneToken)){pollTimer=0;return}
   try{
     status=JSON.parse(await api("/api/status"));
     const ck=[status.connected,status.paused].join();
@@ -1514,17 +1636,22 @@ $("#bridgeRun").onclick=async()=>{try{await api("/api/bridge",{method:"POST"});t
 setInterval(()=>{if(!$("#tab-help").hidden)paintBridge()},1500);
 
 /* ── start ── */
-(async()=>{
-  if("scrollRestoration" in history)history.scrollRestoration="manual";
-  measure();buildPad();buildSliders();
-  const adv=$("#gyroAdv");adv.open=recall("pb.gyroAdv")==="1";adv.ontoggle=()=>store("pb.gyroAdv",adv.open?"1":"0");
+async function startPortal(){
+  portalStarted=true;
   const loc=parseHash(location.hash||recall("pb.loc")||"");
   if(loc.tab&&TABS.includes(loc.tab)){tab=loc.tab;if(loc.sec)sec[loc.tab]=loc.sec}
   try{status=JSON.parse(await api("/api/status"))}catch(e){}
   try{await refreshList();editing=loc.prof&&profiles.some(p=>p.id===loc.prof)?loc.prof:(status.active||"default");await load(editing,true,false)}catch(e){$("#conn").textContent="Backend offline"}
   showTab(tab,false);
-  refreshGames().then(()=>{lastNow="";renderNow()});
+  if(!phoneClient)refreshGames().then(()=>{lastNow="";renderNow()});
   poll();
+}
+(async()=>{
+  if("scrollRestoration" in history)history.scrollRestoration="manual";
+  measure();buildPad();buildSliders();
+  const adv=$("#gyroAdv");adv.open=recall("pb.gyroAdv")==="1";adv.ontoggle=()=>store("pb.gyroAdv",adv.open?"1":"0");
+  if(phoneClient&&!phoneToken)showPhonePair();
+  else await startPortal();
 })();
 </script>
 </body>

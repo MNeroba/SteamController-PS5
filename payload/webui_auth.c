@@ -284,6 +284,24 @@ static int session_storage_failure(const storage_status_t *s) {
         default:return 0;
     }
 }
+int webui_auth_session_token(char token[WEBUI_TOKEN_HEX_LENGTH + 1],
+                             storage_status_t *status) {
+    if (!token) return -1;
+    unsigned char random[WEBUI_TOKEN_HEX_LENGTH/2]={0};
+    if(secure_random_report(random,sizeof(random),status)!=0) {
+        erase_secret(random,sizeof(random));
+        erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
+        return -1;
+    }
+    static const char hex[]="0123456789abcdef";
+    for(size_t i=0;i<sizeof(random);i++) {
+        token[2*i]=hex[random[i]>>4];token[2*i+1]=hex[random[i]&15];
+    }
+    token[WEBUI_TOKEN_HEX_LENGTH]=0;
+    erase_secret(random,sizeof(random));
+    return 0;
+}
+
 webui_auth_mode_t webui_auth_begin(const char *directory,
                                   char token[WEBUI_TOKEN_HEX_LENGTH+1],
                                   storage_status_t *status) {
@@ -292,18 +310,9 @@ webui_auth_mode_t webui_auth_begin(const char *directory,
     if(webui_auth_load_or_create_report(directory,token,NULL,status)==0)
         return WEBUI_AUTH_PERSISTENT;
     if (!token || !session_storage_failure(status))return WEBUI_AUTH_FAILED;
-    unsigned char random[WEBUI_TOKEN_HEX_LENGTH/2]={0};
     storage_status_t entropy;
-    if(secure_random_report(random,sizeof(random),&entropy)!=0) {
-        erase_secret(random,sizeof(random));
-        erase_secret(token,WEBUI_TOKEN_HEX_LENGTH+1);
+    if (webui_auth_session_token(token, &entropy) != 0) {
         *status=entropy;return WEBUI_AUTH_FAILED;
     }
-    static const char hex[]="0123456789abcdef";
-    for(size_t i=0;i<sizeof(random);i++) {
-        token[2*i]=hex[random[i]>>4];token[2*i+1]=hex[random[i]&15];
-    }
-    token[WEBUI_TOKEN_HEX_LENGTH]=0;
-    erase_secret(random,sizeof(random));
     return WEBUI_AUTH_SESSION;
 }
