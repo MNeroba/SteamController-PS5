@@ -1,6 +1,8 @@
-# Current — 1.6.2 Experimental (2026-11-28)
+# Current — 1.6.3 Experimental (2026-11-28)
 
 ## v1.6.3 phone profile editing — 2026-11-28
+
+Published experimental [v1.6.3-experimental](https://github.com/MNeroba/SteamController-PS5/releases/tag/dev/v1.6.3-experimental) from `a9eaedd26ab87281cd57b26d1faec85211d8e09d` via [DEV workflow 46089866324](https://github.com/MNeroba/SteamController-PS5/actions/runs/46089866324) at 2026-11-28T00:51:40Z. The release contains seven assets and one ELF, 2,241,224 bytes, SHA-256 `6b6d9b40fefcfc1cd226157bc48b493b700c7f4fd5e52695ddc5b79b6d887faa`. The downloaded assets, ELF checksum and tag were verified.
 
 Owner selected the header popup and explicitly approved the next experimental publication. The default console listener stays on loopback. **On phone** starts a temporary same-subnet listener, displays an offline QR and address, and generates an eight-digit one-use code. Phone access edits existing profiles and can be revoked on the console. It uses local HTTP. PS5/phone runtime and FW 13.60 remain NOT_RUN. Source and release gates are recorded in TEST_LOG and SESSION_LOG.
 

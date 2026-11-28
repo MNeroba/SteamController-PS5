@@ -35,12 +35,14 @@ One native payload takes input from one **Steam Controller 2026** over USB-C or 
 
 Pick a Steam input, choose one or more DualSense outputs, then confirm the assignment. The rear views put the bumpers, triggers and Steam rear buttons on the same screen. Physical **L is on the right** and **R on the left** in those views.
 
+![Main WebUI showing profile controls, visual remapping and the On phone button in the header](docs/images/remap/webui-main.png)
+
 | Steam Controller | DualSense |
 | --- | --- |
 | ![Steam Controller front with every button outlined](docs/images/remap/steam-controller-front.png) | ![DualSense front with every button outlined](docs/images/remap/dualsense-front.png) |
 | ![Steam Controller rear view with bumpers, triggers and rear buttons outlined](docs/images/remap/steam-controller-back.png) | ![DualSense rear view with all four bumpers and triggers outlined](docs/images/remap/dualsense-back.png) |
 
-The host preview shows the current source with every outline visible for inspection. [Remapping overview](docs/images/remap/overview.png) · [Binding editor](docs/images/remap/editor.png) · [Editor guide](docs/WEBUI_REMAP.md)
+The host preview shows the current source. The four separate views highlight every button for inspection. [Binding editor](docs/images/remap/editor.png) · [Editor guide](docs/WEBUI_REMAP.md)
 
 ## Quick start
 
@@ -51,6 +53,10 @@ The host preview shows the current source with every outline visible for inspect
 ### Edit from your phone
 
 With your PS5 and phone on the same trusted home network, open **On phone → Enable phone access** in the WebUI. Scan the QR code or enter the displayed IP address and port, then enter the two groups of four digits shown on the console. On your phone, select an existing profile and choose **Save changes**. The payload reloads the active profile without a restart.
+
+![Phone setup popup with QR code, full IPv4 address and port, and a PIN in two groups of four](docs/images/remap/phone-setup.png)
+
+The screenshot uses an example address and PIN. Use the values shown on your PS5.
 
 Phone access starts off, lasts up to one hour and can be ended from **On phone → Turn off**. The code is valid for five minutes and one use. Phone access uses local HTTP and is limited to existing profile edits. [Phone setup and limits](docs/development/LOADING.md#edit-from-your-phone)
 
