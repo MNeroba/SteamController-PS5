@@ -1,8 +1,8 @@
 # Image-based button remapping
 
-**Evidence:** `VERIFIED_HOST_TEST` (181 Microsoft Edge browser checks + nine portable asset/geometry/embedding tests); `VERIFIED_PS5_BUILD`. Actual portal operation on PS5 FW 12.00 remains **NOT_RUN / BLOCKED_HARDWARE**.
+**Evidence:** `VERIFIED_HOST_TEST` (246 Chromium checks and eight portable controller asset/embedding tests) and `VERIFIED_PS5_BUILD` for the November 28 contour update. Actual portal operation on the target PS5 remains **NOT_RUN / BLOCKED_HARDWARE**.
 
-![Steam Controller → DualSense](images/remap-desktop.png)
+![Steam Controller → DualSense](images/remap/overview.png)
 
 ## Use
 
@@ -17,12 +17,12 @@ The **Import** action validates input/output IDs and known setting keys before c
 
 The **Import** action merges settings: values present in the file replace the current values, while omitted settings are preserved. An empty or `NONE` activator value clears that activator. `NONE`/empty activators do not appear as phantom “Nothing” actions. Face-button assignments use the PlayStation glyphs (✕ ○ □ △) in visible summaries; their accessible labels retain the spoken button names.
 
-[Back / top screenshot](images/remap-desktop-back.png) · [Editor screenshot](images/remap-editor.png) · [Mobile screenshot](images/remap-mobile.png)
+[All four controller views](../README.md#visual-remapping) · [Editor screenshot](images/remap/editor.png)
 
 ## Implementation and build
 
 - `payload/web/index.html`: production HTML/CSS/JS; one logical key per input across both views; transient editor state is separate from profile state. No PS5 ABI or new output protocol IDs.
-- `payload/web/controllers/layouts.json`: keeps the Steam reference dimensions and records the manually checked DualSense button centers. DualSense front/back L1/R1 regions target the upper bumper buttons; L2/R2 target the lower triggers. Triangle and circle centers are aligned to the supplied source artwork. The four user-provided transparent WebPs and rights notice are unchanged.
+- `payload/web/controllers/layouts.json` defines outlines in each source image's logical coordinates. Curved SVG paths trace irregular controls and also serve as their pointer targets. Bumpers and triggers appear on each rear view, with an upper bumper and a lower trigger on each side.
 - Keep Steam logical `iw`/`ih` and `vb` values: front decodes at 1500×1091 but its geometry is 2566×1867; back is 1400×1007 with 2136×1536 geometry. SVG scales the image into that coordinate system.
 - `payload/gen_html.py`: embeds the four WebPs and geometry alongside the existing icons in the generated header. The generator works from any current directory. Never edit `webui_html.h` manually.
 - `payload/Makefile`: artwork, layout JSON and button icons are dependencies of `webui_html.h`. No CDN, remote font or framework is needed. The dev.3 generated page is 695,105 UTF-8 bytes; historical measurement records below retain their original values. On coarse pointers, destination hotspots accept taps up to 16 CSS pixels outside the visible shape; selection prioritizes actual SVG fill containment, then distance to the transformed shape boundary (curves sampled with segments no longer than one CSS pixel), with center distance as a tie breaker. Front/back shoulder fills and neighboring D-pad/triangle zones are disjoint.
@@ -54,7 +54,7 @@ playwright-cli run-code --filename tests/webui_remap_browser.js
 playwright-cli close
 ```
 
-Require the returned object to contain `result: PASS` and at least `checks: 220`; the workflow also parses the JSON result so a displayed CLI error cannot pass on shell status alone. The scenario creates its own clean tab, resets only the loopback fixture profile via HTTP, and checks calibrated front/back L1/R1 targets and face centers, Shift semantics, symbol labels, grouped outputs, staged DualSense assignment and Cancel, Merge import and `NONE` normalization, all physical input/output hotspots, activators, QAM reservation, token-bearing save/reload, profile switching, keyboard behavior, responsive layout, expanded coarse-pointer hit targets and Games/Settings navigation. Four screenshots are written to `output/playwright/`. The current GitHub Host workflow requires 220 checks on every push; [run 38070068676](https://github.com/MNeroba/SteamController-PS5/actions/runs/38070068676) passed the normal suite, ASan/UBSan and Chromium browser regression for the published security follow-up. Machine-readable results from this execution are in [webui-remap-host-results.json](webui-remap-host-results.json).
+Require `result: PASS` with at least 220 checks. The scenario uses a clean tab and resets only the loopback fixture profile. It checks both rear orientations, photo-aligned hit areas, every mapped physical input and output, activators, symbol labels, staged assignment and Cancel, merge import, save/reload, profile switching, keyboard behavior, responsive layout and Games/Settings navigation. The README gallery uses the same generated page with all button outlines visible. Earlier browser evidence is recorded in [webui-remap-host-results.json](webui-remap-host-results.json).
 
 The fixture binds only 127.0.0.1:8765, uses the deliberately public `preview-only` token and RAM-only profiles. On startup it builds `tests/webui_profile_fixture.c`, which delegates normalization to the production C parser/formatter. Host regression also checks hostile file rejection, failed/incomplete readback, concurrent editing/profile switching during Save, all SVG output fills at a two-source-pixel sampling interval, touch boundaries on front/back at 390/768 pixels, and access to the final output group in the mobile dialog. It does not simulate PS5 device services or establish console HTTP, filesystem, browser, USB, controller, firmware or rendering compatibility. H-09 on the real portal remains required; verify both transports, profile persistence and live highlighting there. Asset publication was authorized by the owner; see [provenance](PROVENANCE.md) and the artwork notice.
 

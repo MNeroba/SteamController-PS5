@@ -10,7 +10,7 @@ USB-C & Valve Puck · visual remapping · gyro · trackpads · haptics
 [![Host tests](https://github.com/MNeroba/SteamController-PS5/actions/workflows/host-tests.yml/badge.svg)](https://github.com/MNeroba/SteamController-PS5/actions/workflows/host-tests.yml)
 [![PS5 build](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml/badge.svg)](https://github.com/MNeroba/SteamController-PS5/actions/workflows/ps5-cross-build.yml)
 
-![Image-based controller remapping in the host preview](docs/images/remap-desktop.png)
+![Steam Controller A mapped to DualSense Cross in the WebUI](docs/images/remap/overview.png)
 
 </div>
 
@@ -74,13 +74,14 @@ Review the report before sharing it: profile names or USB paths may need further
 
 ## Visual remapping
 
-Select a Steam input, choose DualSense outputs, and stage changes before saving. Front/back views cover stick clicks, grip buttons and trackpad clicks. In the back view, physical **L is on the right**, **R on the left**.
+Select a Steam input, choose DualSense outputs, and stage changes before saving. Use **Back / top** for the bumpers, triggers and Steam rear buttons. In that view, physical **L is on the right** and **R is on the left**.
 
-| Back controls | Binding editor |
+| Steam Controller | DualSense |
 | --- | --- |
-| ![Back mappings](docs/images/remap-desktop-back.png) | ![Binding editor](docs/images/remap-editor.png) |
+| ![Steam Controller front with all button outlines](docs/images/remap/steam-controller-front.png) | ![DualSense front with all button outlines](docs/images/remap/dualsense-front.png) |
+| ![Steam Controller back with bumpers, triggers and rear buttons outlined](docs/images/remap/steam-controller-back.png) | ![DualSense back with bumpers and triggers outlined](docs/images/remap/dualsense-back.png) |
 
-These screenshots come from the real **host fixture**, not a PS5 session; they illustrate remapping rather than current release Settings screens. [Editor behavior and verification →](docs/WEBUI_REMAP.md)
+The gallery shows every button outline at once in the host preview of the current source. [Binding editor screenshot](docs/images/remap/editor.png) · [Editor behavior and verification](docs/WEBUI_REMAP.md)
 
 ## Build from source
 

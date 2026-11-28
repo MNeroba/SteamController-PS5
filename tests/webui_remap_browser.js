@@ -113,7 +113,57 @@ async (page) => {
   await page.waitForFunction(()=>cur['B.long']===undefined);
   await page.locator('#save').click();await page.waitForFunction(()=>!saving);
   auditCheck(await page.evaluate(()=>!cur['B.long']&&!cur['B.toggle']&&!cur['B.turbo']&&!cur['LT.full']),'Save persists cleared activators and flags through the production merge parser');
-  // Real touch event at the former L1/L2 overlap, rather than hotspot centers.
+  const overlap = (svg, selector) => {
+    const screen = svg.getScreenCTM(), fromScreen = screen.inverse();
+    const shapes = [...svg.querySelectorAll(selector)].map(g => {
+      const shape = g.querySelector('.s'), toScreen = shape.getScreenCTM();
+      const fromView = toScreen.inverse().multiply(screen);
+      const bounds = shape.getBoundingClientRect();
+      const start = new DOMPoint(bounds.left,bounds.top).matrixTransform(fromScreen);
+      const end = new DOMPoint(bounds.right,bounds.bottom).matrixTransform(fromScreen);
+      return {shape,fromView,start,end,key:g.dataset.out||g.dataset.k};
+    });
+    for (const [i,a] of shapes.entries()) for (const b of shapes.slice(i+1)) {
+      for (let x=Math.max(a.start.x,b.start.x);x<Math.min(a.end.x,b.end.x);x+=2)
+        for (let y=Math.max(a.start.y,b.start.y);y<Math.min(a.end.y,b.end.y);y+=2) {
+          const point = new DOMPoint(x,y);
+          if (a.shape.isPointInFill(point.matrixTransform(a.fromView)) &&
+              b.shape.isPointInFill(point.matrixTransform(b.fromView))) return a.key+'/'+b.key;
+        }
+    }
+    return null;
+  };
+  for (const v of ['front','back']) {
+    await view('steam',v);
+    const result=await page.locator('#steamStage svg:not([hidden])').evaluate(overlap,'.ctl');
+    auditCheck(!result,'all Steam control fills disjoint '+v+' (overlap: '+result+')');
+  }
+  await view('steam','front');
+  // Probe visible edges and the surrounding plastic in artwork coordinates.
+  for (const [v,points] of [
+    ['front',[[625,244,'TOUCHPAD'],[260,418,'UP'],[228,446,'LEFT'],
+      [625,572,'PS'],[993,570,'CROSS'],[907,483,'SQUARE'],[1078,483,'CIRCLE'],
+      [589,579,null],[338,288,null]]],
+    ['back',[[990,250,'L1'],[974,274,'L2'],[1010,390,null],[1025,245,null],
+      [260,250,'R1'],[270,274,'R2'],[250,390,null],[225,245,null]]]
+  ]){
+    await view('dual',v);
+    const hits=await page.locator('#dualStage svg:not([hidden])').evaluate((svg,points)=>{
+      const matrix=svg.getScreenCTM();
+      const shapes=[...svg.querySelectorAll('.destination')].map(g=>{
+        const shape=g.querySelector('.s');
+        return {key:g.dataset.out,shape,inverse:shape.getScreenCTM().inverse()};
+      });
+      return points.map(([x,y])=>{
+        const point=new DOMPoint(x,y).matrixTransform(matrix);
+        return shapes.filter(({shape,inverse})=>shape.isPointInFill(point.matrixTransform(inverse))).map(s=>s.key);
+      });
+    },points);
+    points.forEach(([x,y,key],i)=>auditCheck(hits[i].join(',')===(key||''),
+      'artwork edge '+v+' at '+x+','+y+' uses '+(key||'no output')+' (got '+hits[i].join(',')+')'));
+  }
+  await view('dual','front');
+  // Exercise real touches near the physical bumper/trigger seams.
   const auditTouch=await page.context().browser().newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
   try{
     const tp=await auditTouch.newPage();await tp.goto('http://127.0.0.1:8765/#remap/profile=default/buttons');
@@ -122,24 +172,14 @@ async (page) => {
     for(const width of [390,768]){
       await tp.setViewportSize({width,height:844});
       for(const [v,points] of [
-        ['front',[[262,262,'L1'],[260,288,'L2'],[260,306,'L2'],[990,262,'R1'],[994,288,'R2'],[994,306,'R2']]],
-        ['back',[[980,300,'L1'],[975,380,'L2'],[274,300,'R1'],[279,380,'R2']]]
+        ['front',[[260,418,'UP'],[228,446,'LEFT'],[625,244,'TOUCHPAD'],[1078,483,'CIRCLE']]],
+        ['back',[[980,250,'L1'],[975,268,'L2'],[274,249,'R1'],[279,270,'R2'],
+          [977,256,'L1'],[272,257,'R1']]]
       ]){
         await tp.locator('.viewswitch[data-controller="dual"] [data-view="'+v+'"]').tap();
         await tp.locator('#dualStage').scrollIntoViewIfNeeded();
-        const overlap=await tp.evaluate(()=>{
-          const svg=document.querySelector('#dualStage svg:not([hidden])'),hits=[...svg.querySelectorAll('.destination')];
-          const shapes=hits.map(g=>({key:g.dataset.out,shape:g.querySelector('.s'),box:g.querySelector('.s').getBBox()}));
-          for(let x=150;x<=1120;x+=2)for(let y=230;y<=690;y+=2){
-            const point=new DOMPoint(x,y).matrixTransform(svg.getScreenCTM());
-            const inside=shapes.filter(({shape,box})=>{
-              const p=point.matrixTransform(shape.getScreenCTM().inverse());
-              return p.x>=box.x&&p.x<=box.x+box.width&&p.y>=box.y&&p.y<=box.y+box.height&&shape.isPointInFill(p);
-            });
-            if(inside.length>1)return inside.map(s=>s.key).join('/');
-          }return null;
-        });
-        auditCheck(!overlap,'all output fills disjoint across their full sampled geometry '+v+':'+width);
+        const result=await tp.locator('#dualStage svg:not([hidden])').evaluate(overlap,'.destination');
+        auditCheck(!result,'all DualSense output fills disjoint '+v+':'+width+' (overlap: '+result+')');
         for(const [x,y,key] of points){
           const point=await tp.evaluate(([x,y])=>new DOMPoint(x,y).matrixTransform(document.querySelector('#dualStage svg:not([hidden])').getScreenCTM()).toJSON(),[x,y]);
           await tp.touchscreen.tap(point.x,point.y);
@@ -152,17 +192,22 @@ async (page) => {
   if(auditFailures.length)throw new Error('Audit regressions: '+auditFailures.join('; '));
   await page.request.post('http://127.0.0.1:8765/api/profile?id=default',{headers:{Authorization:'Bearer preview-only'},data:base});
   await page.reload();await page.waitForFunction(()=>saved!==''&&cur.A==='CROSS');
-  const calibrated = await page.evaluate(() => {
-    const front=Object.fromEntries(SHAPES.dual.front.shapes.map(s=>[s.id,s]));
-    const back=Object.fromEntries(SHAPES.dual.back.shapes.map(s=>[s.id,s]));
-    const cy=s=>s.pts.reduce((n,p)=>n+p[1],0)/s.pts.length;
-    return {frontShoulders:[!!front.l1,!!front.r1,!!front.l2,!!front.r2],
-      tri:[front.tri.cx,front.tri.cy],circle:[front.ci.cx,front.ci.cy],
-      backL1:cy(back.l1),backL2:cy(back.l2),backR1:cy(back.r1),backR2:cy(back.r2)};
-  });
-  check(calibrated.frontShoulders.every(v=>!v),'shoulder hotspots are not drawn on the front view');
-  check(calibrated.backL1<calibrated.backL2&&calibrated.backR1<calibrated.backR2,'back L1/R1 target upper bumper buttons');
-  check(calibrated.tri[0]===994&&calibrated.tri[1]===360&&calibrated.circle[0]===1078&&calibrated.circle[1]===440,'face-button overlays centered on source artwork');
+  check(await page.locator('#dualStage svg[data-view=front] :is([data-out=L1],[data-out=R1],[data-out=L2],[data-out=R2])').count()===0,
+    'shoulder hotspots are not drawn on the front view');
+  for (const [device,stage,attribute,keys] of [
+    ['steam','#steamStage','data-k',['LB','RB','LT','RT','L4','R4']],
+    ['dual','#dualStage','data-out',['L1','R1','L2','R2']]
+  ]){
+    await view(device,'back');
+    const boxes=await page.locator(stage+' svg:not([hidden])').evaluate((svg,{attribute,keys})=>
+      keys.map(key=>{
+        const {x,y}=svg.querySelector(`[${attribute}=${key}] .s`).getBBox();
+        return {x,y};
+      }),{attribute,keys});
+    check(boxes.every((b,i)=>i%2!==0||b.x>boxes[i+1].x),device+' physical left is on the right in back view');
+    check(boxes[0].y<boxes[2].y&&boxes[1].y<boxes[3].y,device+' bumpers sit above triggers in back view');
+    await view(device,'front');
+  }
   const decoded = await page.evaluate(async () => {
     const result = [];
     for (const device of ['steam', 'dual']) for (const view of ['front', 'back']) {
@@ -230,8 +275,17 @@ async (page) => {
     const keys = await page.locator('#sheetDual svg:not([hidden]) .destination').evaluateAll(gs=>gs.map(g=>g.dataset.out));
     for(const k of keys){
       const spot = page.locator(`#sheetDual svg:not([hidden]) .destination[data-out="${k}"]`);
-      await spot.click();check(await page.evaluate(k=>draft[act].has(k),k),'physical output hotspot '+v+':'+k);
-      await spot.click();
+      // A curved bumper's bounding-box center can fall below its painted face.
+      const bumper = {L1:[990,250], R1:[260,250]}[k];
+      const click = async () => {
+        if (!bumper) return spot.click();
+        const point = await spot.evaluate((g,[x,y]) =>
+          new DOMPoint(x,y).matrixTransform(g.ownerSVGElement.getScreenCTM()).toJSON(),bumper);
+        return page.mouse.click(point.x,point.y);
+      };
+      await click();
+      check(await page.evaluate(k=>draft[act].has(k),k),'physical output hotspot '+v+':'+k);
+      await click();
     }
   }
   await view('sheet','front');

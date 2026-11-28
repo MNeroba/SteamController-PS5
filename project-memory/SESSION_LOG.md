@@ -1597,3 +1597,10 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 
 - Completed the remaining audit list: truthful haptic enqueue status, diagnostic-grade log redaction, HEAD/OPTIONS/Allow, read-route dispatch-lock narrowing, precise recover/delete statuses, profile rename/duplicate and browser mutation-flow tests.
 - Published v1.6.2-experimental from 9afa9f6 by DEV workflow 46081216835; gates Host 46080984292, PS5 46080984319, smoke 46080984293, secret 46080984349. Physical gates remain NOT_RUN.
+
+## 2026-11-28 — WebUI controller contours and README gallery
+
+- Owner requested photo-aligned DualSense outlines and screenshots of every button on both sides of both controllers, then explicitly authorized a GitHub source push and README image update.
+- Local main was one commit ahead of origin `c8424afe89ba2436ca0ad8dfea0cc201e9efcf60` with the shoulder-only-back change at `dd57df9b26e0ddaef69d0dd7db0ba3ce5d85cf93`; its accompanying local geometry and test edits were superseded by the traced curves and real-SVG regressions. Both upstream reference pins remain the audited Puckbridge `78460113ef7c48502c765a1f83ba34d53c977134` and OmniPad `b7682efce18ee0a8d7c80bbc90afbce72151ef96`.
+- Updated `README.md`, `docs/WEBUI_REMAP.md` and `docs/images/remap/`. Earlier image evidence remains at the original paths. Source screenshots use the generated page in the loopback fixture. Host regression, ASan/UBSan, Chromium and SDK build evidence are in TEST_LOG.
+- Use `git log --oneline -3` and `gh run list --branch main` to locate the source publication and exact-source checks. For further controller artwork changes use `python3 payload/gen_html.py` then `bash scripts/run_webui_browser.sh`. Physical PS5 H-09 remains `NOT_RUN`.

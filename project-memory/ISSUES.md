@@ -364,3 +364,7 @@ Owner selected no pairing code and PS5-only access, then requested automatic Med
 Exact-source push Host43702935960, SDK43702935974 and secret scan43702935930 succeeded. The release workflow repeated normal Host, ASan/UBSan, Chromium, deterministic assets, SDKv0.43/LLVM18, package/dependency and checksum gates. The earlier DEV workflow43702614078 was deliberately cancelled before creating a tag to correct misleading tile-status wording. Historical releases and the stable hardware gate remain unchanged.
 
 Downloaded assets and GitHub metadata are retained in output/dev9-published. Release digest is from the published Linux artifact and differs from local SDK builds. Next: controlled physical test with exact release SHA, console firmware/loader, native DualSense and USB/Puck status; do not claim compatibility or post to others without an explicit request. Previous dev.8 and earlier tags/assets are unchanged.
+
+## 2026-11-28 — WebUI shoulder outlines
+
+**Resolved on host.** DualSense's rear highlight extended into the white shell and missed the curved bumper/trigger seam. The browser regression reproduces the mismatched hit regions and confirms the calibrated SVG paths. All four views have updated README images. Physical browser behavior remains H-09 / `NOT_RUN`.

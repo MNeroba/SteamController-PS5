@@ -139,3 +139,7 @@ Reviewed for API/behavior facts only; no implementation code was copied.
 - `itsPLK/ps5-payload-manager` and `owendswang/ps5-web-file-manager`: `param.json` category `65536`, `deeplinkUri` and 512×512 `icon0.png` schema confirmation.
 
 These are engineering references; their licenses and notices remain their own.
+
+## Controller outline gallery — 2026-11-28
+
+The SVG curves in `payload/web/controllers/layouts.json` were drawn against the four owner-authorized WebPs listed above. The images in `docs/images/remap/` are new Chromium screenshots of the generated WebUI served by the loopback host fixture. The same artwork rights and attribution apply.

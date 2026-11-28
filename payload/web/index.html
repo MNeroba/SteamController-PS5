@@ -168,10 +168,10 @@ nav.sub button[aria-current=true]{background:var(--panel2);border-color:var(--li
 .mapping-badges{display:flex;flex-wrap:wrap;justify-content:center;gap:6px;margin-top:6px}
 .mapping-badges .chip{display:inline-flex;align-items:center;gap:5px}
 .ctl,.destination{cursor:pointer;outline:none}
-.controller-stage .s{fill:transparent;stroke:transparent;stroke-width:3;vector-effect:non-scaling-stroke;transition:fill .12s,stroke .12s;pointer-events:all}
+.controller-stage .s{fill:transparent;stroke:transparent;stroke-width:1.75;stroke-linejoin:round;vector-effect:non-scaling-stroke;transition:fill .12s,stroke .12s;pointer-events:all}
 .ctl.changed .s{stroke:var(--accent);stroke-width:1.5}
 .ctl:hover .s,.ctl:focus .s,.informational:hover .s,.informational:focus .s{fill:#6f9bff33;stroke:var(--accent)}
-.ctl.sel .s{fill:#6f9bff40;stroke:var(--accent);stroke-width:3}
+.ctl.sel .s{fill:#6f9bff40;stroke:var(--accent);stroke-width:2}
 .ctl.live .s{fill:#6f9bff88;stroke:var(--accent)}
 .destination.assigned .s{fill:#62dba633;stroke:var(--ok)}
 .destination:hover .s,.destination:focus .s{fill:#62dba655;stroke:var(--ok)}
@@ -185,6 +185,7 @@ nav.sub button[aria-current=true]{background:var(--panel2);border-color:var(--li
 .assignment-list .list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr))}
 .sheetpreview{display:flex;align-items:center;gap:12px;margin:8px 0}
 .sheetpreview .controller-stage{width:220px;height:154px;aspect-ratio:auto;flex-shrink:0}
+.sheetpreview .controller-stage .s{stroke-width:1.25}
 .sheetpreview .viewswitch{display:inline-flex}
 .sheetpreview .mapping-badges{justify-content:flex-start}
 @media(max-width:720px){.controller-pair{grid-template-columns:minmax(0,1fr);gap:24px}.controller-workspace{padding:14px}.controller-head h3{font-size:1rem}.assignment-list .list{grid-template-columns:minmax(0,1fr)}.sheetpreview .controller-stage{width:150px;height:108px}.legend{flex-wrap:wrap;gap:8px!important}}
@@ -771,6 +772,7 @@ function hotspot(s,parent){
   if(s.t==="c")e=svgEl("circle",{cx:s.cx,cy:s.cy,r:s.r},parent);
   else if(s.t==="r"){e=svgEl("rect",{x:s.x,y:s.y,width:s.w,height:s.h,rx:s.rx},parent);cx=s.x+s.w/2;cy=s.y+s.h/2}
   else if(s.t==="e")e=svgEl("ellipse",{cx:s.cx,cy:s.cy,rx:s.rx,ry:s.ry},parent);
+  else if(s.t==="path")e=svgEl("path",{d:s.d},parent);
   else e=svgEl("polygon",{points:s.pts.map(p=>p.join(",")).join(" ")},parent);
   e.setAttribute("class","s");if(s.rot)e.setAttribute("transform",`rotate(${s.rot} ${cx} ${cy})`);
 }

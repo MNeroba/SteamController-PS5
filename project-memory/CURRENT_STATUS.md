@@ -1,5 +1,11 @@
 # Current — 1.6.2 Experimental (2026-11-28)
 
+## WebUI controller contours — 2026-11-28
+
+The source diagrams now follow the supplied controller photos. DualSense uses curved rear bumper and trigger outlines and realigned front controls. Steam uses the same SVG renderer for its cross-shaped D-pad, trackpads, rear controls and other calibrated regions. The README gallery shows all four views with the button outlines visible. Local Chromium passed 246 checks, including clicks, edge probes and touch at 390 and 768 px. Normal host, ASan/UBSan and the SDK v0.43 cross-build passed. Hardware remains `NOT_RUN`. The published v1.6.2 experimental ELF predates the update.
+
+To verify the update again, generate the page with `python3 payload/gen_html.py` and run `bash scripts/run_webui_browser.sh` with Playwright CLI 0.1.22. Use `gh run list --branch main` for the exact-source GitHub checks.
+
 ## M1-266 — v1.6.2-experimental final WebUI audit fixes (2026-11-28)
 
 Published **v1.6.2-experimental** from [`9afa9f6fa05dffe3f2308ee3b94f670fcc40e394`](https://github.com/MNeroba/SteamController-PS5/tree/9afa9f6fa05dffe3f2308ee3b94f670fcc40e394) by [DEV workflow 46081216835](https://github.com/MNeroba/SteamController-PS5/actions/runs/46081216835) at 2026-11-27T23:15:29Z. Seven assets, one ELF `SteamController-PS5-v1.6.2-experimental.elf`, 2,127,824 bytes, SHA-256 `da9663f1c39e7d40e4932b892ea0dff381111f527f02a99e90cf7f77dd80ba86`; downloaded sidecar matched.

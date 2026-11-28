@@ -3,7 +3,6 @@
 import base64
 import hashlib
 import json
-import math
 import re
 import shutil
 import subprocess
@@ -57,47 +56,22 @@ class Controllers(unittest.TestCase):
         self.assertNotIn('mute', keys)
         self.assertEqual(keys['tp'], 'TOUCHPAD')
 
-    def test_geometry_and_back_orientation(self):
+    def test_steam_front_logical_coordinates(self):
         self.assertEqual(LAYOUTS['steam']['front']['iw'], 2566)
         self.assertEqual(LAYOUTS['steam']['front']['vb'], '170 120 2230 1640')
-        for device in ('steam', 'dual'):
-            shapes = {s['id']: s for s in LAYOUTS[device]['back']['shapes']}
-            for left, right in [('l1', 'r1'), ('l2', 'r2')]:
-                self.assertGreater(shapes[left]['pts'][0][0], shapes[right]['pts'][0][0])
-        shapes = {s['id']: s for s in LAYOUTS['steam']['back']['shapes']}
-        self.assertGreater(shapes['l4']['cx'], shapes['r4']['cx'])
 
-    def test_dualsense_trigger_and_face_button_calibration(self):
-        # Coordinates use the supplied image's 1254 x 1254 source-pixel space.
-        front = {s['id']: s for s in LAYOUTS['dual']['front']['shapes']}
-        for shoulder in ('l1', 'r1', 'l2', 'r2'):
-            self.assertNotIn(shoulder, front)
-        self.assertLessEqual(abs(front['tri']['cx'] - 994), 2)
-        self.assertLessEqual(abs(front['tri']['cy'] - 360), 2)
-        self.assertLessEqual(abs(front['ci']['cx'] - 1078), 2)
-        self.assertLessEqual(abs(front['ci']['cy'] - 440), 2)
-
-        back = {s['id']: s for s in LAYOUTS['dual']['back']['shapes']}
-        center_y = lambda shape: sum(point[1] for point in shape['pts']) / len(shape['pts'])
-        center_x = lambda shape: sum(point[0] for point in shape['pts']) / len(shape['pts'])
-        self.assertLess(center_y(back['l1']), center_y(back['l2']))
-        self.assertLess(center_y(back['r1']), center_y(back['r2']))
-        self.assertGreater(center_x(back['l1']), center_x(back['r1']))
+    def test_dualsense_shoulders_only_on_back(self):
+        ids = {view: {s['id'] for s in LAYOUTS['dual'][view]['shapes']}
+               for view in ('front', 'back')}
+        shoulders = {'l1', 'r1', 'l2', 'r2'}
+        self.assertTrue(ids['front'].isdisjoint(shoulders))
+        self.assertTrue(shoulders.issubset(ids['back']))
 
     def test_informational_controls_not_mappings(self):
         for key in ('grl', 'grr', 'usbc', 'puck'):
             self.assertNotIn(key, mapping('SOURCE_KEYS'))
         self.assertIn('const RESERVED="QAM"', HTML)
         self.assertIn('if(k===RESERVED)', HTML)
-
-    def test_dualsense_shoulders_have_disjoint_fills(self):
-        # Rotation-aware vertical extents prove the ellipses cannot overlap;
-        # back polygons occupy separate y ranges. Browser tests additionally
-        # sample the actual SVG fills and exercise boundary touch coordinates.
-        shapes = {s['id']: s for s in LAYOUTS['dual']['back']['shapes']}
-        for bumper, trigger in (('l1', 'l2'), ('r1', 'r2')):
-            a, b = shapes[bumper], shapes[trigger]
-            self.assertLess(max(p[1] for p in a['pts']), min(p[1] for p in b['pts']))
 
     def test_self_contained_generator_roundtrip(self):
         with tempfile.TemporaryDirectory() as tmp:
@@ -120,6 +94,7 @@ class Controllers(unittest.TestCase):
                     self.assertEqual(base64.b64decode(v['img'].split(',')[1]),
                                      (WEB / 'controllers' / v['asset']).read_bytes())
                     self.assertEqual(v['vb'], LAYOUTS[device][view]['vb'])
+                    self.assertEqual(v['shapes'], LAYOUTS[device][view]['shapes'])
             self.assertNotRegex(text, r'<(?:script|link)[^>]+(?:src|href)="https?://')
 
     def test_makefile_tracks_asset_changes(self):
