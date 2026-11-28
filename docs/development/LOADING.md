@@ -49,7 +49,7 @@ The console listener keeps its IPv4 loopback binding and Host/Origin validation.
 ## Edit from your phone
 
 1. Put the phone and PS5 on the same trusted home network. On the PS5 WebUI, open **On phone** in the header and select **Enable phone access**.
-2. Scan the QR code or enter the displayed `http://IP:port/` address. Enter the eight-digit code on your phone within five minutes.
+2. Scan the QR code or enter the displayed `http://IP:port/` address. Enter the two groups of four digits on your phone within five minutes. You can enter or paste them with or without the space.
 3. Select an existing profile, edit your bindings, then choose **Save changes**. Saving reloads the active profile. The setup window can be closed on PS5 while the phone remains paired.
 4. Select **Turn off** on PS5 to revoke access. **New code** revokes the preceding session and starts a fresh one. Access also expires after one hour or when the payload stops.
 

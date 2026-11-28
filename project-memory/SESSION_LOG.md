@@ -1614,3 +1614,5 @@ Downloaded assets and GitHub metadata are retained in output/dev9-published. Rel
 
 - Owner chose the header popup variant and authorized the next experimental release. Implemented the UI, offline QR, numeric address, one-use pairing, existing-profile save/readback and revocation. Retained console loopback startup and the source/build prerequisite of SDK v0.43. No native PS5 or firmware experiment.
 - Source baseline `d305e1a3f371a29d7536d9f065acf578ae0e6ad0`. Wait for exact-source main Host, PS5 and secret-scan workflows before `gh workflow run dev-release.yml --ref main -f source_sha=<full-tested-sha> -f version=v1.6.3-experimental`. Then verify the acknowledged tag, the seven assets and the downloaded checksum.
+
+- The owner requested a visibly grouped PIN and asked about IP/port clipping. The first candidate already corrected the field width. Cancelled workflow 46089336688 after validation and before tag creation to include the grouped PIN in the same v1.6.3 release. Browser checks now measure the full maximum-length address at 320 px and desktop and exercise grouped and ungrouped entry. The enrollment API continues to receive exactly eight digits.

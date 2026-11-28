@@ -338,6 +338,8 @@ dialog.profile-guard::backdrop{background:#0009}
 .phone-dialog input{width:100%;min-height:42px;padding:8px;border:1px solid var(--line);border-radius:8px;background:var(--panel2);color:var(--text)}
 .phone-dialog input,.phone-dialog output{font-family:ui-monospace,monospace}
 #phoneAddress{font-size:.75rem}
+#phoneCodeRow{margin-top:6px}
+#phoneCode{display:inline-block;white-space:nowrap;letter-spacing:.06em;font-weight:700}
 .phone-dialog .guard-actions{margin-top:14px}
 .phone-note{min-height:1.4em}
 .phone-client :is(#tabbtn-help,#tabbtn-games,#tab-help,#tab-games,#nowAction,#profileRecovery,#del,#dup,.use-profile){display:none !important}
@@ -610,7 +612,7 @@ dialog.profile-guard::backdrop{background:#0009}
   <h3 id="phonePairHeading">Connect to the PS5</h3>
   <p>Enter the one-time code from <strong>On phone</strong> on your PS5.</p>
   <form id="phonePairForm">
-    <label>One-time code <input id="phonePin" required inputmode="numeric" pattern="[0-9]{8}" maxlength="8" autocomplete="one-time-code"></label>
+    <label>One-time code <input id="phonePin" required inputmode="numeric" pattern="[0-9]{4} ?[0-9]{4}" maxlength="9" placeholder="0000 0000" autocomplete="one-time-code"></label>
     <p id="phonePairNote" class="phone-note" role="status"></p>
     <button class="primary" type="submit">Connect</button>
   </form>
@@ -776,7 +778,7 @@ $("#phonePairForm").onsubmit=async event=>{
   const input=$("#phonePin"),button=event.currentTarget.querySelector("button");
   button.disabled=true;
   try{
-    const response=await fetch("/api/phone/pair",{method:"POST",body:input.value});
+    const response=await fetch("/api/phone/pair",{method:"POST",body:input.value.replace(" ","")});
     const token=await response.text();
     if(!response.ok)throw new Error(token);
     if(!/^[a-f0-9]{64}$/.test(token))throw new Error("Invalid pairing response");
@@ -795,7 +797,8 @@ function paintPhone(info){
   $("#phoneStart").textContent=info.enabled?"New code":"Enable phone access";
   $("#phoneStop").hidden=$("#phoneState").hidden=!info.enabled;
   $("#phoneCodeRow").hidden=!info.code||info.paired;
-  $("#phoneCode").textContent=info.paired?"":info.code||"";
+  const code=info.paired?"":info.code||"";
+  $("#phoneCode").textContent=code.replace(/^([0-9]{4})([0-9]{4})$/,"$1 $2");
   $("#phoneAddress").value=info.url||"";
   $("#phoneNote").textContent=info.enabled?(info.paired?"Phone connected":info.code?
     "Scan the QR or open the address, then enter the code within five minutes.":"Choose New code to connect a phone."):"Phone access is off.";

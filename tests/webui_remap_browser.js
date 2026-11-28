@@ -35,10 +35,20 @@ async (page) => {
   await page.waitForFunction(()=>document.querySelector('#phoneNote').textContent==='Phone access is off.');
   check(!await page.locator('#phoneState').isVisible(),'opening phone popup does not enable LAN');
   await page.locator('#phoneStart').click();
-  await page.waitForFunction(()=>document.querySelector('#phoneCode').textContent.length===8);
+  await page.waitForFunction(()=>document.querySelector('#phoneCode').textContent==='5382 0741');
   check(await page.locator('#phoneAddress').inputValue()===phoneUrl &&
     await page.locator('#phoneQr').evaluate(canvas=>canvas.width>25&&canvas.width===canvas.height),
     'console shows matching LAN address, offline QR canvas and pairing code');
+  for(const width of [320,1440]){
+    await page.setViewportSize({width,height:1050});
+    const fits=await page.locator('#phoneAddress').evaluate(input=>{
+      const style=getComputedStyle(input),ctx=document.createElement('canvas').getContext('2d');
+      ctx.font=style.font;
+      return ctx.measureText('http://192.168.255.254:65535/').width <=
+        input.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight);
+    });
+    check(fits,'long IPv4 address and port fit at '+width+' px');
+  }
   await page.locator('#phoneDialog').screenshot({path:'output/playwright/phone-popup.png'});
   await page.locator('#phoneDialog form button').click();
   check(enabled,'closing setup popup keeps phone session active');
@@ -67,7 +77,7 @@ async (page) => {
     await phone.locator('#phonePin').fill('12345678');
     await phone.locator('#phonePairForm button').click();
     await phone.getByText('Code incorrect',{exact:true}).waitFor();
-    await phone.locator('#phonePin').fill(pin);
+    await phone.locator('#phonePin').fill('5382 0741');
     await phone.locator('#phonePairForm button').click();
     await phone.waitForFunction(()=>saved!==''&&cur.A==='CROSS');
     check(!await phone.locator('#phonePair').isVisible(),'valid pairing code unlocks the phone editor');

@@ -50,7 +50,7 @@ The host preview shows the current source with every outline visible for inspect
 
 ### Edit from your phone
 
-With your PS5 and phone on the same trusted home network, open **On phone → Enable phone access** in the WebUI. Scan the QR code or enter the displayed IP address and port, then enter the one-time code from the console. On your phone, select an existing profile and choose **Save changes**. The payload reloads the active profile without a restart.
+With your PS5 and phone on the same trusted home network, open **On phone → Enable phone access** in the WebUI. Scan the QR code or enter the displayed IP address and port, then enter the two groups of four digits shown on the console. On your phone, select an existing profile and choose **Save changes**. The payload reloads the active profile without a restart.
 
 Phone access starts off, lasts up to one hour and can be ended from **On phone → Turn off**. The code is valid for five minutes and one use. Phone access uses local HTTP and is limited to existing profile edits. [Phone setup and limits](docs/development/LOADING.md#edit-from-your-phone)
 

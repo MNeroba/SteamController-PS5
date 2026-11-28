@@ -12,7 +12,7 @@ DEV entries describe software and build verification. They do not establish phys
 
 ### New Features / Improvements
 
-- Open **On phone** in the PS5 WebUI to start a temporary phone session with an offline QR code, local IP and port, and an eight-digit one-time code.
+- Open **On phone** in the PS5 WebUI to start a temporary phone session with an offline QR code, local IP and port, and a one-time code displayed in two groups of four digits.
 - Edit and save existing profiles from the phone over the home network. The console controls a one-hour session and can revoke it at any time.
 - Add a README hero banner, controller gallery and quick-start instructions for phone access.
 
